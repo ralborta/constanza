@@ -9,7 +9,7 @@ cmds = [
   "corepack enable",
   "corepack prepare pnpm@8.15.0 --activate",
   "pnpm install --frozen-lockfile",
-  "cd infra/prisma && pnpm generate"
+  "cd infra/prisma && pnpm run generate"
 ]
 
 [phases.build]
