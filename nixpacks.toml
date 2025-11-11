@@ -1,0 +1,21 @@
+# Nixpacks configuration for Railway
+# Railway usa Nixpacks para detectar y construir la aplicación
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "pnpm"]
+
+[phases.install]
+cmds = [
+  "corepack enable",
+  "corepack prepare pnpm@8.15.0 --activate",
+  "pnpm install --frozen-lockfile"
+]
+
+[phases.build]
+cmds = [
+  "cd apps/${{RAILWAY_SERVICE_NAME}} && pnpm build"
+]
+
+[start]
+cmd = "cd apps/${{RAILWAY_SERVICE_NAME}} && pnpm start"
+

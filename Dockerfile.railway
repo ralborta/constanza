@@ -1,0 +1,33 @@
+# Dockerfile para Railway
+# Railway puede usar este Dockerfile si Nixpacks no funciona correctamente
+
+FROM node:20-alpine
+
+# Habilitar Corepack para pnpm
+RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+
+WORKDIR /app
+
+# Copiar archivos de configuración del monorepo
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY infra/prisma ./infra/prisma
+COPY packages ./packages
+
+# Instalar dependencias
+RUN pnpm install --frozen-lockfile
+
+# Copiar código de la app específica (se sobrescribe con RAILWAY_SERVICE_NAME)
+COPY apps ./apps
+
+# Generar Prisma Client
+RUN cd infra/prisma && pnpm generate
+
+# Build (se ejecuta según el servicio)
+# Railway inyectará el comando de build según el servicio
+
+# Exponer puerto
+EXPOSE $PORT
+
+# Start command (Railway lo sobrescribirá)
+CMD ["node", "apps/api-gateway/dist/index.js"]
+
