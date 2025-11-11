@@ -1,0 +1,4 @@
+# Railway ignore file
+# No ignorar pnpm-lock.yaml
+!pnpm-lock.yaml
+
