@@ -1,0 +1,3 @@
+# Migraciones de Prisma
+# Se generan con: pnpm prisma:migrate
+

@@ -1,0 +1,3 @@
+# Migraciones SQL de Supabase
+# Se aplican con: supabase db push
+
