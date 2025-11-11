@@ -19,7 +19,7 @@
     "pino": "^8.16.2",
     "pino-pretty": "^10.2.3",
     "zod": "^3.22.4",
-    "@prisma/client": "workspace:*",
+    "@constanza/prisma": "workspace:*",
     "bcryptjs": "^2.4.3"
   },
   "devDependencies": {

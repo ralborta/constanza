@@ -15,7 +15,7 @@
     "ioredis": "^5.3.2",
     "pino": "^8.16.2",
     "pino-pretty": "^10.2.3",
-    "@prisma/client": "workspace:*",
+    "@constanza/prisma": "workspace:*",
     "zod": "^3.22.4",
     "crypto": "^1.0.1"
   },
