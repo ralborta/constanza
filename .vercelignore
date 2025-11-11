@@ -1,0 +1,8 @@
+# Ignorar todo excepto apps/web
+*
+!apps/web
+!apps/web/**
+!package.json
+!pnpm-workspace.yaml
+!pnpm-lock.yaml
+
