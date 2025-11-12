@@ -30,12 +30,21 @@ RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 WORKDIR /app
 
-# Copiar node_modules y dist
-COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/apps/api-gateway/dist ./dist
-COPY --from=build /repo/apps/api-gateway/package.json ./
+# Copiar solo lo necesario para instalar deps de producción
+COPY --from=build /repo/package.json ./
+COPY --from=build /repo/pnpm-workspace.yaml ./
+COPY --from=build /repo/pnpm-lock.yaml ./
+COPY --from=build /repo/apps/api-gateway/package.json ./apps/api-gateway/package.json
+COPY --from=build /repo/infra ./infra
+
+# Instalar SOLO las dependencias de producción del servicio
+RUN pnpm install --frozen-lockfile --prod --filter "@constanza/api-gateway"
+
+# Copiar el código compilado
+COPY --from=build /repo/apps/api-gateway/dist ./apps/api-gateway/dist
 
 ENV NODE_ENV=production
 
-CMD ["node", "dist/index.js"]
+# Ejecutar desde /app (root del workspace)
+CMD sh -c "node apps/api-gateway/dist/index.js"
 
