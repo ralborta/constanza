@@ -7,8 +7,8 @@ FROM node:20-alpine AS base
 # Instalar dependencias del sistema necesarias para Prisma
 RUN apk add --no-cache openssl libc6-compat
 
-# Habilitar pnpm
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+# Habilitar pnpm (versión alineada con local)
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 WORKDIR /app
 
@@ -42,7 +42,7 @@ RUN pnpm --filter "@constanza/${SERVICE}" run build
 FROM node:20-alpine AS runner
 
 RUN apk add --no-cache openssl libc6-compat
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 WORKDIR /app
 

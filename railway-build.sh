@@ -6,7 +6,7 @@ set -e
 
 echo "🔧 Configurando pnpm..."
 corepack enable
-corepack prepare pnpm@8.15.0 --activate
+corepack prepare pnpm@9.12.0 --activate
 
 echo "📦 Instalando dependencias..."
 pnpm install --frozen-lockfile
