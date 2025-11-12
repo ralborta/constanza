@@ -15,8 +15,8 @@ COPY infra ./infra
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Generar Prisma directamente (sin pasar por script)
-RUN cd apps/rail-cucuru && pnpm exec prisma generate --schema=../../infra/prisma/schema.prisma
+# Generar Prisma directamente desde root usando path completo
+RUN ./node_modules/.bin/prisma generate --schema=infra/prisma/schema.prisma
 
 # Compilar
 RUN pnpm --filter "@constanza/rail-cucuru" run build
