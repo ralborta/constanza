@@ -195,6 +195,7 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
               sourceSystem: app.payment.sourceSystem,
               appliedAt: app.appliedAt,
               settledAt: app.payment.settledAt,
+              ts: app.appliedAt,
             })),
           ].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()),
         },

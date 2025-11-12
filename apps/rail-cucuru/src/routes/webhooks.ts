@@ -79,21 +79,26 @@ export async function webhookRoutes(fastify: FastifyInstance) {
       // Por ahora asumimos que viene en el body o lo obtenemos de otra forma
       const tenantId = body.tenant_id || 'default-tenant-id'; // Ajustar según tu lógica
 
-      // Buscar o crear payment
-      const payment = await prisma.payment.upsert({
+      // Buscar o crear payment (externalRef no es único, usamos findFirst + create)
+      let payment = await prisma.payment.findFirst({
         where: {
-          // Necesitas un unique constraint en external_ref o crear uno
-          // Por ahora usamos create + catch duplicate
-        },
-        update: {},
-        create: {
           tenantId,
-          sourceSystem: 'CUCURU',
-          method: 'TRANSFERENCIA',
-          status: 'APLICADO',
           externalRef: data.payment_id,
+          sourceSystem: 'CUCURU',
         },
       });
+
+      if (!payment) {
+        payment = await prisma.payment.create({
+          data: {
+            tenantId,
+            sourceSystem: 'CUCURU',
+            method: 'TRANSFERENCIA',
+            status: 'APLICADO',
+            externalRef: data.payment_id,
+          },
+        });
+      }
 
       // Crear payment applications
       for (const app of data.applications) {

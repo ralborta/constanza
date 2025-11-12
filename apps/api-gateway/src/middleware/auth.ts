@@ -13,13 +13,19 @@ declare module 'fastify' {
   }
 }
 
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    user: JWTPayload;
+  }
+}
+
 export async function authenticate(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
   try {
     await request.jwtVerify();
-    request.user = request.user as JWTPayload;
+    // request.user ya está tipado correctamente por la declaración del módulo
   } catch (err) {
     reply.status(401).send({ error: 'No autorizado' });
   }
