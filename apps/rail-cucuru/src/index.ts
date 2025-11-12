@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { webhookRoutes } from './routes/webhooks.js';
 import { healthRoutes } from './routes/health.js';
-import type { SimpleLogger } from '../../types.js';
+// SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const prisma = new PrismaClient();
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');

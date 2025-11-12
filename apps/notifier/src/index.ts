@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { sendEmail } from './channels/email.js';
 import { sendWhatsApp } from './channels/whatsapp.js';
 import { sendVoice } from './channels/voice.js';
-import type { SimpleLogger } from '../../types.js';
+// SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const prisma = new PrismaClient();
 

@@ -8,7 +8,7 @@ import { healthRoutes } from './routes/health.js';
 import { invoiceRoutes } from './routes/invoices.js';
 import { customerRoutes } from './routes/customers.js';
 import { kpiRoutes } from './routes/kpi.js';
-import type { SimpleLogger } from '../../types.js';
+// SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const server: FastifyInstance = Fastify({
   logger: {

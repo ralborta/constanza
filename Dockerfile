@@ -6,8 +6,8 @@ RUN apk add --no-cache openssl \
 
 WORKDIR /repo
 
-# Manifests primero para cache correcto
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+# Manifests + configs base primero para cache correcto
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.base.json types.d.ts ./
 COPY apps ./apps
 COPY packages ./packages
 COPY infra ./infra

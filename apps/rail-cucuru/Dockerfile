@@ -7,7 +7,7 @@ RUN apk add --no-cache openssl \
 WORKDIR /repo
 
 # Copiar archivos necesarios del monorepo
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.base.json types.d.ts ./
 COPY apps/rail-cucuru ./apps/rail-cucuru
 COPY packages ./packages
 COPY infra ./infra
