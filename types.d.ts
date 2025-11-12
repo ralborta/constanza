@@ -1,4 +1,4 @@
-declare type SimpleLogger = {
+export type SimpleLogger = {
   info: (...args: any[]) => void;
   warn: (...args: any[]) => void;
   error: (...args: any[]) => void;

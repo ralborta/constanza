@@ -1,14 +1,16 @@
-import Fastify from 'fastify';
+import Fastify, { FastifyInstance } from 'fastify';
 import Redis from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { webhookRoutes } from './routes/webhooks.js';
 import { healthRoutes } from './routes/health.js';
+import type { SimpleLogger } from '../../types.js';
 
 const prisma = new PrismaClient();
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
-const server = Fastify({
+const server: FastifyInstance = Fastify({
   logger: {
+    level: 'info',
     transport: {
       target: 'pino-pretty',
       options: {
@@ -19,13 +21,15 @@ const server = Fastify({
   },
 });
 
+const logger = server.log as unknown as SimpleLogger;
+
 // Routes
 await server.register(healthRoutes);
 await server.register(webhookRoutes, { prefix: '/wh/cucuru' });
 
 // Error handler
 server.setErrorHandler((error, request, reply) => {
-  server.log.error(error);
+  logger.error(error);
   reply.status(error.statusCode || 500).send({
     error: error.message || 'Internal Server Error',
   });
@@ -37,9 +41,9 @@ const start = async () => {
     const host = process.env.HOST || '0.0.0.0';
 
     await server.listen({ port, host });
-    server.log.info(`🚀 Rail Cucuru running on http://${host}:${port}`);
+    logger.info(`🚀 Rail Cucuru running on http://${host}:${port}`);
   } catch (err) {
-    server.log.error(err);
+    logger.error(err);
     process.exit(1);
   }
 };

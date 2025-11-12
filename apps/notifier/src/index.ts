@@ -1,15 +1,17 @@
-import Fastify from 'fastify';
+import Fastify, { FastifyInstance } from 'fastify';
 import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { sendEmail } from './channels/email.js';
 import { sendWhatsApp } from './channels/whatsapp.js';
 import { sendVoice } from './channels/voice.js';
+import type { SimpleLogger } from '../../types.js';
 
 const prisma = new PrismaClient();
 
-const server = Fastify({
+const server: FastifyInstance = Fastify({
   logger: {
+    level: 'info',
     transport: {
       target: 'pino-pretty',
       options: {
@@ -19,6 +21,8 @@ const server = Fastify({
     },
   },
 });
+
+const logger = server.log as unknown as SimpleLogger;
 
 // Redis connection
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -34,7 +38,7 @@ export const notifyWorker = new Worker(
   async (job) => {
     const { channel, customerId, invoiceId, message, templateId, variables, batchId } = job.data;
 
-    server.log.info({ jobId: job.id, channel, customerId }, 'Processing notification');
+    logger.info({ jobId: job.id, channel, customerId }, 'Processing notification');
 
     try {
       // Obtener cliente
@@ -96,11 +100,11 @@ export const notifyWorker = new Worker(
         },
       });
 
-      server.log.info({ jobId: job.id, channel, customerId }, 'Notification sent successfully');
+      logger.info({ jobId: job.id, channel, customerId }, 'Notification sent successfully');
 
       return { success: true, externalMessageId };
     } catch (error: any) {
-      server.log.error({ jobId: job.id, error: error.message }, 'Failed to send notification');
+      logger.error({ jobId: job.id, error: error.message }, 'Failed to send notification');
 
       // Registrar error en contact.events
       await prisma.contactEvent.create({
@@ -175,10 +179,10 @@ const start = async () => {
     const host = process.env.HOST || '0.0.0.0';
 
     await server.listen({ port, host });
-    server.log.info(`🚀 Notifier running on http://${host}:${port}`);
-    server.log.info('📬 Worker started, processing notifications...');
+    logger.info(`🚀 Notifier running on http://${host}:${port}`);
+    logger.info('📬 Worker started, processing notifications...');
   } catch (err) {
-    server.log.error(err);
+    logger.error(err);
     process.exit(1);
   }
 };

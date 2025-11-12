@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -8,9 +8,11 @@ import { healthRoutes } from './routes/health.js';
 import { invoiceRoutes } from './routes/invoices.js';
 import { customerRoutes } from './routes/customers.js';
 import { kpiRoutes } from './routes/kpi.js';
+import type { SimpleLogger } from '../../types.js';
 
-const server = Fastify({
+const server: FastifyInstance = Fastify({
   logger: {
+    level: 'info',
     transport: {
       target: 'pino-pretty',
       options: {
@@ -20,6 +22,8 @@ const server = Fastify({
     },
   },
 });
+
+const logger = server.log as unknown as SimpleLogger;
 
 // Plugins
 await server.register(cors, {
@@ -46,7 +50,7 @@ await server.register(kpiRoutes, { prefix: '/v1' });
 
 // Error handler
 server.setErrorHandler((error, request, reply) => {
-  server.log.error(error);
+  logger.error(error);
   reply.status(error.statusCode || 500).send({
     error: error.message || 'Internal Server Error',
   });
@@ -58,9 +62,9 @@ const start = async () => {
     const host = process.env.HOST || '0.0.0.0';
     
     await server.listen({ port, host });
-    server.log.info(`🚀 API Gateway running on http://${host}:${port}`);
+    logger.info(`🚀 API Gateway running on http://${host}:${port}`);
   } catch (err) {
-    server.log.error(err);
+    logger.error(err);
     process.exit(1);
   }
 };
