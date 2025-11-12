@@ -1,6 +1,6 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { Queue, Worker } from 'bullmq';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { sendEmail } from './channels/email.js';
 import { sendWhatsApp } from './channels/whatsapp.js';

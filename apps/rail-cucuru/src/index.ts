@@ -1,5 +1,5 @@
 import Fastify, { FastifyInstance } from 'fastify';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { webhookRoutes } from './routes/webhooks.js';
 import { healthRoutes } from './routes/health.js';
