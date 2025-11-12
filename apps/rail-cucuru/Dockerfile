@@ -15,8 +15,8 @@ COPY infra ./infra
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Generar Prisma usando path completo (pnpm exec no funciona en Docker)
-RUN node_modules/.bin/prisma generate --schema=infra/prisma/schema.prisma
+# Generar Prisma usando el script del servicio (encuentra el binario correctamente)
+RUN pnpm --filter "@constanza/rail-cucuru" run generate
 
 # Compilar
 RUN pnpm --filter "@constanza/rail-cucuru" run build
