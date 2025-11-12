@@ -7,14 +7,14 @@ export interface JWTPayload {
   perfil: 'ADM' | 'OPERADOR_1' | 'OPERADOR_2' | 'CLIENTE';
 }
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    user?: JWTPayload;
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    user: JWTPayload;
   }
 }
 
-declare module '@fastify/jwt' {
-  interface FastifyJWT {
+declare module 'fastify' {
+  interface FastifyRequest {
     user: JWTPayload;
   }
 }
