@@ -23,11 +23,19 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  users     User[]
-  customers Customer[]
-  invoices  Invoice[]
-  promises  Promise[]
-  policyRules PolicyRule[]
+  users          User[]
+  customers      Customer[]
+  invoices       Invoice[]
+  promises       Promise[]
+  policyRules    PolicyRule[]
+  customerCuits  CustomerCuit[]
+  asociados      Asociado[]
+  echeqs         Echeq[]
+  sequences      Sequence[]
+  contactRuns    ContactRun[]
+  contactEvents  ContactEvent[]
+  batchJobs      BatchJob[]
+  decisionItems  DecisionItem[]
 
   @@map("tenants")
   @@schema("core")
@@ -283,6 +291,7 @@ model ContactRun {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
   invoiceId String   @map("invoice_id") @db.Uuid
+  customerId String? @map("customer_id") @db.Uuid
   sequenceId String? @map("sequence_id") @db.Uuid
   state     String   // PRÓX_VENCER | VENCIDA | PROMESA | PROMESA_INCUMPLIDA
   step      Int      @default(0)
@@ -292,6 +301,7 @@ model ContactRun {
 
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
   sequence  Sequence? @relation(fields: [sequenceId], references: [id], onDelete: SetNull)
   events    ContactEvent[]
 
@@ -326,6 +336,7 @@ model ContactEvent {
 
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer  Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   run       ContactRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
   batch     BatchJob? @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
