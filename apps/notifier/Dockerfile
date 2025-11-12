@@ -40,9 +40,8 @@ COPY --from=build /repo/infra ./infra
 # Instalar SOLO las dependencias de producción del servicio
 RUN pnpm install --frozen-lockfile --prod --filter "@constanza/notifier"
 
-# 🔥 Copiar Prisma Client generado desde el build stage
-COPY --from=build /repo/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /repo/node_modules/@prisma ./node_modules/@prisma
+# 🔥 Regenerar Prisma Client en el runner stage (después de instalar deps)
+RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
 
 # Copiar el código compilado
 COPY --from=build /repo/apps/notifier/dist ./apps/notifier/dist
