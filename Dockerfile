@@ -15,12 +15,14 @@ COPY infra ./infra
 # Install (lockfile congelado)
 RUN pnpm install --frozen-lockfile
 
+# 🔥 Hot-fix: generar el cliente con npx SIN tocar tu lockfile
+RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
+
 # Elegimos el servicio a compilar desde Railway (Build Arg)
 ARG SERVICE
 ENV SERVICE=${SERVICE}
 
-# Generar Prisma y compilar SOLO ese servicio
-RUN pnpm --filter "@constanza/${SERVICE}" run generate
+# Compilar SOLO ese servicio
 RUN pnpm --filter "@constanza/${SERVICE}" run build
 
 # Imagen final

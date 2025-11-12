@@ -15,8 +15,8 @@ COPY infra ./infra
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Generar Prisma desde el workspace (evita auto-instalación)
-RUN pnpm -w exec prisma generate --schema=infra/prisma/schema.prisma
+# 🔥 Hot-fix: generar el cliente con npx SIN tocar tu lockfile
+RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
 
 # Compilar SOLO el servicio
 ARG SERVICE=api-gateway
