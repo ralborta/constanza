@@ -32,15 +32,15 @@ RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 WORKDIR /app
 
-# Copiamos TODO lo necesario para que pnpm resuelva módulos correctamente
+# Copiamos TODO el workspace para mantener la estructura de pnpm
 COPY --from=build /repo/package.json ./
 COPY --from=build /repo/pnpm-workspace.yaml ./
 COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/.pnpm ./pnpm 2>/dev/null || true
 COPY --from=build /repo/apps/${SERVICE} ./apps/${SERVICE}
+# Copiar infra para @prisma/client
+COPY --from=build /repo/infra ./infra
 
 ENV NODE_ENV=production
 
-# Usar formato shell para que ${SERVICE} se expanda correctamente
-# Ejecutar desde /app para que Node.js resuelva módulos correctamente
-CMD sh -c "cd /app && node apps/${SERVICE}/dist/index.js"
+# Ejecutar desde /app (root del workspace) para que Node.js resuelva módulos correctamente
+CMD sh -c "node apps/${SERVICE}/dist/index.js"
