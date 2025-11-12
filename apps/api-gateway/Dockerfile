@@ -15,11 +15,13 @@ COPY infra ./infra
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Generar Prisma usando el script del servicio (encuentra el binario correctamente)
-RUN pnpm --filter "@constanza/api-gateway" run generate
+# Generar Prisma desde el workspace (evita auto-instalación)
+RUN pnpm -w exec prisma generate --schema=infra/prisma/schema.prisma
 
-# Compilar
-RUN pnpm --filter "@constanza/api-gateway" run build
+# Compilar SOLO el servicio
+ARG SERVICE=api-gateway
+ENV SERVICE=${SERVICE}
+RUN pnpm --filter "@constanza/${SERVICE}" run build
 
 # Imagen final
 FROM node:20-alpine AS runner
