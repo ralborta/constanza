@@ -40,6 +40,10 @@ COPY --from=build /repo/infra ./infra
 # Instalar SOLO las dependencias de producción del servicio
 RUN pnpm install --frozen-lockfile --prod --filter "@constanza/api-gateway"
 
+# 🔥 Copiar Prisma Client generado desde el build stage
+COPY --from=build /repo/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /repo/node_modules/@prisma ./node_modules/@prisma
+
 # Copiar el código compilado
 COPY --from=build /repo/apps/api-gateway/dist ./apps/api-gateway/dist
 
