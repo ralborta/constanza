@@ -15,10 +15,9 @@ COPY infra ./infra
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Generar Prisma y compilar
-WORKDIR /repo/apps/rail-cucuru
-RUN pnpm generate
-RUN pnpm build
+# Generar Prisma y compilar (desde root con filtro)
+RUN pnpm --filter "@constanza/rail-cucuru" run generate
+RUN pnpm --filter "@constanza/rail-cucuru" run build
 
 # Imagen final
 FROM node:20-alpine AS runner
