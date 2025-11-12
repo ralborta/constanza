@@ -36,4 +36,5 @@ COPY --from=build /repo/apps/${SERVICE} ./apps/${SERVICE}
 
 ENV NODE_ENV=production
 
-CMD ["sh","-lc","node apps/${SERVICE}/dist/index.js"]
+# Usar formato shell para que ${SERVICE} se expanda correctamente
+CMD sh -c "node apps/${SERVICE}/dist/index.js"
