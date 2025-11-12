@@ -32,15 +32,22 @@ RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 WORKDIR /app
 
-# Copiamos TODO el workspace para mantener la estructura de pnpm
+# Copiar solo lo necesario para instalar deps de producción
 COPY --from=build /repo/package.json ./
 COPY --from=build /repo/pnpm-workspace.yaml ./
-COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/apps/${SERVICE} ./apps/${SERVICE}
-# Copiar infra para @prisma/client
+COPY --from=build /repo/pnpm-lock.yaml ./
+COPY --from=build /repo/apps/${SERVICE}/package.json ./apps/${SERVICE}/package.json
 COPY --from=build /repo/infra ./infra
+
+# Instalar SOLO las dependencias de producción del servicio específico
+ARG SERVICE
+ENV SERVICE=${SERVICE}
+RUN pnpm install --frozen-lockfile --prod --filter "@constanza/${SERVICE}"
+
+# Copiar el código compilado
+COPY --from=build /repo/apps/${SERVICE}/dist ./apps/${SERVICE}/dist
 
 ENV NODE_ENV=production
 
-# Ejecutar desde /app (root del workspace) para que Node.js resuelva módulos correctamente
+# Ejecutar desde /app (root del workspace)
 CMD sh -c "node apps/${SERVICE}/dist/index.js"
