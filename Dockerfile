@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # Dockerfile multi-app para Railway
 # Railway configurará el Build Arg SERVICE para cada servicio
+# Ejemplo: docker build --build-arg SERVICE=api-gateway -t constanza-api-gateway .
 
 FROM node:20-alpine AS base
 
@@ -20,13 +21,8 @@ COPY apps ./apps
 COPY packages ./packages
 COPY infra ./infra
 
-# Instalar deps de todos los workspaces
+# Instalar deps de todos los workspaces (incluye prisma en deps)
 RUN pnpm install --frozen-lockfile
-
-# Generar Prisma Client en CADA app que lo usa
-RUN pnpm --filter @constanza/notifier run generate || true
-RUN pnpm --filter @constanza/rail-cucuru run generate || true
-RUN pnpm --filter @constanza/api-gateway run generate || true
 
 # -----------------------------------------------------------------------------
 # Elegir qué app compilar pasando ARG SERVICE
@@ -35,10 +31,11 @@ RUN pnpm --filter @constanza/api-gateway run generate || true
 ARG SERVICE
 ENV SERVICE=${SERVICE}
 
-# Compilar solo el servicio indicado
+# Orden crítico: 1) Generar Prisma Client, 2) Compilar TypeScript
+RUN pnpm --filter "@constanza/${SERVICE}" run generate
 RUN pnpm --filter "@constanza/${SERVICE}" run build
 
-# Imagen final
+# Imagen final (runner)
 FROM node:20-alpine AS runner
 
 RUN apk add --no-cache openssl libc6-compat
@@ -53,8 +50,10 @@ COPY --from=base /app/infra ./infra
 COPY --from=base /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=base /app/package.json ./package.json
 
+# Copiar Prisma Client generado (si está en node_modules/.prisma)
+COPY --from=base /app/node_modules/.prisma ./node_modules/.prisma 2>/dev/null || true
+
 ENV NODE_ENV=production
 
 # Usar el servicio indicado
 CMD ["sh", "-c", "pnpm --filter \"@constanza/${SERVICE}\" start"]
-
