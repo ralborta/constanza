@@ -15,8 +15,8 @@ COPY infra ./infra
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Generar Prisma usando el que ya está instalado (evita auto-instalación)
-RUN pnpm exec -- prisma generate --schema=infra/prisma/schema.prisma
+# Generar Prisma usando path completo (pnpm exec no funciona en Docker)
+RUN node_modules/.bin/prisma generate --schema=infra/prisma/schema.prisma
 
 # Compilar
 RUN pnpm --filter "@constanza/api-gateway" run build
