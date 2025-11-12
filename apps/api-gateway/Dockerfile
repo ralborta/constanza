@@ -15,8 +15,10 @@ COPY infra ./infra
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Generar Prisma y compilar (desde root con filtro)
-RUN pnpm --filter "@constanza/api-gateway" run generate
+# Generar Prisma directamente (sin pasar por script)
+RUN cd apps/api-gateway && pnpm exec prisma generate --schema=../../infra/prisma/schema.prisma
+
+# Compilar
 RUN pnpm --filter "@constanza/api-gateway" run build
 
 # Imagen final

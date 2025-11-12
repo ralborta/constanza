@@ -15,8 +15,10 @@ COPY infra ./infra
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Generar Prisma y compilar (desde root con filtro)
-RUN pnpm --filter "@constanza/notifier" run generate
+# Generar Prisma directamente (sin pasar por script)
+RUN cd apps/notifier && pnpm exec prisma generate --schema=../../infra/prisma/schema.prisma
+
+# Compilar
 RUN pnpm --filter "@constanza/notifier" run build
 
 # Imagen final
