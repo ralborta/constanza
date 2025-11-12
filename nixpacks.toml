@@ -8,12 +8,13 @@ nixPkgs = ["nodejs_20", "pnpm"]
 cmds = [
   "corepack enable",
   "corepack prepare pnpm@8.15.0 --activate",
-  "pnpm install --frozen-lockfile",
-  "cd infra/prisma && pnpm run generate"
+  "pnpm install --frozen-lockfile"
 ]
 
 [phases.build]
 cmds = [
+  "cd infra/prisma && pnpm run generate",
+  "cd ../..",
   "cd apps/${{RAILWAY_SERVICE_NAME}} && pnpm build"
 ]
 

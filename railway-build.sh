@@ -16,6 +16,14 @@ cd infra/prisma
 pnpm run generate
 cd ../..
 
+echo "✅ Verificando que Prisma Client se generó..."
+if [ ! -d "node_modules/.prisma" ] && [ ! -d "infra/prisma/node_modules/.prisma" ]; then
+  echo "⚠️  Prisma Client no encontrado, regenerando..."
+  cd infra/prisma
+  pnpm run generate
+  cd ../..
+fi
+
 echo "🏗️  Building servicio: $RAILWAY_SERVICE_NAME"
 cd apps/$RAILWAY_SERVICE_NAME
 pnpm build
