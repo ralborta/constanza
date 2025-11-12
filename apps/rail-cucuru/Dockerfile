@@ -26,6 +26,9 @@ RUN pnpm --filter "@constanza/${SERVICE}" run build
 # Imagen final
 FROM node:20-alpine AS runner
 
+# Instalar dependencias SSL necesarias para Prisma Query Engine
+RUN apk add --no-cache openssl libc6-compat
+
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 WORKDIR /app
