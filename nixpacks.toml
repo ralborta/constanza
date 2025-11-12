@@ -1,5 +1,6 @@
 # Nixpacks configuration for Railway
 # Railway usa Nixpacks para detectar y construir la aplicación
+# NOTA: Si usas Dockerfile, Railway lo usará en lugar de Nixpacks
 
 [phases.setup]
 nixPkgs = ["nodejs_20", "pnpm"]
@@ -13,10 +14,12 @@ cmds = [
 
 [phases.build]
 cmds = [
-  "cd infra/prisma && pnpm run generate",
-  "cd ../..",
-  "cd apps/${{RAILWAY_SERVICE_NAME}} && pnpm build"
+  "pnpm --filter @constanza/notifier run generate || true",
+  "pnpm --filter @constanza/rail-cucuru run generate || true",
+  "pnpm --filter @constanza/api-gateway run generate || true",
+  "pnpm --filter \"@constanza/${RAILWAY_SERVICE_NAME}\" run generate",
+  "pnpm --filter \"@constanza/${RAILWAY_SERVICE_NAME}\" run build"
 ]
 
 [start]
-cmd = "cd apps/${{RAILWAY_SERVICE_NAME}} && pnpm start"
+cmd = "pnpm --filter \"@constanza/${RAILWAY_SERVICE_NAME}\" start"

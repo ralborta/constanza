@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Dependencies (se copian en el Dockerfile)
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+build
+.next
+out
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NO ignorar estos (necesarios para Prisma):
+# infra/prisma/schema.prisma
+# pnpm-lock.yaml
+# pnpm-workspace.yaml
+
