@@ -15,8 +15,8 @@ COPY infra ./infra
 # Instalar dependencias
 RUN pnpm install --frozen-lockfile
 
-# Generar Prisma directamente desde root usando path completo
-RUN ./node_modules/.bin/prisma generate --schema=infra/prisma/schema.prisma
+# Generar Prisma usando pnpm dlx (recomendado para CI/CD)
+RUN pnpm dlx prisma generate --schema=infra/prisma/schema.prisma
 
 # Compilar
 RUN pnpm --filter "@constanza/notifier" run build
