@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "generate": "prisma generate --schema=../../infra/prisma/schema.prisma",
+    "generate": "pnpm exec prisma generate --schema=../../infra/prisma/schema.prisma",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js"
   },
