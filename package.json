@@ -1,29 +1,5 @@
 {
-  "name": "constanza",
-  "version": "1.0.0",
+  "name": "constanza-monorepo",
   "private": true,
-  "description": "Sistema de Cobranzas B2B Omnicanal",
-  "scripts": {
-    "dev": "pnpm -r --parallel dev",
-    "build": "pnpm -r build",
-    "lint": "pnpm -r lint",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
-    "clean": "pnpm -r clean && rm -rf node_modules",
-    "prisma:generate": "pnpm --filter @constanza/prisma generate",
-    "prisma:migrate": "pnpm --filter @constanza/prisma migrate",
-    "prisma:studio": "pnpm --filter @constanza/prisma studio"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "typescript": "^5.3.3",
-    "prettier": "^3.1.0",
-    "eslint": "^8.55.0"
-  },
-  "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
-  },
   "packageManager": "pnpm@9.12.0"
 }
-

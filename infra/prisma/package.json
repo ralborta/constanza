@@ -1,23 +1,5 @@
 {
   "name": "@constanza/prisma",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "generate": "prisma generate --schema=./schema.prisma",
-    "migrate": "prisma migrate dev",
-    "migrate:deploy": "prisma migrate deploy",
-    "studio": "prisma studio",
-    "format": "prisma format",
-    "seed": "tsx seed.ts"
-  },
-  "dependencies": {
-    "@prisma/client": "^5.7.1",
-    "bcryptjs": "^2.4.3"
-  },
-  "devDependencies": {
-    "prisma": "^5.7.1",
-    "tsx": "^4.7.0",
-    "@types/bcryptjs": "^2.4.6"
-  }
+  "version": "0.0.0",
+  "private": true
 }
-
