@@ -11,7 +11,7 @@ export async function kpiRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const user = request.user!;
-      const tenantId = user.tenant_id;
+      const tenantId = user.tenant_id as string;
 
       // DSO (Days Sales Outstanding) - promedio de días de cobranza
       const invoices = await prisma.invoice.findMany({
@@ -25,7 +25,7 @@ export async function kpiRoutes(fastify: FastifyInstance) {
       let totalDays = 0;
       let count = 0;
 
-      invoices.forEach((inv) => {
+      invoices.forEach((inv: { fechaVto: Date }) => {
         const daysDiff = Math.floor((today.getTime() - inv.fechaVto.getTime()) / (1000 * 60 * 60 * 24));
         totalDays += daysDiff;
         count++;
@@ -58,8 +58,8 @@ export async function kpiRoutes(fastify: FastifyInstance) {
         },
       });
 
-      const cashIn7d = payments7d.reduce((sum, app) => sum + app.amount, 0);
-      const cashIn30d = payments30d.reduce((sum, app) => sum + app.amount, 0);
+      const cashIn7d = payments7d.reduce((sum: number, app: { amount: number }) => sum + app.amount, 0);
+      const cashIn30d = payments30d.reduce((sum: number, app: { amount: number }) => sum + app.amount, 0);
 
       // Promesas de hoy
       const todayStart = new Date(today);

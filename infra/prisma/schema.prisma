@@ -148,14 +148,15 @@ model Promise {
 }
 
 model PolicyRule {
-  tenantId  String   @id @map("tenant_id") @db.Uuid
-  key       String   @id
+  tenantId  String   @map("tenant_id") @db.Uuid
+  key       String
   valueJson Json     @map("value_json") @db.JsonB
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@id([tenantId, key])
   @@map("policy_rules")
   @@schema("core")
 }
