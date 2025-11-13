@@ -4,6 +4,40 @@ import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { MainLayout } from '@/components/layout/main-layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Download,
+  Plus,
+  Search,
+  Eye,
+  Bell,
+  Phone,
+  Edit,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 
 interface KPISummary {
   dso: number;
@@ -13,6 +47,13 @@ interface KPISummary {
   promisesBroken: number;
   autoAppliedPct: number;
   echeqsPending: number;
+  totalCollected?: number;
+  totalPending?: number;
+  efficiency?: number;
+  totalCollectedVariation?: number;
+  totalPendingVariation?: number;
+  efficiencyVariation?: number;
+  echeqsVariation?: number;
 }
 
 interface Invoice {
@@ -27,6 +68,36 @@ interface Invoice {
   montoAplicado: number;
   fechaVto: string;
   estado: string;
+}
+
+interface ECheck {
+  id: string;
+  emisor: string;
+  monto: number;
+  estado: string;
+}
+
+function getDaysSinceDue(date: string): number {
+  const dueDate = new Date(date);
+  const today = new Date();
+  const diffTime = today.getTime() - dueDate.getTime();
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function getStatusBadge(estado: string) {
+  if (estado === 'ABIERTA' || estado === 'POR_VENCER') {
+    return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Por vencer</Badge>;
+  }
+  if (estado === 'VENCIDA' || estado === 'VENCIDO') {
+    return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Vencido</Badge>;
+  }
+  if (estado === 'PROGRAMADA' || estado === 'PROGRAMADO') {
+    return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Programado</Badge>;
+  }
+  if (estado === 'PARCIAL') {
+    return <Badge variant="outline">Parcial</Badge>;
+  }
+  return <Badge variant="outline">{estado}</Badge>;
 }
 
 export default function DashboardPage() {
@@ -46,156 +117,352 @@ export default function DashboardPage() {
     },
   });
 
+  // Mock data para E-Checks (hasta que esté implementado en el backend)
+  const eChecks: ECheck[] = [
+    { id: 'E-78910', emisor: 'Innova Corp', monto: 250000, estado: 'PENDIENTE' },
+    { id: 'E-78911', emisor: 'Global Exports', monto: 55075, estado: 'PENDIENTE' },
+    { id: 'E-78912', emisor: 'Quantum Dynamics', monto: 182000, estado: 'PENDIENTE' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Constanza</h1>
-            <nav className="space-x-4">
-              <Link href="/dashboard" className="text-blue-600 hover:text-blue-800">
-                Dashboard
-              </Link>
-              <Link href="/invoices" className="text-gray-600 hover:text-gray-800">
-                Facturas
-              </Link>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('token');
-                  window.location.href = '/login';
-                }}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                Salir
-              </button>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h2>
-
-        {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">DSO</h3>
-            <p className="text-3xl font-bold text-gray-900">
-              {kpisLoading ? '...' : kpis?.dso.toFixed(1)} días
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Cash-in 7 días</h3>
-            <p className="text-3xl font-bold text-gray-900">
-              {kpisLoading ? '...' : `$${kpis?.cashIn7d.toLocaleString('es-AR')}`}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Cash-in 30 días</h3>
-            <p className="text-3xl font-bold text-gray-900">
-              {kpisLoading ? '...' : `$${kpis?.cashIn30d.toLocaleString('es-AR')}`}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Promesas hoy</h3>
-            <p className="text-3xl font-bold text-gray-900">
-              {kpisLoading ? '...' : kpis?.promisesToday}
-            </p>
+    <MainLayout>
+      <div className="p-8">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard de Cobranzas</h1>
+          <div className="flex gap-3">
+            <Button variant="outline" size="sm">
+              <Download className="mr-2 h-4 w-4" />
+              Exportar Reporte
+            </Button>
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+              <Plus className="mr-2 h-4 w-4" />
+              Generar Nuevo Cobro
+            </Button>
           </div>
         </div>
 
-        {/* Facturas próximas a vencer */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Facturas Abiertas</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cliente
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Número
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Monto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Aplicado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vencimiento
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {invoicesLoading ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                      Cargando...
-                    </td>
-                  </tr>
-                ) : invoices?.invoices.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                      No hay facturas abiertas
-                    </td>
-                  </tr>
-                ) : (
-                  invoices?.invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {invoice.customer.razonSocial}
-                        </div>
-                        {invoice.customer.cuit && (
-                          <div className="text-sm text-gray-500">CUIT: {invoice.customer.cuit}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          href={`/invoices/${invoice.id}`}
-                          className="text-sm text-blue-600 hover:text-blue-800"
-                        >
-                          {invoice.numero}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${(invoice.monto / 100).toLocaleString('es-AR')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${(invoice.montoAplicado / 100).toLocaleString('es-AR')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            invoice.estado === 'ABIERTA'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : invoice.estado === 'PARCIAL'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {invoice.estado}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+        {/* KPI Cards */}
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Monto Total Cobrado</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {kpisLoading ? '...' : `$${((kpis?.totalCollected || kpis?.cashIn30d || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </div>
+              {kpis?.totalCollectedVariation !== undefined && (
+                <p className={`text-xs mt-1 font-medium ${kpis.totalCollectedVariation >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {kpis.totalCollectedVariation >= 0 ? '+' : ''}{kpis.totalCollectedVariation.toFixed(1)}%
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Deuda Pendiente</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {kpisLoading ? '...' : `$${((kpis?.totalPending || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </div>
+              {kpis?.totalPendingVariation !== undefined && (
+                <p className={`text-xs mt-1 font-medium ${kpis.totalPendingVariation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {kpis.totalPendingVariation >= 0 ? '+' : ''}{kpis.totalPendingVariation.toFixed(1)}%
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Eficiencia de Cobro</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {kpisLoading ? '...' : `${(kpis?.efficiency || kpis?.autoAppliedPct || 0).toFixed(0)}%`}
+              </div>
+              {kpis?.efficiencyVariation !== undefined && (
+                <p className={`text-xs mt-1 font-medium ${kpis.efficiencyVariation >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {kpis.efficiencyVariation >= 0 ? '+' : ''}{kpis.efficiencyVariation.toFixed(1)}%
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">E-Checks Pendientes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {kpisLoading ? '...' : kpis?.echeqsPending || 0}
+              </div>
+              {kpis?.echeqsVariation !== undefined && (
+                <p className={`text-xs mt-1 font-medium ${kpis.echeqsVariation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {kpis.echeqsVariation >= 0 ? '+' : ''}{kpis.echeqsVariation.toFixed(1)}%
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Tabla de Cobranzas Pendientes - Ocupa 2 columnas */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Cobranzas Pendientes</CardTitle>
+                {/* Barra de búsqueda y filtros */}
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      placeholder="Buscar..."
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select defaultValue="all">
+                    <SelectTrigger className="w-full sm:w-[160px]">
+                      <SelectValue placeholder="Todos los estados" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los estados</SelectItem>
+                      <SelectItem value="ABIERTA">Por vencer</SelectItem>
+                      <SelectItem value="VENCIDA">Vencido</SelectItem>
+                      <SelectItem value="PARCIAL">Parcial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select defaultValue="all">
+                    <SelectTrigger className="w-full sm:w-[160px]">
+                      <SelectValue placeholder="Todas las fechas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las fechas</SelectItem>
+                      <SelectItem value="7d">Últimos 7 días</SelectItem>
+                      <SelectItem value="30d">Últimos 30 días</SelectItem>
+                      <SelectItem value="90d">Últimos 90 días</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="sm">
+                    <Filter className="mr-2 h-4 w-4" />
+                    Más filtros
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="cursor-pointer hover:bg-gray-50">
+                          <div className="flex items-center gap-1">
+                            ID FACTURA
+                            <ArrowDown className="h-3 w-3 text-gray-400" />
+                          </div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:bg-gray-50">
+                          <div className="flex items-center gap-1">
+                            CLIENTE
+                            <ArrowUp className="h-3 w-3 text-gray-400" />
+                          </div>
+                        </TableHead>
+                        <TableHead>MONTO</TableHead>
+                        <TableHead>FECHA VENCIMIENTO</TableHead>
+                        <TableHead>ANTIGÜEDAD</TableHead>
+                        <TableHead>ESTADO</TableHead>
+                        <TableHead>ACCIONES</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoicesLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-gray-500">
+                            Cargando...
+                          </TableCell>
+                        </TableRow>
+                      ) : invoices?.invoices.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-gray-500">
+                            No hay facturas pendientes
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        invoices?.invoices.map((invoice) => {
+                          const daysSinceDue = getDaysSinceDue(invoice.fechaVto);
+                          return (
+                            <TableRow key={invoice.id}>
+                              <TableCell className="font-medium">
+                                {invoice.numero}
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{invoice.customer.razonSocial}</div>
+                                  {invoice.customer.cuit && (
+                                    <div className="text-xs text-gray-500">CUIT: {invoice.customer.cuit}</div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                ${(invoice.monto / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </TableCell>
+                              <TableCell>{format(new Date(invoice.fechaVto), 'dd MMM yyyy')}</TableCell>
+                              <TableCell>
+                                <span className={daysSinceDue > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
+                                  {daysSinceDue > 0 ? `${daysSinceDue} días` : 'Al día'}
+                                </span>
+                              </TableCell>
+                              <TableCell>{getStatusBadge(invoice.estado)}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Button variant="ghost" size="sm" asChild>
+                                    <Link href={`/invoices/${invoice.id}`}>
+                                      Ver
+                                    </Link>
+                                  </Button>
+                                  {invoice.estado === 'ABIERTA' && (
+                                    <Button variant="ghost" size="sm">
+                                      Recordar
+                                    </Button>
+                                  )}
+                                  {invoice.estado === 'VENCIDA' && (
+                                    <Button variant="ghost" size="sm">
+                                      Llamar
+                                    </Button>
+                                  )}
+                                  {invoice.estado === 'PROGRAMADA' && (
+                                    <Button variant="ghost" size="sm">
+                                      Editar
+                                    </Button>
+                                  )}
+                                  {invoice.estado === 'VENCIDA' && (
+                                    <Button variant="ghost" size="sm">
+                                      Notificar
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                {/* Paginación */}
+                {invoices && invoices.invoices.length > 0 && (
+                  <div className="mt-4 flex items-center justify-between">
+                    <p className="text-sm text-gray-500">
+                      Mostrando 1-{invoices.invoices.length} de {invoices.invoices.length} resultados
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" disabled>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="bg-gray-100">
+                        1
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        2
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        3
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 )}
-              </tbody>
-            </table>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Columna derecha: E-Checks arriba y Gráfico abajo */}
+          <div className="space-y-6">
+            {/* Tabla de E-Checks */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>E-Checks Pendientes de Aprobación</CardTitle>
+                  <Link href="#" className="text-sm text-blue-600 hover:text-blue-800">
+                    Ver todos
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID CHEQUE</TableHead>
+                        <TableHead>EMISOR</TableHead>
+                        <TableHead className="cursor-pointer hover:bg-gray-50">
+                          <div className="flex items-center gap-1">
+                            MONTO
+                            <ArrowUp className="h-3 w-3 text-gray-400" />
+                          </div>
+                        </TableHead>
+                        <TableHead>ACCIONES</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {eChecks.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-sm text-gray-500 py-4">
+                            No hay e-cheques pendientes
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        eChecks.map((check) => (
+                          <TableRow key={check.id}>
+                            <TableCell className="font-medium">{check.id}</TableCell>
+                            <TableCell>{check.emisor}</TableCell>
+                            <TableCell>
+                              ${(check.monto / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </TableCell>
+                            <TableCell>
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                                Aprobar
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Gráfico de Rendimiento Mensual */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Rendimiento de Cobranzas Mensuales</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64 flex items-end justify-between gap-2">
+                  {/* Mock bars - en producción usar una librería de gráficos como recharts */}
+                  {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'].map((month, index) => {
+                    const heights = [45, 52, 48, 60, 55, 70]; // Valores mock
+                    return (
+                      <div key={month} className="flex-1 flex flex-col items-center">
+                        <div
+                          className="w-full bg-green-400 rounded-t"
+                          style={{ height: `${heights[index]}%` }}
+                        />
+                        <span className="mt-2 text-xs text-gray-500">{month}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </MainLayout>
   );
 }
-

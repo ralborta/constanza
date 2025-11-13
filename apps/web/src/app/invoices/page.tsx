@@ -4,6 +4,33 @@ import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { MainLayout } from '@/components/layout/main-layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Search, Eye, MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Invoice {
   id: string;
@@ -19,6 +46,21 @@ interface Invoice {
   estado: string;
 }
 
+function getStatusBadge(estado: string) {
+  const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+    ABIERTA: { label: 'Por vencer', variant: 'secondary' },
+    VENCIDA: { label: 'Vencido', variant: 'destructive' },
+    PARCIAL: { label: 'Parcial', variant: 'outline' },
+    PAGADA: { label: 'Pagada', variant: 'default' },
+    PROGRAMADA: { label: 'Programado', variant: 'default' },
+  };
+
+  const status = statusMap[estado] || { label: estado, variant: 'outline' };
+  return (
+    <Badge variant={status.variant}>{status.label}</Badge>
+  );
+}
+
 export default function InvoicesPage() {
   const { data, isLoading } = useQuery<{ invoices: Invoice[] }>({
     queryKey: ['invoices'],
@@ -29,109 +71,120 @@ export default function InvoicesPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <Link href="/dashboard" className="text-blue-600 hover:text-blue-800">
-                ← Dashboard
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900 mt-2">Facturas</h1>
-            </div>
-          </div>
+    <MainLayout>
+      <div className="p-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Facturas</h1>
+          <p className="mt-1 text-sm text-gray-500">Gestiona todas tus facturas</p>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cliente
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Número
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Monto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Aplicado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vencimiento
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                      Cargando...
-                    </td>
-                  </tr>
-                ) : data?.invoices.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                      No hay facturas
-                    </td>
-                  </tr>
-                ) : (
-                  data?.invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {invoice.customer.razonSocial}
-                        </div>
-                        {invoice.customer.cuit && (
-                          <div className="text-sm text-gray-500">CUIT: {invoice.customer.cuit}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          href={`/invoices/${invoice.id}`}
-                          className="text-sm text-blue-600 hover:text-blue-800"
-                        >
-                          {invoice.numero}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${(invoice.monto / 100).toLocaleString('es-AR')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${(invoice.montoAplicado / 100).toLocaleString('es-AR')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            invoice.estado === 'ABIERTA'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : invoice.estado === 'PARCIAL'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {invoice.estado}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </main>
-    </div>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Todas las Facturas</CardTitle>
+            </div>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Buscar por cliente, número de factura..."
+                  className="pl-10"
+                />
+              </div>
+              <Select defaultValue="all">
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Todos los estados" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="ABIERTA">Por vencer</SelectItem>
+                  <SelectItem value="VENCIDA">Vencido</SelectItem>
+                  <SelectItem value="PARCIAL">Parcial</SelectItem>
+                  <SelectItem value="PAGADA">Pagada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID FACTURA</TableHead>
+                    <TableHead>CLIENTE</TableHead>
+                    <TableHead>MONTO</TableHead>
+                    <TableHead>APLICADO</TableHead>
+                    <TableHead>FECHA VENC.</TableHead>
+                    <TableHead>ESTADO</TableHead>
+                    <TableHead>ACCIONES</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-gray-500">
+                        Cargando...
+                      </TableCell>
+                    </TableRow>
+                  ) : data?.invoices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-gray-500">
+                        No hay facturas
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    data?.invoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-medium">
+                          <Link
+                            href={`/invoices/${invoice.id}`}
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {invoice.numero}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{invoice.customer.razonSocial}</div>
+                            {invoice.customer.cuit && (
+                              <div className="text-xs text-gray-500">CUIT: {invoice.customer.cuit}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          ${(invoice.monto / 100).toLocaleString('es-AR')}
+                        </TableCell>
+                        <TableCell>
+                          ${(invoice.montoAplicado / 100).toLocaleString('es-AR')}
+                        </TableCell>
+                        <TableCell>{format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell>{getStatusBadge(invoice.estado)}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/invoices/${invoice.id}`}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Ver Detalle
+                                </Link>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </MainLayout>
   );
 }
-
