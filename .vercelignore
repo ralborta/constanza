@@ -1,8 +1,9 @@
-# Ignorar todo excepto apps/web
-*
-!apps/web
-!apps/web/**
-!package.json
-!pnpm-workspace.yaml
-!pnpm-lock.yaml
-
+apps/api-gateway
+apps/notifier
+apps/rail-cucuru
+infra
+packages
+*.md
+!README.md
+Dockerfile
+.dockerignore
