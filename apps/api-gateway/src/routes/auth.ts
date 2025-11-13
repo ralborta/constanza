@@ -18,83 +18,144 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/login', async (request, reply) => {
     const body = loginSchema.parse(request.body);
 
-    const user = await prisma.user.findFirst({
-      where: {
-        email: body.email,
-        activo: true,
-      },
-      include: {
-        tenant: true,
-      },
-    });
+    // 🔥 TEMPORAL: Usuario fake para desarrollo sin DB
+    // TODO: Remover cuando la DB esté lista
+    if (body.email === 'admin@constanza.com' && body.password === 'admin123') {
+      const fakeTenantId = 'fake-tenant-id';
+      const fakeUserId = 'fake-user-id';
+      
+      const token = fastify.jwt.sign({
+        tenant_id: fakeTenantId,
+        user_id: fakeUserId,
+        perfil: 'ADM' as const,
+      });
 
-    if (!user) {
+      return {
+        token,
+        user: {
+          id: fakeUserId,
+          nombre: 'Admin',
+          apellido: 'Sistema',
+          email: 'admin@constanza.com',
+          perfil: 'ADM',
+        },
+      };
+    }
+
+    // Intenta login real con DB (puede fallar si DB no está disponible)
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          email: body.email,
+          activo: true,
+        },
+        include: {
+          tenant: true,
+        },
+      });
+
+      if (!user) {
+        return reply.status(401).send({ error: 'Credenciales inválidas' });
+      }
+
+      if (!user.passwordHash) {
+        return reply.status(401).send({ error: 'Usuario sin contraseña configurada' });
+      }
+
+      const isValid = await bcrypt.compare(body.password, user.passwordHash);
+      if (!isValid) {
+        return reply.status(401).send({ error: 'Credenciales inválidas' });
+      }
+
+      const token = fastify.jwt.sign({
+        tenant_id: user.tenantId,
+        user_id: user.id,
+        perfil: user.perfil as 'ADM' | 'OPERADOR_1' | 'OPERADOR_2',
+      });
+
+      return {
+        token,
+        user: {
+          id: user.id,
+          nombre: user.nombre,
+          apellido: user.apellido,
+          email: user.email,
+          perfil: user.perfil,
+        },
+      };
+    } catch (error: any) {
+      // Si falla la DB, devuelve error pero permite el usuario fake
+      fastify.log.warn({ error: error.message }, 'Error consultando DB, usando usuario fake si aplica');
       return reply.status(401).send({ error: 'Credenciales inválidas' });
     }
-
-    if (!user.passwordHash) {
-      return reply.status(401).send({ error: 'Usuario sin contraseña configurada' });
-    }
-
-    const isValid = await bcrypt.compare(body.password, user.passwordHash);
-    if (!isValid) {
-      return reply.status(401).send({ error: 'Credenciales inválidas' });
-    }
-
-    const token = fastify.jwt.sign({
-      tenant_id: user.tenantId,
-      user_id: user.id,
-      perfil: user.perfil as 'ADM' | 'OPERADOR_1' | 'OPERADOR_2',
-    });
-
-    return {
-      token,
-      user: {
-        id: user.id,
-        nombre: user.nombre,
-        apellido: user.apellido,
-        email: user.email,
-        perfil: user.perfil,
-      },
-    };
   });
 
   // Login clientes
   fastify.post('/customer/login', async (request, reply) => {
     const body = customerLoginSchema.parse(request.body);
 
-    const customer = await prisma.customer.findFirst({
-      where: {
-        email: body.email,
-        activo: true,
-        accesoHabilitado: true,
-      },
-    });
+    // 🔥 TEMPORAL: Cliente fake para desarrollo sin DB
+    // TODO: Remover cuando la DB esté lista
+    if (body.email === 'cliente@acme.com' && body.password === 'cliente123') {
+      const fakeTenantId = 'fake-tenant-id';
+      const fakeCustomerId = 'fake-customer-id';
+      
+      const token = fastify.jwt.sign({
+        tenant_id: fakeTenantId,
+        customer_id: fakeCustomerId,
+        perfil: 'CLIENTE',
+      });
 
-    if (!customer || !customer.passwordHash) {
-      return reply.status(401).send({ error: 'Credenciales inválidas o acceso no habilitado' });
+      return {
+        token,
+        customer: {
+          id: fakeCustomerId,
+          razonSocial: 'Acme Inc',
+          email: 'cliente@acme.com',
+          perfil: 'CLIENTE',
+        },
+      };
     }
 
-    const isValid = await bcrypt.compare(body.password, customer.passwordHash);
-    if (!isValid) {
+    // Intenta login real con DB (puede fallar si DB no está disponible)
+    try {
+      const customer = await prisma.customer.findFirst({
+        where: {
+          email: body.email,
+          activo: true,
+          accesoHabilitado: true,
+        },
+      });
+
+      if (!customer || !customer.passwordHash) {
+        return reply.status(401).send({ error: 'Credenciales inválidas o acceso no habilitado' });
+      }
+
+      const isValid = await bcrypt.compare(body.password, customer.passwordHash);
+      if (!isValid) {
+        return reply.status(401).send({ error: 'Credenciales inválidas' });
+      }
+
+      const token = fastify.jwt.sign({
+        tenant_id: customer.tenantId,
+        customer_id: customer.id,
+        perfil: 'CLIENTE',
+      });
+
+      return {
+        token,
+        customer: {
+          id: customer.id,
+          razonSocial: customer.razonSocial,
+          email: customer.email,
+          perfil: 'CLIENTE',
+        },
+      };
+    } catch (error: any) {
+      // Si falla la DB, devuelve error pero permite el cliente fake
+      fastify.log.warn({ error: error.message }, 'Error consultando DB, usando cliente fake si aplica');
       return reply.status(401).send({ error: 'Credenciales inválidas' });
     }
-
-    const token = fastify.jwt.sign({
-      tenant_id: customer.tenantId,
-      customer_id: customer.id,
-      perfil: 'CLIENTE',
-    });
-
-    return {
-      token,
-      customer: {
-        id: customer.id,
-        razonSocial: customer.razonSocial,
-        email: customer.email,
-        perfil: 'CLIENTE',
-      },
-    };
   });
 
   // Verificar token
