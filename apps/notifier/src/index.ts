@@ -25,7 +25,10 @@ const server: FastifyInstance = Fastify({
 const logger = server.log as unknown as SimpleLogger;
 
 // Redis connection
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+// BullMQ requiere maxRetriesPerRequest: null
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  maxRetriesPerRequest: null,
+});
 
 // BullMQ Queue
 export const notifyQueue = new Queue('notify.send', {
