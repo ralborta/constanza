@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "vercel-build": "cd ../.. && pnpm install && pnpm --filter @constanza/web build"
+    "vercel-build": "cd ../.. && pnpm install --filter @constanza/web... && cd apps/web && pnpm build"
   },
   "dependencies": {
     "next": "^14.0.4",
