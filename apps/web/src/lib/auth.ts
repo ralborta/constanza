@@ -58,9 +58,3 @@ export function removeToken() {
   }
 }
 
-export async function getServerSession() {
-  // Server-side session check
-  // Por ahora retornamos null, se implementará con cookies
-  return null;
-}
-
