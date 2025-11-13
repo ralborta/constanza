@@ -5,7 +5,8 @@ import { prisma } from '../lib/prisma.js';
 export async function seedRoutes(fastify: FastifyInstance) {
   // Endpoint temporal para ejecutar seed
   // Solo disponible si SEED_SECRET está configurado y coincide
-  fastify.post('/seed', async (request, reply) => {
+  // La ruta final será /seed porque el prefijo es /seed
+  fastify.post('/', async (request, reply) => {
     const secret = request.headers['x-seed-secret'] as string;
     const expectedSecret = process.env.SEED_SECRET;
 
