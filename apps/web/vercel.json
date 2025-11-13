@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd ../.. && pnpm install --filter @constanza/web... && cd apps/web && pnpm build",
+  "buildCommand": "pnpm install --filter @constanza/web... && cd apps/web && pnpm build",
   "outputDirectory": ".next",
-  "installCommand": "cd ../.. && pnpm install --filter @constanza/web...",
+  "installCommand": "pnpm install --filter @constanza/web...",
   "framework": "nextjs"
 }
 
