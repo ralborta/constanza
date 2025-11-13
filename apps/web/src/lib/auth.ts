@@ -24,19 +24,62 @@ export interface AuthResponse {
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  const response = await axios.post(`${API_URL}/auth/login`, {
-    email,
-    password,
-  });
-  return response.data;
+  // 🔥 TEMPORAL: Usuario fake para desarrollo sin backend
+  // TODO: Remover cuando Railway esté funcionando
+  if (email === 'admin@constanza.com' && password === 'admin123') {
+    const fakeToken = 'fake-token-' + Date.now();
+    return {
+      token: fakeToken,
+      user: {
+        id: 'fake-user-id',
+        nombre: 'Admin',
+        apellido: 'Sistema',
+        email: 'admin@constanza.com',
+        perfil: 'ADM',
+      },
+    };
+  }
+
+  // Intenta login real con backend
+  try {
+    const response = await axios.post(`${API_URL}/auth/login`, {
+      email,
+      password,
+    });
+    return response.data;
+  } catch (error: any) {
+    // Si falla el backend, permite el usuario fake
+    throw error;
+  }
 }
 
 export async function loginCustomer(email: string, password: string): Promise<AuthResponse> {
-  const response = await axios.post(`${API_URL}/auth/customer/login`, {
-    email,
-    password,
-  });
-  return response.data;
+  // 🔥 TEMPORAL: Cliente fake para desarrollo sin backend
+  // TODO: Remover cuando Railway esté funcionando
+  if (email === 'cliente@acme.com' && password === 'cliente123') {
+    const fakeToken = 'fake-token-customer-' + Date.now();
+    return {
+      token: fakeToken,
+      customer: {
+        id: 'fake-customer-id',
+        razonSocial: 'Acme Inc',
+        email: 'cliente@acme.com',
+        perfil: 'CLIENTE',
+      },
+    };
+  }
+
+  // Intenta login real con backend
+  try {
+    const response = await axios.post(`${API_URL}/auth/customer/login`, {
+      email,
+      password,
+    });
+    return response.data;
+  } catch (error: any) {
+    // Si falla el backend, permite el cliente fake
+    throw error;
+  }
 }
 
 export function setToken(token: string) {
