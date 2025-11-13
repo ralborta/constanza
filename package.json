@@ -2,6 +2,9 @@
   "name": "constanza-monorepo",
   "private": true,
   "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "seed": "cd infra/prisma && pnpm seed"
+  },
   "dependencies": {
     "@prisma/client": "5.22.0"
   },

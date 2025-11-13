@@ -1,0 +1,38 @@
+name: Seed Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      database_url:
+        description: 'Database URL (Supabase connection string)'
+        required: true
+        type: string
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9.12.0
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Generate Prisma Client
+        run: pnpm prisma:generate
+        env:
+          DATABASE_URL: ${{ inputs.database_url }}
+      
+      - name: Run seed
+        run: pnpm seed
+        env:
+          DATABASE_URL: ${{ inputs.database_url }}
+

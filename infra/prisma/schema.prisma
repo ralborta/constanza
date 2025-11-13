@@ -6,6 +6,8 @@ generator client {
   previewFeatures = ["multiSchema"]
 }
 
+// Seed configuration
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
