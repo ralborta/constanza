@@ -51,6 +51,10 @@ COPY --from=build /repo/apps/api-gateway/dist ./apps/api-gateway/dist
 
 ENV NODE_ENV=production
 
+# Copiar migraciones SQL (si existen)
+COPY --from=build /repo/infra/supabase/migrations ./infra/supabase/migrations
+
 # Ejecutar desde /app (root del workspace)
-CMD sh -c "node apps/api-gateway/dist/index.js"
+# Ejecutar migraciones SQL antes de iniciar el servidor
+CMD sh -c "if [ -n \"$DATABASE_URL\" ]; then npx -y prisma@5.22.0 db push --schema=infra/prisma/schema.prisma --accept-data-loss || true; fi && node apps/api-gateway/dist/index.js"
 
