@@ -52,5 +52,6 @@ COPY --from=build /repo/apps/notifier/dist ./apps/notifier/dist
 ENV NODE_ENV=production
 
 # Ejecutar desde /app (root del workspace)
+# NOTA: Las migraciones se ejecutan solo desde api-gateway
 CMD sh -c "node apps/notifier/dist/index.js"
 
