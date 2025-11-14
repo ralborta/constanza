@@ -19,6 +19,9 @@ import {
   List,
   ChevronDown,
   ChevronRight,
+  Wallet,
+  ArrowLeftRight,
+  CheckCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -44,10 +47,18 @@ const callsSubmenu = [
   { name: 'Listado de Llamadas', href: '/calls', icon: List },
 ];
 
+const paymentsSubmenu = [
+  { name: 'Transferencias Bancarias', href: '/payments/transfers', icon: ArrowLeftRight },
+  { name: 'Conciliación de Pagos', href: '/payments/reconciliation', icon: CheckCircle },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const [callsOpen, setCallsOpen] = useState(
     pathname?.startsWith('/calls') || false
+  );
+  const [paymentsOpen, setPaymentsOpen] = useState(
+    pathname?.startsWith('/payments') || false
   );
 
   const handleLogout = () => {
@@ -56,6 +67,7 @@ export function Sidebar() {
   };
 
   const isCallsActive = pathname?.startsWith('/calls');
+  const isPaymentsActive = pathname?.startsWith('/payments');
 
   return (
     <div className="flex h-screen w-64 flex-col bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 border-r border-slate-700 shadow-xl">
@@ -130,6 +142,53 @@ export function Sidebar() {
                 { active: 'bg-gradient-to-r from-cyan-400 to-cyan-500', inactive: 'text-cyan-300 hover:bg-cyan-500/20' },
                 { active: 'bg-gradient-to-r from-teal-400 to-teal-500', inactive: 'text-teal-300 hover:bg-teal-500/20' },
                 { active: 'bg-gradient-to-r from-emerald-400 to-emerald-500', inactive: 'text-emerald-300 hover:bg-emerald-500/20' },
+              ];
+              const colors = submenuColors[index % submenuColors.length];
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200',
+                    isActive
+                      ? `${colors.active} text-white shadow-md`
+                      : `${colors.inactive} hover:text-white`
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Menú desplegable de Pagos */}
+        <Collapsible open={paymentsOpen} onOpenChange={setPaymentsOpen}>
+          <CollapsibleTrigger
+            className={cn(
+              'w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+              isPaymentsActive
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/50'
+                : 'text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200'
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <Wallet className="h-5 w-5" />
+              <span>Pagos</span>
+            </div>
+            {paymentsOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pl-4 mt-2 space-y-1.5">
+            {paymentsSubmenu.map((item, index) => {
+              const isActive = pathname === item.href;
+              const submenuColors = [
+                { active: 'bg-gradient-to-r from-emerald-400 to-emerald-500', inactive: 'text-emerald-300 hover:bg-emerald-500/20' },
+                { active: 'bg-gradient-to-r from-teal-400 to-teal-500', inactive: 'text-teal-300 hover:bg-teal-500/20' },
               ];
               const colors = submenuColors[index % submenuColors.length];
               return (
