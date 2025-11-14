@@ -66,7 +66,11 @@ export function UploadInvoiceButton() {
       
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
         const apiUrl = getApiUrl();
-        errorMessage = `Error de conexión: No se pudo conectar al servidor en ${apiUrl}. Verifica que la API esté corriendo y accesible.`;
+        if (apiUrl.includes('localhost')) {
+          errorMessage = `Error de conexión: La variable NEXT_PUBLIC_API_URL no está configurada en Vercel. Actualmente está usando: ${apiUrl}. Ve a Vercel → Settings → Environment Variables y agrega NEXT_PUBLIC_API_URL con la URL de Railway (ej: https://api-gateway-production.up.railway.app). Luego haz redeploy.`;
+        } else {
+          errorMessage = `Error de conexión: No se pudo conectar al servidor en ${apiUrl}. Verifica que la API esté corriendo y accesible en Railway.`;
+        }
       } else if (error.response) {
         // El servidor respondió con un código de error
         errorMessage = error.response.data?.error || error.response.data?.details || error.response.statusText || 'Error del servidor';
