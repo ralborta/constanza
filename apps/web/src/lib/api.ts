@@ -1,7 +1,20 @@
 import axios from 'axios';
 import { getToken } from './auth';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+// La variable de entorno DEBE estar configurada en Vercel
+// En desarrollo local, usar localhost como fallback
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : '');
+
+// Validar en producción que la variable esté configurada
+if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_API_URL) {
+  console.error('❌ ERROR: NEXT_PUBLIC_API_URL no está configurada en Vercel. Las requests fallarán.');
+}
+
+// Validar en desarrollo que la variable esté configurada
+if (process.env.NODE_ENV === 'development' && !process.env.NEXT_PUBLIC_API_URL) {
+  console.warn('⚠️ NEXT_PUBLIC_API_URL no está configurada. Usando fallback localhost:3000');
+}
 
 // Exportar la URL para usarla en mensajes de error
 export const getApiUrl = () => API_URL;
