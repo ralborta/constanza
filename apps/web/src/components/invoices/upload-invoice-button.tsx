@@ -90,13 +90,13 @@ export function UploadInvoiceButton() {
             <br />
             <strong>Columnas requeridas:</strong>
             <br />
-            - Código Cliente (o "Codigo", también acepta CUIT o Email)
+            - Código Cliente (o &quot;Codigo&quot;, también acepta CUIT o Email)
             <br />
-            - Número Factura (o "Nro. Factura", "Nro", "Numero")
+            - Número Factura (o &quot;Nro. Factura&quot;, &quot;Nro&quot;, &quot;Numero&quot;)
             <br />
-            - Monto (o "Importe")
+            - Monto (o &quot;Importe&quot;)
             <br />
-            - Fecha Vencimiento (o "Vencimiento", "Fecha Vto")
+            - Fecha Vencimiento (o &quot;Vencimiento&quot;, &quot;Fecha Vto&quot;)
             <br />
             <br />
             <strong>Columnas opcionales:</strong> Estado (ABIERTA, PARCIAL, SALDADA)

@@ -143,9 +143,9 @@ export default function CustomersPage() {
                   Sube un archivo Excel (.xlsx) con los datos de tus clientes.
                   <br />
                   <br />
-                  <strong>Columnas requeridas:</strong> Código Único (o "Codigo"), Razón Social (o "Nombre"/"Nombrte"), Email (o "email")
+                  <strong>Columnas requeridas:</strong> Código Único (o &quot;Codigo&quot;), Razón Social (o &quot;Nombre&quot;/&quot;Nombrte&quot;), Email (o &quot;email&quot;)
                   <br />
-                  <strong>Columnas opcionales:</strong> Teléfono (o "telefono"), CUIT (o "cuit"), Código Venta (o "Codigo Ventas")
+                  <strong>Columnas opcionales:</strong> Teléfono (o &quot;telefono&quot;), CUIT (o &quot;cuit&quot;), Código Venta (o &quot;Codigo Ventas&quot;)
                   <br />
                   <br />
                   <span className="text-xs text-gray-500">
