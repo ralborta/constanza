@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -12,10 +13,21 @@ import {
   User,
   Users,
   Send,
+  Phone,
+  Upload,
+  Play,
+  List,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 const navigation = [
   { name: 'Cobranzas', href: '/dashboard', icon: LayoutDashboard },
@@ -26,13 +38,24 @@ const navigation = [
   { name: 'Eventos', href: '#', icon: Bell },
 ];
 
+const callsSubmenu = [
+  { name: 'Cargar Batch', href: '/calls/upload', icon: Upload },
+  { name: 'Ejecutar Batches', href: '/calls/batches', icon: Play },
+  { name: 'Listado de Llamadas', href: '/calls', icon: List },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
+  const [callsOpen, setCallsOpen] = useState(
+    pathname?.startsWith('/calls') || false
+  );
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.href = '/login';
   };
+
+  const isCallsActive = pathname?.startsWith('/calls');
 
   return (
     <div className="flex h-screen w-64 flex-col bg-gray-100 border-r border-gray-200">
@@ -42,7 +65,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
           return (
@@ -61,6 +84,48 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Menú desplegable de Llamadas */}
+        <Collapsible open={callsOpen} onOpenChange={setCallsOpen}>
+          <CollapsibleTrigger
+            className={cn(
+              'w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+              isCallsActive
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'text-gray-700 hover:bg-gray-50'
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <Phone className="h-5 w-5" />
+              <span>Llamadas</span>
+            </div>
+            {callsOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pl-4 mt-1 space-y-1">
+            {callsSubmenu.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                    isActive
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </CollapsibleContent>
+        </Collapsible>
       </nav>
 
       <Separator className="bg-gray-200" />
