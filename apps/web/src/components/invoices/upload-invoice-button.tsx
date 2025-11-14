@@ -56,18 +56,37 @@ export function UploadInvoiceButton() {
         }, 3000);
       }
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error || error.response?.data?.details || error.message || 'Error al subir el archivo';
-      const errorDetails = error.response?.data?.details;
+      console.error('Error completo al subir archivo:', error);
+      console.error('Error response:', error.response);
+      console.error('Error request:', error.request);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      
+      let errorMessage = 'Error al subir el archivo';
+      
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        errorMessage = `Error de conexión: No se pudo conectar al servidor. Verifica que la API esté corriendo en ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}`;
+      } else if (error.response) {
+        // El servidor respondió con un código de error
+        errorMessage = error.response.data?.error || error.response.data?.details || error.response.statusText || 'Error del servidor';
+        const errorDetails = error.response.data?.details;
+        if (errorDetails) {
+          errorMessage += `: ${errorDetails}`;
+        }
+      } else if (error.request) {
+        // La petición se hizo pero no hubo respuesta
+        errorMessage = 'No se recibió respuesta del servidor. Verifica tu conexión a internet y que el servidor esté corriendo.';
+      } else {
+        errorMessage = error.message || 'Error desconocido';
+      }
       
       setUploadResult({
         success: false,
         total: 0,
         created: 0,
         skipped: 0,
-        errors: [{ row: 0, error: errorMessage + (errorDetails ? `: ${errorDetails}` : '') }],
+        errors: [{ row: 0, error: errorMessage }],
       });
-      
-      console.error('Error uploading file:', error);
     } finally {
       setUploading(false);
       // Resetear input
