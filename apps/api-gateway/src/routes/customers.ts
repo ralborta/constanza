@@ -194,12 +194,13 @@ export async function customerRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const user = request.user!;
       
-      // Inicializar results fuera del try para que esté disponible en el catch
+      // Inicializar variables fuera del try para que estén disponibles en el catch
       const results = {
         created: 0,
         skipped: 0,
         errors: [] as Array<{ row: number; error: string }>,
       };
+      let rows: ExcelRow[] = [];
 
       try {
         const data = await request.file();
@@ -219,7 +220,7 @@ export async function customerRoutes(fastify: FastifyInstance) {
         const workbook = XLSX.read(buffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const rows: ExcelRow[] = XLSX.utils.sheet_to_json(worksheet);
+        rows = XLSX.utils.sheet_to_json(worksheet);
 
         if (rows.length === 0) {
           return reply.status(400).send({ error: 'El archivo Excel está vacío' });
@@ -367,7 +368,7 @@ export async function customerRoutes(fastify: FastifyInstance) {
         }, 'Error processing Excel file');
         
         // Si hay errores en las filas, devolverlos
-        if (results.errors.length > 0) {
+        if (results.errors.length > 0 && rows.length > 0) {
           return {
             success: false,
             total: rows.length,
