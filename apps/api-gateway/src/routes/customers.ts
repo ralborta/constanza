@@ -125,6 +125,18 @@ export async function customerRoutes(fastify: FastifyInstance) {
       fastify.log.info('POST /customers/upload endpoint called');
       const user = request.user!;
       
+      // Test de conexión a la DB
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+        fastify.log.info('Database connection OK');
+      } catch (dbError: any) {
+        fastify.log.error({ error: dbError.message, stack: dbError.stack }, 'Database connection failed');
+        return reply.status(500).send({
+          error: 'Error de conexión a la base de datos',
+          details: dbError.message || 'No se pudo conectar a la base de datos. Verifica que DATABASE_URL esté configurada y que las migraciones se hayan ejecutado.',
+        });
+      }
+      
       // Inicializar variables fuera del try para que estén disponibles en el catch
       const results = {
         created: 0,
@@ -134,11 +146,15 @@ export async function customerRoutes(fastify: FastifyInstance) {
       let rows: ExcelRow[] = [];
 
       try {
+        fastify.log.info('Starting file upload processing');
         const data = await request.file();
 
         if (!data) {
+          fastify.log.warn('No file received in request');
           return reply.status(400).send({ error: 'No se envió ningún archivo' });
         }
+        
+        fastify.log.info({ filename: data.filename, mimetype: data.mimetype }, 'File received');
 
         // Verificar que sea un archivo Excel
         const filename = data.filename.toLowerCase();
@@ -147,11 +163,14 @@ export async function customerRoutes(fastify: FastifyInstance) {
         }
 
         // Leer el archivo
+        fastify.log.info('Reading Excel file...');
         const buffer = await data.toBuffer();
+        fastify.log.info({ bufferSize: buffer.length }, 'Buffer read, parsing Excel...');
         const workbook = XLSX.read(buffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         rows = XLSX.utils.sheet_to_json(worksheet);
+        fastify.log.info({ rowsCount: rows.length, sheetName }, 'Excel parsed successfully');
 
         if (rows.length === 0) {
           return reply.status(400).send({ error: 'El archivo Excel está vacío' });
@@ -243,6 +262,7 @@ export async function customerRoutes(fastify: FastifyInstance) {
             }
 
             // Crear cliente
+            fastify.log.info({ codigoUnico, email }, 'Attempting to create customer in database');
             const customer = await prisma.customer.create({
               data: {
                 tenantId: user.tenant_id,
