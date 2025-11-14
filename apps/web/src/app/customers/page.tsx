@@ -77,11 +77,8 @@ export default function CustomersPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await api.post('/v1/customers/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // No especificar Content-Type manualmente - axios lo maneja automáticamente para FormData
+      const response = await api.post('/v1/customers/upload', formData);
 
       setUploadResult(response.data);
       
