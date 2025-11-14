@@ -59,13 +59,18 @@ export function UploadInvoiceButton() {
         }, 3000);
       }
     } catch (error: any) {
+      const errorMessage = error.response?.data?.error || error.response?.data?.details || error.message || 'Error al subir el archivo';
+      const errorDetails = error.response?.data?.details;
+      
       setUploadResult({
         success: false,
         total: 0,
         created: 0,
         skipped: 0,
-        errors: [{ row: 0, error: error.response?.data?.error || 'Error al subir el archivo' }],
+        errors: [{ row: 0, error: errorMessage + (errorDetails ? `: ${errorDetails}` : '') }],
       });
+      
+      console.error('Error uploading file:', error);
     } finally {
       setUploading(false);
       // Resetear input

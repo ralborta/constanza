@@ -218,7 +218,15 @@ export async function customerRoutes(fastify: FastifyInstance) {
           return reply.status(400).send({ error: 'El archivo Excel está vacío' });
         }
 
-        fastify.log.info({ rowsCount: rows.length }, 'Processing Excel file');
+        // Log de las columnas detectadas para debugging
+        if (rows.length > 0) {
+          const firstRowKeys = Object.keys(rows[0]);
+          fastify.log.info({ 
+            rowsCount: rows.length, 
+            columns: firstRowKeys,
+            firstRowSample: rows[0]
+          }, 'Processing Excel file');
+        }
 
         const results = {
           created: 0,
@@ -234,6 +242,14 @@ export async function customerRoutes(fastify: FastifyInstance) {
           try {
             // Normalizar nombres de columnas
             const row = normalizeExcelRow(rawRow);
+            
+            // Log para debugging
+            fastify.log.debug({ 
+              rowNumber, 
+              rawKeys: Object.keys(rawRow),
+              normalizedKeys: Object.keys(row),
+              normalizedRow: row
+            }, 'Processing row');
 
             // Validar campos requeridos
             if (!row['Código Único']) {
