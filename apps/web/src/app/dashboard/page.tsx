@@ -383,10 +383,10 @@ export default function DashboardPage() {
           {/* Columna derecha: E-Checks arriba y Gráfico abajo */}
           <div className="space-y-6">
             {/* Tabla de E-Checks */}
-            <Card>
-              <CardHeader>
+            <Card className="border-0 shadow-lg bg-white">
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
                 <div className="flex items-center justify-between">
-                  <CardTitle>E-Checks Pendientes de Aprobación</CardTitle>
+                  <CardTitle className="text-gray-800">E-Checks Pendientes de Aprobación</CardTitle>
                   <Link href="#" className="text-sm text-blue-600 hover:text-blue-800">
                     Ver todos
                   </Link>
