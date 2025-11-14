@@ -114,87 +114,15 @@ export async function customerRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // POST /customers - Crear cliente
-  fastify.post(
-    '/customers',
-    {
-      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1'])],
-    },
-    async (request, reply) => {
-      const user = request.user!;
-      const body = createCustomerSchema.parse(request.body);
-
-      // Verificar que codigo_unico no exista
-      const existing = await prisma.customer.findFirst({
-        where: {
-          tenantId: user.tenant_id,
-          codigoUnico: body.codigoUnico,
-        },
-      });
-
-      if (existing) {
-        return reply.status(409).send({ error: 'Código único ya existe' });
-      }
-
-      // Verificar que email no exista
-      const existingEmail = await prisma.customer.findFirst({
-        where: {
-          tenantId: user.tenant_id,
-          email: body.email,
-        },
-      });
-
-      if (existingEmail) {
-        return reply.status(409).send({ error: 'Email ya existe' });
-      }
-
-      const customer = await prisma.customer.create({
-        data: {
-          tenantId: user.tenant_id,
-          codigoUnico: body.codigoUnico,
-          codigoVenta: body.codigoVenta,
-          razonSocial: body.razonSocial,
-          email: body.email,
-          telefono: body.telefono,
-          activo: true,
-          accesoHabilitado: false,
-          customerCuits: body.cuits
-            ? {
-                create: body.cuits.map((cuit) => ({
-                  tenantId: user.tenant_id,
-                  cuit: cuit.cuit,
-                  razonSocial: cuit.razonSocial,
-                  isPrimary: cuit.isPrimary,
-                })),
-              }
-            : undefined,
-        },
-        include: {
-          customerCuits: true,
-        },
-      });
-
-      return {
-        customer: {
-          id: customer.id,
-          codigoUnico: customer.codigoUnico,
-          codigoVenta: customer.codigoVenta,
-          razonSocial: customer.razonSocial,
-          email: customer.email,
-          telefono: customer.telefono,
-          cuits: customer.customerCuits,
-        },
-      };
-    }
-  );
-
   // POST /customers/upload - Cargar clientes desde Excel
+  // IMPORTANTE: Esta ruta debe estar ANTES de POST /customers para que Fastify la reconozca correctamente
   fastify.post(
     '/customers/upload',
     {
       preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1'])],
     },
     async (request, reply) => {
+      fastify.log.info('POST /customers/upload endpoint called');
       const user = request.user!;
       
       // Inicializar variables fuera del try para que estén disponibles en el catch
