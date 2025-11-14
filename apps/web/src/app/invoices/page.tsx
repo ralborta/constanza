@@ -76,16 +76,18 @@ export default function InvoicesPage() {
       <div className="p-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Facturas</h1>
-            <p className="mt-1 text-sm text-gray-500">Gestiona todas tus facturas y carga datos desde Excel</p>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              Facturas
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">Gestiona todas tus facturas y carga datos desde Excel</p>
           </div>
           <UploadInvoiceButton />
         </div>
 
-        <Card>
-          <CardHeader>
+        <Card className="border-0 shadow-lg bg-white">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
             <div className="flex items-center justify-between">
-              <CardTitle>Todas las Facturas</CardTitle>
+              <CardTitle className="text-gray-800">Todas las Facturas</CardTitle>
             </div>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">

@@ -76,7 +76,7 @@ export function UploadInvoiceButton() {
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-lg">
           <Upload className="mr-2 h-4 w-4" />
           Cargar desde Excel
         </Button>

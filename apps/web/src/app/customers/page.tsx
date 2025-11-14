@@ -124,12 +124,14 @@ export default function CustomersPage() {
       <div className="p-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Clientes</h1>
-            <p className="mt-1 text-sm text-gray-500">Gestiona tus clientes y carga datos desde Excel</p>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
+              Clientes
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">Gestiona tus clientes y carga datos desde Excel</p>
           </div>
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white shadow-lg">
                 <Upload className="mr-2 h-4 w-4" />
                 Cargar desde Excel
               </Button>
@@ -207,10 +209,10 @@ export default function CustomersPage() {
           </Dialog>
         </div>
 
-        <Card>
-          <CardHeader>
+        <Card className="border-0 shadow-lg bg-white">
+          <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
             <div className="flex items-center justify-between">
-              <CardTitle>Lista de Clientes</CardTitle>
+              <CardTitle className="text-gray-800">Lista de Clientes</CardTitle>
             </div>
             <div className="mt-4">
               <div className="relative">
