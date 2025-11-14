@@ -81,14 +81,43 @@ if [ "$RAILWAY_AVAILABLE" = true ]; then
     echo "2️⃣ Configurando Railway..."
     echo ""
     
-    # Obtener DATABASE_URL de Supabase (pedir al usuario)
-    echo -e "${YELLOW}📝 Necesito la DATABASE_URL de Supabase:${NC}"
-    echo "   Ve a Supabase Dashboard → Settings → Database → Connection string → URI"
-    read -p "   DATABASE_URL: " DATABASE_URL
+    # Intentar crear Postgres en Railway automáticamente
+    echo "🗄️  Intentando crear Postgres en Railway..."
+    echo "   (Si ya existe, Railway lo detectará automáticamente)"
     
-    if [ -z "$DATABASE_URL" ]; then
-        echo -e "${RED}❌ DATABASE_URL es requerida${NC}"
-        exit 1
+    # Railway Postgres se crea desde el dashboard, pero podemos verificar si existe
+    # Por ahora, intentamos obtener DATABASE_URL de variables existentes
+    EXISTING_DB=$(railway variables --service api-gateway 2>/dev/null | grep DATABASE_URL | cut -d'=' -f2- || echo "")
+    
+    if [ -n "$EXISTING_DB" ]; then
+        echo -e "${GREEN}✅ DATABASE_URL ya existe en Railway${NC}"
+        DATABASE_URL="$EXISTING_DB"
+    else
+        echo -e "${YELLOW}⚠️  DATABASE_URL no encontrada en Railway${NC}"
+        echo ""
+        echo "   Opciones:"
+        echo "   1. Crear Postgres en Railway Dashboard → + New → Database → Postgres"
+        echo "   2. O usar Supabase (necesitarás la URL manualmente)"
+        echo ""
+        read -p "   ¿Tienes DATABASE_URL? (pega aquí o presiona Enter para usar Railway Postgres): " DATABASE_URL
+        
+        if [ -z "$DATABASE_URL" ]; then
+            echo ""
+            echo -e "${YELLOW}📝 Para crear Postgres en Railway:${NC}"
+            echo "   1. Ve a Railway Dashboard"
+            echo "   2. Click en '+ New' → 'Database' → 'Postgres'"
+            echo "   3. Railway creará DATABASE_URL automáticamente"
+            echo "   4. Luego ejecuta este script de nuevo"
+            echo ""
+            echo "   O pega aquí tu DATABASE_URL de Supabase:"
+            read -p "   DATABASE_URL: " DATABASE_URL
+            
+            if [ -z "$DATABASE_URL" ]; then
+                echo -e "${RED}❌ DATABASE_URL es requerida${NC}"
+                echo "   Crea Postgres en Railway o proporciona una DATABASE_URL"
+                exit 1
+            fi
+        fi
     fi
     
     # Configurar variables en Railway
