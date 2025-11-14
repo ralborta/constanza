@@ -41,7 +41,7 @@ export const notifyQueue = new Queue('notify.send', {
 export const notifyWorker = new Worker(
   'notify.send',
   async (job) => {
-    const { channel, customerId, invoiceId, message, templateId, variables, batchId } = job.data;
+    const { channel, customerId, invoiceId, message, templateId, variables, batchId, tenantId } = job.data;
 
     logger.info({ jobId: job.id, channel, customerId }, 'Processing notification');
 
@@ -107,6 +107,20 @@ export const notifyWorker = new Worker(
 
       logger.info({ jobId: job.id, channel, customerId }, 'Notification sent successfully');
 
+      // Actualizar batch job si existe
+      if (batchId && tenantId) {
+        try {
+          await prisma.batchJob.update({
+            where: { id: batchId },
+            data: {
+              processed: { increment: 1 },
+            },
+          });
+        } catch (error: any) {
+          logger.warn({ batchId, error: error.message }, 'Failed to update batch job');
+        }
+      }
+
       return { success: true, externalMessageId };
     } catch (error: any) {
       logger.error({ jobId: job.id, error: error.message }, 'Failed to send notification');
@@ -114,7 +128,7 @@ export const notifyWorker = new Worker(
       // Registrar error en contact.events
       await prisma.contactEvent.create({
         data: {
-          tenantId: job.data.tenantId,
+          tenantId: tenantId || job.data.tenantId,
           customerId,
           invoiceId: invoiceId || null,
           batchId: batchId || null,
@@ -128,6 +142,20 @@ export const notifyWorker = new Worker(
           ts: new Date(),
         },
       });
+
+      // Actualizar batch job con error si existe
+      if (batchId && tenantId) {
+        try {
+          await prisma.batchJob.update({
+            where: { id: batchId },
+            data: {
+              failed: { increment: 1 },
+            },
+          });
+        } catch (err: any) {
+          logger.warn({ batchId, error: err.message }, 'Failed to update batch job on error');
+        }
+      }
 
       throw error;
     }
@@ -158,7 +186,7 @@ server.get('/health', async () => {
 
 // Endpoint para agregar mensaje a la cola
 server.post('/notify/send', async (request, reply) => {
-  const { channel, customerId, invoiceId, message, templateId, variables, batchId } =
+  const { channel, customerId, invoiceId, message, templateId, variables, batchId, tenantId } =
     request.body as any;
 
   const job = await notifyQueue.add('send', {
@@ -169,7 +197,7 @@ server.post('/notify/send', async (request, reply) => {
     templateId,
     variables,
     batchId,
-    tenantId: (request as any).user?.tenant_id,
+    tenantId: tenantId || (request as any).user?.tenant_id,
   });
 
   return {

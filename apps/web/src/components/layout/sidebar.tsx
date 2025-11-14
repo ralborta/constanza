@@ -11,6 +11,7 @@ import {
   LogOut,
   User,
   Users,
+  Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -20,9 +21,9 @@ const navigation = [
   { name: 'Cobranzas', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Facturas', href: '/invoices', icon: FileText },
   { name: 'Clientes', href: '/customers', icon: Users },
+  { name: 'Enviar Mensajes', href: '/notify', icon: Send },
   { name: 'Cheques', href: '#', icon: CreditCard },
   { name: 'Eventos', href: '#', icon: Bell },
-  { name: 'Notificaciones', href: '#', icon: Bell },
 ];
 
 export function Sidebar() {

@@ -10,6 +10,7 @@ import { invoiceRoutes } from './routes/invoices.js';
 import { customerRoutes } from './routes/customers.js';
 import { kpiRoutes } from './routes/kpi.js';
 import { seedRoutes } from './routes/seed.js';
+import { notifyRoutes } from './routes/notify.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const server: FastifyInstance = Fastify({
@@ -55,6 +56,7 @@ await server.register(authRoutes, { prefix: '/auth' });
 await server.register(invoiceRoutes, { prefix: '/v1' });
 await server.register(customerRoutes, { prefix: '/v1' });
 await server.register(kpiRoutes, { prefix: '/v1' });
+await server.register(notifyRoutes, { prefix: '/v1' });
 await server.register(seedRoutes, { prefix: '/seed' });
 
 // Error handler
