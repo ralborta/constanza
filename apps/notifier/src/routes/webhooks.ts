@@ -109,8 +109,8 @@ export async function webhookRoutes(fastify: FastifyInstance) {
       });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        fastify.log.warn({ error: error.errors }, 'Invalid webhook payload');
-        return reply.status(400).send({ error: 'Invalid payload', details: error.errors });
+        fastify.log.warn({ error: error.issues }, 'Invalid webhook payload');
+        return reply.status(400).send({ error: 'Invalid payload', details: error.issues });
       }
 
       fastify.log.error({ error: error.message }, 'Error processing WhatsApp webhook');
