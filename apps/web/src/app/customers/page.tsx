@@ -230,13 +230,13 @@ export default function CustomersPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Código Único</TableHead>
-                    <TableHead>Razón Social</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Teléfono</TableHead>
-                    <TableHead>CUIT</TableHead>
-                    <TableHead>Estado</TableHead>
+                  <TableRow className="bg-gradient-to-r from-indigo-50 to-blue-50">
+                    <TableHead className="font-semibold text-gray-800">Código Único</TableHead>
+                    <TableHead className="font-semibold text-gray-800">Razón Social</TableHead>
+                    <TableHead className="font-semibold text-gray-800">Email</TableHead>
+                    <TableHead className="font-semibold text-gray-800">Teléfono</TableHead>
+                    <TableHead className="font-semibold text-gray-800">CUIT</TableHead>
+                    <TableHead className="font-semibold text-gray-800">Estado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -255,9 +255,9 @@ export default function CustomersPage() {
                   ) : (
                     filteredCustomers?.map((customer) => (
                       <TableRow key={customer.id}>
-                        <TableCell className="font-medium">{customer.codigoUnico}</TableCell>
-                        <TableCell>{customer.razonSocial}</TableCell>
-                        <TableCell>{customer.email}</TableCell>
+                        <TableCell className="font-semibold text-indigo-600">{customer.codigoUnico}</TableCell>
+                        <TableCell className="font-medium text-gray-900">{customer.razonSocial}</TableCell>
+                        <TableCell className="text-blue-600">{customer.email}</TableCell>
                         <TableCell>{customer.telefono || '-'}</TableCell>
                         <TableCell>
                           {customer.cuits.find((c) => c.isPrimary)?.cuit || '-'}

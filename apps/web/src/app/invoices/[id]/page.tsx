@@ -127,13 +127,15 @@ export default function InvoiceDetailPage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver al Dashboard
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Factura {invoice.numero}</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            Factura {invoice.numero}
+          </h1>
         </div>
 
         {/* Información de la factura */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Información de la Factura</CardTitle>
+        <Card className="mb-6 border-0 shadow-lg bg-white">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
+            <CardTitle className="text-gray-800">Información de la Factura</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -148,10 +150,10 @@ export default function InvoiceDetailPage() {
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Monto Total</h3>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                   ${(invoice.monto / 100).toLocaleString('es-AR')}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-green-600 font-medium mt-1">
                   Aplicado: ${(invoice.montoAplicado / 100).toLocaleString('es-AR')}
                 </p>
               </div>
@@ -198,9 +200,9 @@ export default function InvoiceDetailPage() {
         </Card>
 
         {/* Timeline */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Timeline de Eventos</CardTitle>
+        <Card className="border-0 shadow-lg bg-white">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+            <CardTitle className="text-gray-800">Timeline de Eventos</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">

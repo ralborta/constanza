@@ -115,14 +115,14 @@ export default function InvoicesPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>ID FACTURA</TableHead>
-                    <TableHead>CLIENTE</TableHead>
-                    <TableHead>MONTO</TableHead>
-                    <TableHead>APLICADO</TableHead>
-                    <TableHead>FECHA VENC.</TableHead>
-                    <TableHead>ESTADO</TableHead>
-                    <TableHead>ACCIONES</TableHead>
+                  <TableRow className="bg-gradient-to-r from-purple-50 to-pink-50">
+                    <TableHead className="font-semibold text-gray-800">ID FACTURA</TableHead>
+                    <TableHead className="font-semibold text-gray-800">CLIENTE</TableHead>
+                    <TableHead className="font-semibold text-gray-800">MONTO</TableHead>
+                    <TableHead className="font-semibold text-gray-800">APLICADO</TableHead>
+                    <TableHead className="font-semibold text-gray-800">FECHA VENC.</TableHead>
+                    <TableHead className="font-semibold text-gray-800">ESTADO</TableHead>
+                    <TableHead className="font-semibold text-gray-800">ACCIONES</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -144,7 +144,7 @@ export default function InvoicesPage() {
                         <TableCell className="font-medium">
                           <Link
                             href={`/invoices/${invoice.id}`}
-                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                            className="text-purple-600 hover:text-purple-800 hover:underline font-semibold"
                           >
                             {invoice.numero}
                           </Link>
@@ -157,10 +157,10 @@ export default function InvoicesPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="font-semibold text-gray-900">
                           ${(invoice.monto / 100).toLocaleString('es-AR')}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="font-medium text-green-600">
                           ${(invoice.montoAplicado / 100).toLocaleString('es-AR')}
                         </TableCell>
                         <TableCell>{format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}</TableCell>

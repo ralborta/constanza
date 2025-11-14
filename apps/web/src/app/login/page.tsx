@@ -37,15 +37,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-3xl font-bold">Constanza</CardTitle>
-          <CardDescription className="text-base">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-600 p-4">
+      <Card className="w-full max-w-md shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+        <CardHeader className="space-y-1 text-center bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white rounded-t-lg py-6">
+          <CardTitle className="text-3xl font-bold text-white drop-shadow-lg">Constanza</CardTitle>
+          <CardDescription className="text-base text-white/90">
             Sistema de Cobranzas B2B
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">
@@ -102,7 +102,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11"
+              className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg font-semibold"
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
