@@ -27,7 +27,8 @@ RUN pnpm --filter "@constanza/${SERVICE}" run build
 FROM node:20-alpine AS runner
 
 # Instalar dependencias SSL necesarias para Prisma Query Engine
-RUN apk add --no-cache openssl libc6-compat
+# Y postgresql-client para ejecutar SQL
+RUN apk add --no-cache openssl libc6-compat postgresql-client
 
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
@@ -51,10 +52,12 @@ COPY --from=build /repo/apps/api-gateway/dist ./apps/api-gateway/dist
 
 ENV NODE_ENV=production
 
-# Copiar migraciones SQL (si existen)
+# Copiar migraciones SQL para crear esquemas
 COPY --from=build /repo/infra/supabase/migrations ./infra/supabase/migrations
 
 # Ejecutar desde /app (root del workspace)
-# Ejecutar migraciones SQL antes de iniciar el servidor
-CMD sh -c "if [ -n \"$DATABASE_URL\" ]; then npx -y prisma@5.22.0 db push --schema=infra/prisma/schema.prisma --accept-data-loss || true; fi && node apps/api-gateway/dist/index.js"
+# 1. Crear esquemas SQL (core, pay, bindx, etc.)
+# 2. Prisma db push crea las tablas
+# 3. Iniciar servidor
+CMD sh -c "if [ -n \"$DATABASE_URL\" ]; then psql \"$DATABASE_URL\" -f infra/supabase/migrations/001_initial_schemas.sql 2>/dev/null || true; npx -y prisma@5.22.0 db push --schema=infra/prisma/schema.prisma --accept-data-loss || true; fi && node apps/api-gateway/dist/index.js"
 
