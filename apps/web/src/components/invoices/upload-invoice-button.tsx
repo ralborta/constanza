@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { getApiUrl } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -65,7 +65,8 @@ export function UploadInvoiceButton() {
       let errorMessage = 'Error al subir el archivo';
       
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-        errorMessage = `Error de conexión: No se pudo conectar al servidor. Verifica que la API esté corriendo en ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}`;
+        const apiUrl = getApiUrl();
+        errorMessage = `Error de conexión: No se pudo conectar al servidor en ${apiUrl}. Verifica que la API esté corriendo y accesible.`;
       } else if (error.response) {
         // El servidor respondió con un código de error
         errorMessage = error.response.data?.error || error.response.data?.details || error.response.statusText || 'Error del servidor';

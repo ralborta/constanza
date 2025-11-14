@@ -3,6 +3,9 @@ import { getToken } from './auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+// Exportar la URL para usarla en mensajes de error
+export const getApiUrl = () => API_URL;
+
 const api = axios.create({
   baseURL: API_URL,
 });
