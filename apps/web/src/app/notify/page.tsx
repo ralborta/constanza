@@ -138,8 +138,10 @@ export default function NotifyPage() {
     <MainLayout>
       <div className="p-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Enviar Notificaciones</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            Enviar Notificaciones
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">
             Envía emails o mensajes de WhatsApp a múltiples clientes
           </p>
         </div>
@@ -147,10 +149,10 @@ export default function NotifyPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Panel izquierdo: Selección de clientes */}
           <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
+            <Card className="border-0 shadow-lg bg-white">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Seleccionar Clientes</CardTitle>
+                  <CardTitle className="text-gray-800">Seleccionar Clientes</CardTitle>
                   <Button variant="outline" size="sm" onClick={handleSelectAll}>
                     {selectedCustomers.size === filteredCustomers.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
                   </Button>
@@ -203,9 +205,9 @@ export default function NotifyPage() {
 
           {/* Panel derecho: Configuración y envío */}
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Configuración</CardTitle>
+            <Card className="border-0 shadow-lg bg-white">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                <CardTitle className="text-gray-800">Configuración</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -264,7 +266,7 @@ export default function NotifyPage() {
                 <Button
                   onClick={handleSend}
                   disabled={!canSend || sendBatchMutation.isPending}
-                  className="w-full"
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
                   size="lg"
                 >
                   {sendBatchMutation.isPending ? (
@@ -306,9 +308,9 @@ export default function NotifyPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Información</CardTitle>
+            <Card className="border-0 shadow-lg bg-white">
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
+                <CardTitle className="text-gray-800">Información</CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-gray-600 space-y-2">
                 <p>

@@ -102,16 +102,18 @@ export default function CallsPage() {
     <MainLayout>
       <div className="p-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Llamadas Telefónicas</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent">
+            Llamadas Telefónicas
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">
             Historial de todas las llamadas realizadas
           </p>
         </div>
 
-        <Card>
-          <CardHeader>
+        <Card className="border-0 shadow-lg bg-white">
+          <CardHeader className="bg-gradient-to-r from-cyan-50 to-teal-50 border-b">
             <div className="flex items-center justify-between">
-              <CardTitle>Lista de Llamadas</CardTitle>
+              <CardTitle className="text-gray-800">Lista de Llamadas</CardTitle>
               <div className="flex items-center gap-4">
                 <Input
                   placeholder="Buscar por cliente, factura o ID..."

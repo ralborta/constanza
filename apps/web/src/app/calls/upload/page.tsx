@@ -71,17 +71,19 @@ export default function CallsUploadPage() {
     <MainLayout>
       <div className="p-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Cargar Batch de Llamadas</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent">
+            Cargar Batch de Llamadas
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">
             Sube un archivo Excel con los datos de las llamadas telefónicas
           </p>
         </div>
 
         <div className="max-w-3xl">
-          <Card>
-            <CardHeader>
-              <CardTitle>Formato del Archivo Excel</CardTitle>
-              <CardDescription>
+          <Card className="border-0 shadow-lg bg-white">
+            <CardHeader className="bg-gradient-to-r from-cyan-50 to-teal-50 border-b">
+              <CardTitle className="text-gray-800">Formato del Archivo Excel</CardTitle>
+              <CardDescription className="text-gray-600">
                 El archivo debe contener las siguientes columnas:
               </CardDescription>
             </CardHeader>
@@ -206,7 +208,7 @@ export default function CallsUploadPage() {
                 <Button
                   onClick={handleUpload}
                   disabled={!file || uploadMutation.isPending}
-                  className="w-full"
+                  className="w-full bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 text-white shadow-lg"
                   size="lg"
                 >
                   {uploadMutation.isPending ? (

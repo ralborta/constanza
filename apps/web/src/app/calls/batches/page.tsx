@@ -127,8 +127,10 @@ function CallsBatchesContent() {
       <div className="p-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Batches de Llamadas</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent">
+              Batches de Llamadas
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
               Gestiona y ejecuta batches de llamadas telefónicas
             </p>
           </div>
@@ -136,15 +138,16 @@ function CallsBatchesContent() {
             onClick={() => queryClient.invalidateQueries({ queryKey: ['calls-batches'] })}
             variant="outline"
             size="sm"
+            className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
           >
             <RefreshCw className="mr-2 h-4 w-4" />
             Actualizar
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Lista de Batches</CardTitle>
+        <Card className="border-0 shadow-lg bg-white">
+          <CardHeader className="bg-gradient-to-r from-cyan-50 to-teal-50 border-b">
+            <CardTitle className="text-gray-800">Lista de Batches</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -210,6 +213,7 @@ function CallsBatchesContent() {
                               executeMutation.mutate(batch.id);
                             }}
                             disabled={executeMutation.isPending}
+                            className="bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 text-white shadow-md"
                           >
                             {executeMutation.isPending && selectedBatchId === batch.id ? (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
