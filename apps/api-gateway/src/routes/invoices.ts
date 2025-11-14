@@ -11,6 +11,72 @@ const querySchema = z.object({
   fecha_vto_to: z.string().date().optional(),
 });
 
+// Función para normalizar nombres de columnas de facturas
+function normalizeInvoiceColumnName(key: string): string {
+  const normalized = key.toLowerCase().trim();
+  
+  // Mapeo de variaciones comunes a nombres estándar
+  // Código Cliente
+  if (normalized.includes('codigo') && normalized.includes('cliente')) {
+    return 'Código Cliente';
+  }
+  if (normalized === 'codigo' || normalized === 'código') {
+    return 'Código Cliente';
+  }
+  // CUIT Cliente
+  if (normalized.includes('cuit') && normalized.includes('cliente')) {
+    return 'CUIT Cliente';
+  }
+  if (normalized === 'cuit') {
+    return 'CUIT';
+  }
+  // Email Cliente
+  if (normalized.includes('email') && normalized.includes('cliente')) {
+    return 'Email Cliente';
+  }
+  if (normalized === 'email') {
+    return 'Email';
+  }
+  // Número Factura
+  if (normalized.includes('factura')) {
+    if (normalized.includes('numero') || normalized.includes('número') || normalized.includes('nro')) {
+      return 'Número Factura';
+    }
+  }
+  if (normalized === 'nro' || normalized === 'nro.' || normalized === 'numero' || normalized === 'número') {
+    return 'Número Factura';
+  }
+  // Monto
+  if (normalized === 'monto' || normalized === 'importe') {
+    return 'Monto';
+  }
+  // Fecha Vencimiento
+  if (normalized.includes('fecha') && (normalized.includes('vencimiento') || normalized.includes('vto'))) {
+    return 'Fecha Vencimiento';
+  }
+  if (normalized === 'vencimiento' || normalized === 'vto') {
+    return 'Fecha Vencimiento';
+  }
+  // Estado
+  if (normalized === 'estado') {
+    return 'Estado';
+  }
+  
+  return key; // Retornar original si no coincide
+}
+
+// Función para normalizar una fila de Excel de facturas
+function normalizeInvoiceRow(row: any): any {
+  const normalized: any = {};
+  
+  Object.keys(row).forEach((key) => {
+    const normalizedKey = normalizeInvoiceColumnName(key);
+    normalized[normalizedKey] = row[key];
+  });
+  
+  return normalized;
+}
+
 export async function invoiceRoutes(fastify: FastifyInstance) {
   // GET /invoices - Lista facturas con filtros
   fastify.get(
@@ -247,13 +313,16 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
 
         // Procesar cada fila
         for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
+          const rawRow = rows[i];
           const rowNumber = i + 2; // +2 porque Excel empieza en 1 y la fila 1 es el header
 
           try {
+            // Normalizar nombres de columnas
+            const row = normalizeInvoiceRow(rawRow);
+
             // Validar campos requeridos
             // Puede venir como "Código Cliente", "Código Único Cliente", "CUIT", o "Email Cliente"
-            const codigoCliente = row['Código Cliente'] || row['Código Único Cliente'] || row['Código Cliente'];
+            const codigoCliente = row['Código Cliente'] || row['Código Único Cliente'];
             const cuitCliente = row['CUIT Cliente'] || row['CUIT'];
             const emailCliente = row['Email Cliente'] || row['Email'];
             
@@ -263,26 +332,26 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
               continue;
             }
 
-            if (!row['Número Factura'] && !row['Número'] && !row['Numero']) {
-              results.errors.push({ row: rowNumber, error: 'Falta "Número Factura"' });
+            if (!row['Número Factura']) {
+              results.errors.push({ row: rowNumber, error: 'Falta "Número Factura" (también acepta: Nro. Factura, Numero, Número)' });
               results.skipped++;
               continue;
             }
 
-            if (!row['Monto'] && !row['Importe']) {
-              results.errors.push({ row: rowNumber, error: 'Falta "Monto"' });
+            if (!row['Monto']) {
+              results.errors.push({ row: rowNumber, error: 'Falta "Monto" (también acepta: Importe)' });
               results.skipped++;
               continue;
             }
 
-            if (!row['Fecha Vencimiento'] && !row['Fecha Vto'] && !row['Vencimiento']) {
-              results.errors.push({ row: rowNumber, error: 'Falta "Fecha Vencimiento"' });
+            if (!row['Fecha Vencimiento']) {
+              results.errors.push({ row: rowNumber, error: 'Falta "Fecha Vencimiento" (también acepta: Vencimiento, Fecha Vto)' });
               results.skipped++;
               continue;
             }
 
-            const numero = String(row['Número Factura'] || row['Número'] || row['Numero']).trim();
-            const montoStr = String(row['Monto'] || row['Importe']).replace(/[^\d.,]/g, '').replace(',', '.');
+            const numero = String(row['Número Factura']).trim();
+            const montoStr = String(row['Monto']).replace(/[^\d.,]/g, '').replace(',', '.');
             const monto = Math.round(parseFloat(montoStr) * 100); // Convertir a centavos
 
             if (isNaN(monto) || monto <= 0) {
@@ -292,7 +361,7 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
             }
 
             // Parsear fecha (puede venir en varios formatos)
-            const fechaVtoStr = String(row['Fecha Vencimiento'] || row['Fecha Vto'] || row['Vencimiento']).trim();
+            const fechaVtoStr = String(row['Fecha Vencimiento']).trim();
             let fechaVto: Date;
             
             // Intentar parsear la fecha

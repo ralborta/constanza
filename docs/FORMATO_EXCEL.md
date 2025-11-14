@@ -15,15 +15,22 @@
 ### Columnas
 
 - **Código Único** (requerido): Código único interno del cliente
+  - También acepta: `Codigo`, `Codigo Unico`, `Código`, `Código Unico`
 - **Razón Social** (requerido): Nombre de la empresa
+  - También acepta: `Nombre`, `Nombrte`, `Razon Social`, `Razón Social`
 - **Email** (requerido): Email del cliente (debe ser único)
+  - También acepta: `email` (minúsculas)
 - **Teléfono** (opcional): Número de teléfono con código de país
+  - También acepta: `telefono`, `Teléfono`
 - **CUIT** (opcional): CUIT del cliente
+  - También acepta: `cuit` (minúsculas)
 - **Código Venta** (opcional): Código de venta, por defecto "000"
+  - También acepta: `Codigo Venta`, `Codigo Ventas`, `Código Ventas`
 
 ### Notas
 
 - La primera fila debe contener los encabezados
+- **Los nombres de columnas son flexibles**: puedes usar mayúsculas/minúsculas, con o sin acentos, y algunas variaciones comunes
 - Los campos requeridos no pueden estar vacíos
 - El email debe tener formato válido
 - Si un cliente ya existe (por código único o email), se omite
@@ -48,15 +55,21 @@
 ### Columnas
 
 - **Código Cliente** (requerido*): Código único del cliente
-  - *Alternativas: CUIT Cliente o Email Cliente
+  - También acepta: `Codigo`, `Codigo Cliente`, `Código`
+  - *Alternativas: CUIT Cliente (o `CUIT`) o Email Cliente (o `Email`)
 - **Número Factura** (requerido): Número único de la factura
+  - También acepta: `Nro. Factura`, `Nro Factura`, `Numero`, `Número`, `Nro.`, `Nro`
 - **Monto** (requerido): Monto en pesos (ej: 1200.50 = $1,200.50)
+  - También acepta: `Importe`
 - **Fecha Vencimiento** (requerido): Fecha en formato DD/MM/YYYY o YYYY-MM-DD
+  - También acepta: `Vencimiento`, `Fecha Vto`, `Vto`
 - **Estado** (opcional): ABIERTA, PARCIAL o SALDADA (por defecto: ABIERTA)
+  - También acepta: `estado` (minúsculas)
 
 ### Notas
 
 - La primera fila debe contener los encabezados
+- **Los nombres de columnas son flexibles**: puedes usar mayúsculas/minúsculas, con o sin acentos, y algunas variaciones comunes
 - El monto se puede escribir con punto o coma decimal (1200.50 o 1200,50)
 - La fecha puede venir en formato DD/MM/YYYY, YYYY-MM-DD o como número de Excel
 - Si una factura ya existe (por número), se omite

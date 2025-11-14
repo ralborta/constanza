@@ -22,12 +22,55 @@ const createCustomerSchema = z.object({
 });
 
 interface ExcelRow {
-  'Código Único'?: string;
-  'Razón Social'?: string;
-  'Email'?: string;
-  'Teléfono'?: string;
-  'CUIT'?: string;
-  'Código Venta'?: string;
+  [key: string]: any;
+}
+
+// Función para normalizar nombres de columnas
+function normalizeColumnName(key: string): string {
+  const normalized = key.toLowerCase().trim();
+  
+  // Mapeo de variaciones comunes a nombres estándar
+  // Primero verificar "Código Venta" antes de "Código Único" para evitar conflictos
+  if (normalized.includes('codigo') && (normalized.includes('venta') || normalized.includes('ventas'))) {
+    return 'Código Venta';
+  }
+  // Luego verificar "Código Único" o solo "Codigo" (si no es venta)
+  if (normalized.includes('codigo') && (normalized.includes('unico') || normalized.includes('único'))) {
+    return 'Código Único';
+  }
+  // Si solo dice "codigo" sin más contexto, asumimos que es "Código Único"
+  if (normalized === 'codigo' || normalized === 'código') {
+    return 'Código Único';
+  }
+  if (normalized.includes('razon') && normalized.includes('social')) {
+    return 'Razón Social';
+  }
+  if (normalized.includes('nombre') || normalized.includes('nombrte')) {
+    return 'Razón Social';
+  }
+  if (normalized === 'email') {
+    return 'Email';
+  }
+  if (normalized.includes('telefono') || normalized.includes('teléfono')) {
+    return 'Teléfono';
+  }
+  if (normalized === 'cuit') {
+    return 'CUIT';
+  }
+  
+  return key; // Retornar original si no coincide
+}
+
+// Función para normalizar una fila de Excel
+function normalizeExcelRow(row: ExcelRow): ExcelRow {
+  const normalized: ExcelRow = {};
+  
+  Object.keys(row).forEach((key) => {
+    const normalizedKey = normalizeColumnName(key);
+    normalized[normalizedKey] = row[key];
+  });
+  
+  return normalized;
 }
 
 export async function customerRoutes(fastify: FastifyInstance) {
@@ -185,25 +228,28 @@ export async function customerRoutes(fastify: FastifyInstance) {
 
         // Procesar cada fila
         for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
+          const rawRow = rows[i];
           const rowNumber = i + 2; // +2 porque Excel empieza en 1 y la fila 1 es el header
 
           try {
+            // Normalizar nombres de columnas
+            const row = normalizeExcelRow(rawRow);
+
             // Validar campos requeridos
             if (!row['Código Único']) {
-              results.errors.push({ row: rowNumber, error: 'Falta "Código Único"' });
+              results.errors.push({ row: rowNumber, error: 'Falta "Código Único" (también acepta: Codigo, Codigo Unico)' });
               results.skipped++;
               continue;
             }
 
             if (!row['Razón Social']) {
-              results.errors.push({ row: rowNumber, error: 'Falta "Razón Social"' });
+              results.errors.push({ row: rowNumber, error: 'Falta "Razón Social" (también acepta: Nombre, Nombrte, Razon Social)' });
               results.skipped++;
               continue;
             }
 
             if (!row['Email']) {
-              results.errors.push({ row: rowNumber, error: 'Falta "Email"' });
+              results.errors.push({ row: rowNumber, error: 'Falta "Email" (también acepta: email)' });
               results.skipped++;
               continue;
             }
