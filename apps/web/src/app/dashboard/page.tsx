@@ -135,7 +135,7 @@ export default function DashboardPage() {
               <Download className="mr-2 h-4 w-4" />
               Exportar Reporte
             </Button>
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+            <Button size="sm" className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg">
               <Plus className="mr-2 h-4 w-4" />
               Generar Nuevo Cobro
             </Button>
@@ -144,64 +144,64 @@ export default function DashboardPage() {
 
         {/* KPI Cards */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Monto Total Cobrado</CardTitle>
+              <CardTitle className="text-sm font-medium text-white/90">Monto Total Cobrado</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-white">
                 {kpisLoading ? '...' : `$${((kpis?.totalCollected || kpis?.cashIn30d || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </div>
               {kpis?.totalCollectedVariation !== undefined && (
-                <p className={`text-xs mt-1 font-medium ${kpis.totalCollectedVariation >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <p className="text-xs mt-1 font-medium text-white/80">
                   {kpis.totalCollectedVariation >= 0 ? '+' : ''}{kpis.totalCollectedVariation.toFixed(1)}%
                 </p>
               )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-red-500 to-rose-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Deuda Pendiente</CardTitle>
+              <CardTitle className="text-sm font-medium text-white/90">Deuda Pendiente</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-white">
                 {kpisLoading ? '...' : `$${((kpis?.totalPending || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </div>
               {kpis?.totalPendingVariation !== undefined && (
-                <p className={`text-xs mt-1 font-medium ${kpis.totalPendingVariation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                <p className="text-xs mt-1 font-medium text-white/80">
                   {kpis.totalPendingVariation >= 0 ? '+' : ''}{kpis.totalPendingVariation.toFixed(1)}%
                 </p>
               )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Eficiencia de Cobro</CardTitle>
+              <CardTitle className="text-sm font-medium text-white/90">Eficiencia de Cobro</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-white">
                 {kpisLoading ? '...' : `${(kpis?.efficiency || kpis?.autoAppliedPct || 0).toFixed(0)}%`}
               </div>
               {kpis?.efficiencyVariation !== undefined && (
-                <p className={`text-xs mt-1 font-medium ${kpis.efficiencyVariation >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <p className="text-xs mt-1 font-medium text-white/80">
                   {kpis.efficiencyVariation >= 0 ? '+' : ''}{kpis.efficiencyVariation.toFixed(1)}%
                 </p>
               )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-500 to-pink-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">E-Checks Pendientes</CardTitle>
+              <CardTitle className="text-sm font-medium text-white/90">E-Checks Pendientes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-white">
                 {kpisLoading ? '...' : kpis?.echeqsPending || 0}
               </div>
               {kpis?.echeqsVariation !== undefined && (
-                <p className={`text-xs mt-1 font-medium ${kpis.echeqsVariation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                <p className="text-xs mt-1 font-medium text-white/80">
                   {kpis.echeqsVariation >= 0 ? '+' : ''}{kpis.echeqsVariation.toFixed(1)}%
                 </p>
               )}
@@ -212,9 +212,9 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Tabla de Cobranzas Pendientes - Ocupa 2 columnas */}
           <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Cobranzas Pendientes</CardTitle>
+            <Card className="border-0 shadow-lg bg-white">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                <CardTitle className="text-gray-800">Cobranzas Pendientes</CardTitle>
                 {/* Barra de búsqueda y filtros */}
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                   <div className="relative flex-1">
