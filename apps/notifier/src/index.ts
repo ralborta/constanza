@@ -5,6 +5,8 @@ import { PrismaClient } from '@prisma/client';
 import { sendEmail } from './channels/email.js';
 import { sendWhatsApp } from './channels/whatsapp.js';
 import { sendVoice } from './channels/voice.js';
+import { webhookRoutes } from './routes/webhooks.js';
+import { WhatsAppPoller } from './polling/whatsapp-poller.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const prisma = new PrismaClient();
@@ -178,12 +180,27 @@ server.post('/notify/send', async (request, reply) => {
 
 const start = async () => {
   try {
+    // Registrar webhooks (builderbot puede enviar webhooks)
+    await server.register(webhookRoutes, { prefix: '/wh' });
+
     const port = Number(process.env.PORT) || 3001;
     const host = process.env.HOST || '0.0.0.0';
 
     await server.listen({ port, host });
     logger.info(`🚀 Notifier running on http://${host}:${port}`);
     logger.info('📬 Worker started, processing notifications...');
+    logger.info('🔗 Webhook endpoint: POST /wh/wa/incoming');
+
+    // Iniciar polling de mensajes de WhatsApp como respaldo (si está habilitado)
+    // Builderbot puede usar webhooks, pero el polling sirve como backup
+    if (process.env.ENABLE_WHATSAPP_POLLING === 'true') {
+      const pollInterval = Number(process.env.WHATSAPP_POLL_INTERVAL_MS) || 30000;
+      const poller = new WhatsAppPoller(pollInterval);
+      await poller.start();
+      logger.info(`📱 WhatsApp polling enabled (interval: ${pollInterval}ms) - Backup method`);
+    } else {
+      logger.info('📱 WhatsApp polling disabled (using webhooks only)');
+    }
   } catch (err) {
     logger.error(err);
     process.exit(1);

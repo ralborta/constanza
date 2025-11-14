@@ -31,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { UploadInvoiceButton } from '@/components/invoices/upload-invoice-button';
 
 interface Invoice {
   id: string;
@@ -73,9 +74,12 @@ export default function InvoicesPage() {
   return (
     <MainLayout>
       <div className="p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Facturas</h1>
-          <p className="mt-1 text-sm text-gray-500">Gestiona todas tus facturas</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Facturas</h1>
+            <p className="mt-1 text-sm text-gray-500">Gestiona todas tus facturas y carga datos desde Excel</p>
+          </div>
+          <UploadInvoiceButton />
         </div>
 
         <Card>
