@@ -193,6 +193,13 @@ export async function customerRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const user = request.user!;
+      
+      // Inicializar results fuera del try para que esté disponible en el catch
+      const results = {
+        created: 0,
+        skipped: 0,
+        errors: [] as Array<{ row: number; error: string }>,
+      };
 
       try {
         const data = await request.file();
@@ -227,12 +234,6 @@ export async function customerRoutes(fastify: FastifyInstance) {
             firstRowSample: rows[0]
           }, 'Processing Excel file');
         }
-
-        const results = {
-          created: 0,
-          skipped: 0,
-          errors: [] as Array<{ row: number; error: string }>,
-        };
 
         // Procesar cada fila
         for (let i = 0; i < rows.length; i++) {
@@ -271,9 +272,13 @@ export async function customerRoutes(fastify: FastifyInstance) {
             }
 
             // Validar email
+            const emailValue = String(row['Email']!).trim();
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(row['Email']!)) {
-              results.errors.push({ row: rowNumber, error: 'Email inválido' });
+            if (!emailRegex.test(emailValue)) {
+              results.errors.push({ 
+                row: rowNumber, 
+                error: `Email inválido: "${emailValue}". El email debe tener formato válido (ej: usuario@dominio.com)` 
+              });
               results.skipped++;
               continue;
             }
@@ -332,12 +337,18 @@ export async function customerRoutes(fastify: FastifyInstance) {
             results.created++;
             fastify.log.info({ customerId: customer.id, codigoUnico }, 'Customer created from Excel');
           } catch (error: any) {
+            const errorMsg = error.message || error.toString() || 'Error desconocido';
             results.errors.push({
               row: rowNumber,
-              error: error.message || 'Error desconocido',
+              error: errorMsg,
             });
             results.skipped++;
-            fastify.log.error({ row: rowNumber, error: error.message }, 'Error processing row');
+            fastify.log.error({ 
+              row: rowNumber, 
+              error: errorMsg,
+              stack: error.stack,
+              errorName: error.name 
+            }, 'Error processing row');
           }
         }
 
@@ -349,10 +360,27 @@ export async function customerRoutes(fastify: FastifyInstance) {
           errors: results.errors,
         };
       } catch (error: any) {
-        fastify.log.error({ error: error.message }, 'Error processing Excel file');
+        fastify.log.error({ 
+          error: error.message, 
+          stack: error.stack,
+          name: error.name 
+        }, 'Error processing Excel file');
+        
+        // Si hay errores en las filas, devolverlos
+        if (results.errors.length > 0) {
+          return {
+            success: false,
+            total: rows.length,
+            created: results.created,
+            skipped: results.skipped,
+            errors: results.errors,
+          };
+        }
+        
         return reply.status(500).send({
           error: 'Error al procesar el archivo Excel',
-          details: error.message,
+          details: error.message || 'Error desconocido',
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
         });
       }
     }
