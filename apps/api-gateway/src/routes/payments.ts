@@ -89,6 +89,7 @@ export async function paymentRoutes(fastify: FastifyInstance) {
           applications: payment.applications.map((app) => ({
             id: app.id,
             invoice: {
+              id: app.invoice.id,
               numero: app.invoice.numero,
               customer: {
                 razonSocial: app.invoice.customer.razonSocial,
