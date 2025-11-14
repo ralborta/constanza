@@ -74,6 +74,9 @@ function normalizeExcelRow(row: ExcelRow): ExcelRow {
 }
 
 export async function customerRoutes(fastify: FastifyInstance) {
+  // Log para verificar que las rutas se registran
+  fastify.log.info('Registering customer routes including /customers/upload');
+  
   // GET /customers - Lista clientes
   fastify.get(
     '/customers',
