@@ -1,65 +1,54 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["multiSchema"]
 }
 
-// Seed configuration
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["core", "pay", "bindx", "contact", "ops", "audit"]
+  schemas  = ["audit", "bindx", "contact", "core", "ops", "pay"]
 }
 
-// ============================================
-// CORE - Entidades principales
-// ============================================
-
 model Tenant {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  users          User[]
-  customers      Customer[]
-  invoices       Invoice[]
-  promises       Promise[]
-  policyRules    PolicyRule[]
-  customerCuits  CustomerCuit[]
-  asociados      Asociado[]
-  echeqs         Echeq[]
-  sequences      Sequence[]
-  contactRuns    ContactRun[]
-  contactEvents  ContactEvent[]
-  batchJobs      BatchJob[]
-  decisionItems  DecisionItem[]
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String
+  slug          String         @unique
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  echeqs        Echeq[]
+  batchJobs     BatchJob[]
+  contactEvents ContactEvent[]
+  contactRuns   ContactRun[]
+  sequences     Sequence[]
+  asociados     Asociado[]
+  customerCuits CustomerCuit[]
+  customers     Customer[]
+  invoices      Invoice[]
+  policyRules   PolicyRule[]
+  promises      Promise[]
+  users         User[]
+  decisionItems DecisionItem[]
 
   @@map("tenants")
   @@schema("core")
 }
 
 model User {
-  id         String   @id @default(uuid()) @db.Uuid
-  tenantId   String   @map("tenant_id") @db.Uuid
-  codigoUnico String  @map("codigo_unico")
-  nombre     String
-  apellido   String
-  email      String
-  passwordHash String? @map("password_hash")
-  perfil     String   // ADM | OPERADOR_1 | OPERADOR_2
-  activo     Boolean  @default(true)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  decisionItemsCreated DecisionItem[] @relation("CreatedBy")
+  id                    String         @id @default(uuid()) @db.Uuid
+  tenantId              String         @map("tenant_id") @db.Uuid
+  codigoUnico           String         @map("codigo_unico")
+  nombre                String
+  apellido              String
+  email                 String
+  passwordHash          String?        @map("password_hash")
+  perfil                String
+  activo                Boolean        @default(true)
+  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  batchJobs             BatchJob[]
+  tenant                Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  decisionItemsCreated  DecisionItem[] @relation("CreatedBy")
   decisionItemsResolved DecisionItem[] @relation("ResolvedBy")
-  batchJobs  BatchJob[]
 
   @@unique([tenantId, email])
   @@unique([tenantId, codigoUnico])
@@ -68,25 +57,24 @@ model User {
 }
 
 model Customer {
-  id              String   @id @default(uuid()) @db.Uuid
-  tenantId        String   @map("tenant_id") @db.Uuid
-  codigoUnico     String   @map("codigo_unico")
-  codigoVenta     String   @default("000") @map("codigo_venta")
-  razonSocial     String   @map("razon_social")
-  email           String
-  passwordHash    String?  @map("password_hash")
-  telefono        String?
-  activo          Boolean  @default(true)
-  accesoHabilitado Boolean  @default(false) @map("acceso_habilitado")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customerCuits   CustomerCuit[]
-  invoices        Invoice[]
-  echeqs          Echeq[]
-  contactEvents   ContactEvent[]
-  contactRuns     ContactRun[]
+  id               String         @id @default(uuid()) @db.Uuid
+  tenantId         String         @map("tenant_id") @db.Uuid
+  codigoUnico      String         @map("codigo_unico")
+  codigoVenta      String         @default("000") @map("codigo_venta")
+  razonSocial      String         @map("razon_social")
+  email            String
+  passwordHash     String?        @map("password_hash")
+  telefono         String?
+  activo           Boolean        @default(true)
+  accesoHabilitado Boolean        @default(false) @map("acceso_habilitado")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  echeqs           Echeq[]
+  contactEvents    ContactEvent[]
+  contactRuns      ContactRun[]
+  customerCuits    CustomerCuit[]
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices         Invoice[]
 
   @@unique([tenantId, codigoUnico])
   @@unique([tenantId, email])
@@ -102,9 +90,8 @@ model CustomerCuit {
   razonSocial String?  @map("razon_social")
   isPrimary   Boolean  @default(false) @map("is_primary")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, cuit])
   @@index([customerId])
@@ -113,22 +100,21 @@ model CustomerCuit {
 }
 
 model Invoice {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  customerId String  @map("customer_id") @db.Uuid
-  numero    String
-  monto     Int      // centavos
-  fechaVto  DateTime @map("fecha_vto") @db.Date
-  estado    String   // ABIERTA | PARCIAL | SALDADA
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  promises  Promise[]
+  id                  String               @id @default(uuid()) @db.Uuid
+  tenantId            String               @map("tenant_id") @db.Uuid
+  customerId          String               @map("customer_id") @db.Uuid
+  numero              String
+  monto               Int
+  fechaVto            DateTime             @map("fecha_vto") @db.Date
+  estado              String
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  contactEvents       ContactEvent[]
+  contactRuns         ContactRun[]
+  customer            Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  promises            Promise[]
   paymentApplications PaymentApplication[]
-  contactRuns     ContactRun[]
-  contactEvents   ContactEvent[]
 
   @@unique([tenantId, numero])
   @@index([tenantId, customerId])
@@ -142,16 +128,15 @@ model Promise {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
   invoiceId String   @map("invoice_id") @db.Uuid
-  amount    Int?     // centavos, NULL si es total
+  amount    Int?
   dueDate   DateTime @map("due_date") @db.Date
-  channel   String   // EMAIL | WHATSAPP | VOICE
-  status    String   // PENDIENTE | CUMPLIDA | INCUMPLIDA
+  channel   String
+  status    String
   reason    String?
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status])
   @@index([dueDate])
@@ -162,10 +147,9 @@ model Promise {
 model PolicyRule {
   tenantId  String   @map("tenant_id") @db.Uuid
   key       String
-  valueJson Json     @map("value_json") @db.JsonB
+  valueJson Json     @map("value_json")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@id([tenantId, key])
@@ -174,21 +158,20 @@ model PolicyRule {
 }
 
 model Asociado {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  codigoUnico String @map("codigo_unico")
-  nombre    String
-  apellido  String
-  dni       String
-  email     String?
-  telefono  String?
-  direccion String?
-  fechaAlta DateTime? @map("fecha_alta") @db.Date
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  codigoUnico String    @map("codigo_unico")
+  nombre      String
+  apellido    String
+  dni         String
+  email       String?
+  telefono    String?
+  direccion   String?
+  fechaAlta   DateTime? @map("fecha_alta") @db.Date
+  activo      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, codigoUnico])
   @@unique([tenantId, dni])
@@ -197,21 +180,16 @@ model Asociado {
   @@schema("core")
 }
 
-// ============================================
-// PAY - Pagos
-// ============================================
-
 model Payment {
-  id          String   @id @default(uuid()) @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  sourceSystem String  @map("source_system") // CUCURU | BINDX | MANUAL
-  method      String   // TRANSFERENCIA | ECHEQ | OTRO
-  status      String   // APLICADO | PEND_LIQ | LIQUIDADO | RECHAZADO
-  settledAt   DateTime? @map("settled_at") @db.Timestamptz(6)
-  externalRef String?  @map("external_ref")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
+  id           String               @id @default(uuid()) @db.Uuid
+  tenantId     String               @map("tenant_id") @db.Uuid
+  sourceSystem String               @map("source_system")
+  method       String
+  status       String
+  settledAt    DateTime?            @map("settled_at") @db.Timestamptz(6)
+  externalRef  String?              @map("external_ref")
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
   applications PaymentApplication[]
 
   @@index([tenantId, status])
@@ -221,19 +199,18 @@ model Payment {
 }
 
 model PaymentApplication {
-  id                    String   @id @default(uuid()) @db.Uuid
-  tenantId              String   @map("tenant_id") @db.Uuid
-  paymentId             String   @map("payment_id") @db.Uuid
-  invoiceId             String   @map("invoice_id") @db.Uuid
-  amount                Int      // centavos
-  isAuthoritative       Boolean  @default(false) @map("is_authoritative")
-  appliedAt             DateTime @map("applied_at") @db.Timestamptz(6)
-  externalApplicationRef String? @map("external_application_ref")
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @map("tenant_id") @db.Uuid
+  paymentId              String   @map("payment_id") @db.Uuid
+  invoiceId              String   @map("invoice_id") @db.Uuid
+  amount                 Int
+  isAuthoritative        Boolean  @default(false) @map("is_authoritative")
+  appliedAt              DateTime @map("applied_at") @db.Timestamptz(6)
+  externalApplicationRef String?  @map("external_application_ref")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  invoice                Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  payment                Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, paymentId])
   @@index([tenantId, invoiceId])
@@ -242,26 +219,21 @@ model PaymentApplication {
   @@schema("pay")
 }
 
-// ============================================
-// BINDX - E-cheques
-// ============================================
-
 model Echeq {
-  id                String   @id @default(uuid()) @db.Uuid
-  tenantId          String   @map("tenant_id") @db.Uuid
-  customerId        String   @map("customer_id") @db.Uuid
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  customerId        String    @map("customer_id") @db.Uuid
   number            String
-  amount            Int      // centavos
-  statusOperativo   String   @map("status_operativo") // RECIBIDO | ACEPTADO | RECHAZADO
-  statusLiquidacion String   @map("status_liquidacion") // PENDIENTE | ACREDITADO | RECHAZADO
+  amount            Int
+  statusOperativo   String    @map("status_operativo")
+  statusLiquidacion String    @map("status_liquidacion")
   acceptedAt        DateTime? @map("accepted_at") @db.Timestamptz(6)
   settledAt         DateTime? @map("settled_at") @db.Timestamptz(6)
-  rejectedReason    String?  @map("rejected_reason")
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rejectedReason    String?   @map("rejected_reason")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  customer          Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, number])
   @@index([tenantId, statusOperativo, statusLiquidacion])
@@ -270,42 +242,36 @@ model Echeq {
   @@schema("bindx")
 }
 
-// ============================================
-// CONTACT - Secuencias y eventos
-// ============================================
-
 model Sequence {
-  id            String   @id @default(uuid()) @db.Uuid
-  tenantId      String   @map("tenant_id") @db.Uuid
-  name          String
-  definitionJson Json    @map("definition_json") @db.JsonB
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  runs          ContactRun[]
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  name           String
+  definitionJson Json         @map("definition_json")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  runs           ContactRun[]
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("sequences")
   @@schema("contact")
 }
 
 model ContactRun {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  invoiceId String   @map("invoice_id") @db.Uuid
-  customerId String? @map("customer_id") @db.Uuid
-  sequenceId String? @map("sequence_id") @db.Uuid
-  state     String   // PRÓX_VENCER | VENCIDA | PROMESA | PROMESA_INCUMPLIDA
-  step      Int      @default(0)
-  nextAt    DateTime? @map("next_at") @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  sequence  Sequence? @relation(fields: [sequenceId], references: [id], onDelete: SetNull)
-  events    ContactEvent[]
+  id         String         @id @default(uuid()) @db.Uuid
+  tenantId   String         @map("tenant_id") @db.Uuid
+  invoiceId  String         @map("invoice_id") @db.Uuid
+  customerId String?        @map("customer_id") @db.Uuid
+  sequenceId String?        @map("sequence_id") @db.Uuid
+  state      String
+  step       Int            @default(0)
+  nextAt     DateTime?      @map("next_at") @db.Timestamptz(6)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  events     ContactEvent[]
+  customer   Customer?      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoice    Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  sequence   Sequence?      @relation(fields: [sequenceId], references: [id])
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, state])
   @@index([nextAt])
@@ -314,33 +280,32 @@ model ContactRun {
 }
 
 model ContactEvent {
-  id              String   @id @default(uuid()) @db.Uuid
-  tenantId        String   @map("tenant_id") @db.Uuid
-  runId           String?  @map("run_id") @db.Uuid
-  batchId         String?  @map("batch_id") @db.Uuid
-  invoiceId       String?  @map("invoice_id") @db.Uuid
-  customerId      String   @map("customer_id") @db.Uuid
-  channel         String   // EMAIL | WHATSAPP | VOICE
-  direction       String   // OUTBOUND | INBOUND
-  isManual        Boolean  @default(false) @map("is_manual")
-  sentBy          String?  @map("sent_by") @db.Uuid
-  templateId      String?  @map("template_id") @db.Uuid
-  messageText     String?  @map("message_text")
-  mediaUrl        String?  @map("media_url")
-  transcription   String?
-  callDuration    Int?     @map("call_duration")
-  callSummary     String?  @map("call_summary")
-  payload         Json?    @db.JsonB
-  status          String   // SCHEDULED | SENT | DELIVERED | READ | FAILED
-  externalMessageId String? @map("external_message_id")
-  errorReason     String?  @map("error_reason")
-  ts              DateTime @default(now()) @db.Timestamptz(6)
-
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  run       ContactRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
-  batch     BatchJob? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  id                String      @id @default(uuid()) @db.Uuid
+  tenantId          String      @map("tenant_id") @db.Uuid
+  runId             String?     @map("run_id") @db.Uuid
+  batchId           String?     @map("batch_id") @db.Uuid
+  invoiceId         String?     @map("invoice_id") @db.Uuid
+  customerId        String      @map("customer_id") @db.Uuid
+  channel           String
+  direction         String
+  isManual          Boolean     @default(false) @map("is_manual")
+  sentBy            String?     @map("sent_by") @db.Uuid
+  templateId        String?     @map("template_id") @db.Uuid
+  messageText       String?     @map("message_text")
+  mediaUrl          String?     @map("media_url")
+  transcription     String?
+  callDuration      Int?        @map("call_duration")
+  callSummary       String?     @map("call_summary")
+  payload           Json?
+  status            String
+  externalMessageId String?     @map("external_message_id")
+  errorReason       String?     @map("error_reason")
+  ts                DateTime    @default(now()) @db.Timestamptz(6)
+  batch             BatchJob?   @relation(fields: [batchId], references: [id])
+  customer          Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoice           Invoice?    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  run               ContactRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, runId])
   @@index([ts])
@@ -350,26 +315,25 @@ model ContactEvent {
 }
 
 model BatchJob {
-  id            String   @id @default(uuid()) @db.Uuid
-  tenantId      String   @map("tenant_id") @db.Uuid
-  createdBy     String   @map("created_by") @db.Uuid
-  channel       String   // EMAIL | WHATSAPP | VOICE
-  templateId    String?  @map("template_id") @db.Uuid
-  totalMessages Int      @map("total_messages")
-  processed     Int      @default(0)
-  failed        Int      @default(0)
-  status        String   // PENDING | PROCESSING | COMPLETED | FAILED | CANCELLED
-  fileName      String?  @map("file_name")
-  fileFormat    String?  @map("file_format") // CSV | JSON
-  errorSummary  Json?    @map("error_summary") @db.JsonB
-  startedAt     DateTime? @map("started_at") @db.Timestamptz(6)
-  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  events    ContactEvent[]
+  id            String         @id @default(uuid()) @db.Uuid
+  tenantId      String         @map("tenant_id") @db.Uuid
+  createdBy     String         @map("created_by") @db.Uuid
+  channel       String
+  templateId    String?        @map("template_id") @db.Uuid
+  totalMessages Int            @map("total_messages")
+  processed     Int            @default(0)
+  failed        Int            @default(0)
+  status        String
+  fileName      String?        @map("file_name")
+  fileFormat    String?        @map("file_format")
+  errorSummary  Json?          @map("error_summary")
+  startedAt     DateTime?      @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime?      @map("completed_at") @db.Timestamptz(6)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user          User           @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events        ContactEvent[]
 
   @@index([tenantId, status])
   @@index([createdBy])
@@ -377,31 +341,25 @@ model BatchJob {
   @@schema("contact")
 }
 
-// ============================================
-// OPS - Operaciones y decisiones
-// ============================================
-
 model DecisionItem {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  type      String   // DESAPLICAR | REAPLICAR | CREDIT_NOTE | ESCALAR
-  severity  String   // LOW | MEDIUM | HIGH
-  status    String   // OPEN | RESOLVED
-  slaAt     DateTime? @map("sla_at") @db.Timestamptz(6)
-  dataJson  Json     @map("data_json") @db.JsonB
-  createdBy String?  @map("created_by") @db.Uuid
-  resolvedBy String? @map("resolved_by") @db.Uuid
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  type       String
+  severity   String
+  status     String
+  slaAt      DateTime? @map("sla_at") @db.Timestamptz(6)
+  dataJson   Json      @map("data_json")
+  createdBy  String?   @map("created_by") @db.Uuid
+  resolvedBy String?   @map("resolved_by") @db.Uuid
   resolvedAt DateTime? @map("resolved_at") @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  creator   User?    @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
-  resolver  User?    @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  creator    User?     @relation("CreatedBy", fields: [createdBy], references: [id])
+  resolver   User?     @relation("ResolvedBy", fields: [resolvedBy], references: [id])
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status])
   @@index([slaAt])
   @@map("decision_items")
   @@schema("ops")
 }
-
