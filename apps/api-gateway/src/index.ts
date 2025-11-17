@@ -33,9 +33,12 @@ const logger = server.log as unknown as SimpleLogger;
 // Plugins
 await server.register(cors, {
   origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  credentials: true,
 });
 
-await server.register(helmet);
+await server.register(helmet, {
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+});
 
 await server.register(rateLimit, {
   max: 100,
