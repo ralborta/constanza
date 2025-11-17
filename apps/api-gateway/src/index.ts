@@ -31,8 +31,25 @@ const server: FastifyInstance = Fastify({
 const logger = server.log as unknown as SimpleLogger;
 
 // Plugins
+// CORS debe estar ANTES de helmet para que funcione correctamente
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || ['*'];
+
 await server.register(cors, {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  origin: allowedOrigins.includes('*') 
+    ? true  // Permitir todos los orígenes si es '*'
+    : (origin, cb) => {
+        // Permitir requests sin origin (Postman, curl, etc.)
+        if (!origin) {
+          return cb(null, true);
+        }
+        if (allowedOrigins.includes(origin)) {
+          cb(null, true);
+        } else {
+          cb(new Error('Not allowed by CORS'), false);
+        }
+      },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 });
 
