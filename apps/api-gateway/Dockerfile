@@ -16,7 +16,11 @@ COPY infra ./infra
 RUN pnpm install --frozen-lockfile
 
 # 🔥 Hot-fix: generar el cliente con npx SIN tocar tu lockfile
-RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
+# Ignorar errores de checksum si Prisma servers están caídos
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma || \
+    (echo "⚠️ Prisma generate falló, reintentando..." && sleep 5 && \
+     npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma)
 
 # Compilar SOLO el servicio
 ARG SERVICE=api-gateway
@@ -45,7 +49,11 @@ COPY --from=build /repo/infra ./infra
 RUN pnpm install --frozen-lockfile --prod --filter "@constanza/api-gateway"
 
 # 🔥 Regenerar Prisma Client en el runner stage (después de instalar deps)
-RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
+# Ignorar errores de checksum si Prisma servers están caídos
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma || \
+    (echo "⚠️ Prisma generate falló, reintentando..." && sleep 5 && \
+     npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma)
 
 # Copiar el código compilado
 COPY --from=build /repo/apps/api-gateway/dist ./apps/api-gateway/dist
