@@ -21,11 +21,30 @@ export async function authRoutes(fastify: FastifyInstance) {
     // 🔥 TEMPORAL: Usuario fake para desarrollo sin DB
     // TODO: Remover cuando la DB esté lista
     if (body.email === 'admin@constanza.com' && body.password === 'admin123') {
-      const fakeTenantId = 'fake-tenant-id';
-      const fakeUserId = 'fake-user-id';
+      // Intentar obtener un tenant real de la DB primero
+      let tenantId: string;
+      try {
+        const tenant = await prisma.tenant.findFirst({
+          orderBy: { createdAt: 'asc' },
+        });
+        if (tenant) {
+          tenantId = tenant.id;
+          fastify.log.info({ tenantId }, 'Using real tenant from DB for fake user');
+        } else {
+          // Si no hay tenant, usar un UUID válido temporal
+          tenantId = '00000000-0000-0000-0000-000000000001';
+          fastify.log.warn('No tenant found in DB, using temporary UUID');
+        }
+      } catch (error) {
+        // Si falla la DB, usar UUID válido temporal
+        tenantId = '00000000-0000-0000-0000-000000000001';
+        fastify.log.warn({ error }, 'DB error, using temporary UUID for fake user');
+      }
+      
+      const fakeUserId = '00000000-0000-0000-0000-000000000002';
       
       const token = fastify.jwt.sign({
-        tenant_id: fakeTenantId,
+        tenant_id: tenantId,
         user_id: fakeUserId,
         perfil: 'ADM' as const,
       });
@@ -97,11 +116,30 @@ export async function authRoutes(fastify: FastifyInstance) {
     // 🔥 TEMPORAL: Cliente fake para desarrollo sin DB
     // TODO: Remover cuando la DB esté lista
     if (body.email === 'cliente@acme.com' && body.password === 'cliente123') {
-      const fakeTenantId = 'fake-tenant-id';
-      const fakeCustomerId = 'fake-customer-id';
+      // Intentar obtener un tenant real de la DB primero
+      let tenantId: string;
+      try {
+        const tenant = await prisma.tenant.findFirst({
+          orderBy: { createdAt: 'asc' },
+        });
+        if (tenant) {
+          tenantId = tenant.id;
+          fastify.log.info({ tenantId }, 'Using real tenant from DB for fake customer');
+        } else {
+          // Si no hay tenant, usar un UUID válido temporal
+          tenantId = '00000000-0000-0000-0000-000000000001';
+          fastify.log.warn('No tenant found in DB, using temporary UUID');
+        }
+      } catch (error) {
+        // Si falla la DB, usar UUID válido temporal
+        tenantId = '00000000-0000-0000-0000-000000000001';
+        fastify.log.warn({ error }, 'DB error, using temporary UUID for fake customer');
+      }
+      
+      const fakeCustomerId = '00000000-0000-0000-0000-000000000003';
       
       const token = fastify.jwt.sign({
-        tenant_id: fakeTenantId,
+        tenant_id: tenantId,
         customer_id: fakeCustomerId,
         perfil: 'CLIENTE',
       });
