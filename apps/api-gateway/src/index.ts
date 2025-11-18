@@ -31,26 +31,20 @@ const server: FastifyInstance = Fastify({
 const logger = server.log as unknown as SimpleLogger;
 
 // Plugins
-// CORS debe estar ANTES de helmet para que funcione correctamente
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || ['*'];
-
+// CORS MARTILLO: Configuración que SÍ O SÍ funciona
 await server.register(cors, {
-  origin: allowedOrigins.includes('*') 
-    ? true  // Permitir todos los orígenes si es '*'
-    : (origin, cb) => {
-        // Permitir requests sin origin (Postman, curl, etc.)
-        if (!origin) {
-          return cb(null, true);
-        }
-        if (allowedOrigins.includes(origin)) {
-          cb(null, true);
-        } else {
-          cb(new Error('Not allowed by CORS'), false);
-        }
-      },
+  origin: true, // PERMITE TODOS LOS ORIGENES (para sacar el problema)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
+});
+
+// Handler explícito para OPTIONS (preflight)
+server.options('*', async (request, reply) => {
+  reply
+    .code(204)
+    .header('Content-Length', '0')
+    .send();
 });
 
 await server.register(helmet, {
@@ -89,6 +83,11 @@ server.setErrorHandler((error, request, reply) => {
   reply.status(error.statusCode || 500).send({
     error: error.message || 'Internal Server Error',
   });
+});
+
+// Hook para verificar que esta versión está corriendo
+server.addHook('onReady', async () => {
+  logger.info('🚀 API-GATEWAY vCORS-TEST DESPLEGADO');
 });
 
 const start = async () => {
