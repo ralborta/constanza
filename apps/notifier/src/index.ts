@@ -2,9 +2,10 @@ import Fastify, { FastifyInstance } from 'fastify';
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
-import { sendEmail } from './channels/email.js';
+import { sendEmail, EmailError, EmailErrorCode } from './channels/email.js';
 import { sendWhatsApp } from './channels/whatsapp.js';
 import { sendVoice } from './channels/voice.js';
+import { renderEmailTemplate } from './templates/email.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { WhatsAppPoller } from './polling/whatsapp-poller.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
@@ -61,10 +62,21 @@ export const notifyWorker = new Worker(
 
       // Enviar según canal
       if (channel === 'EMAIL') {
+        // Renderizar template con variables resueltas
+        const rendered = await renderEmailTemplate({
+          templateText: message.body || message.text || '',
+          variables: variables || {},
+          customerId: customer.id,
+          invoiceId: invoiceId || undefined,
+          tenantId: tenantId || customer.tenantId,
+        });
+
+        // Enviar email con HTML renderizado
         result = await sendEmail({
-          to: customer.email,
-          subject: message.subject || 'Recordatorio de pago',
-          body: message.body || message.text,
+          to: customer.email!,
+          subject: message.subject || rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
         });
         externalMessageId = result.messageId;
       } else if (channel === 'WHATSAPP') {
@@ -123,7 +135,25 @@ export const notifyWorker = new Worker(
 
       return { success: true, externalMessageId };
     } catch (error: any) {
-      logger.error({ jobId: job.id, error: error.message }, 'Failed to send notification');
+      // Determinar código de error y mensaje
+      let errorCode = 'ERROR_UNKNOWN';
+      let errorMessage = error.message || 'Error desconocido';
+
+      if (error instanceof EmailError) {
+        errorCode = error.code;
+        errorMessage = error.message;
+        logger.error(
+          {
+            jobId: job.id,
+            errorCode: error.code,
+            error: error.message,
+            originalError: error.originalError?.message,
+          },
+          'Failed to send email notification'
+        );
+      } else {
+        logger.error({ jobId: job.id, error: error.message, stack: error.stack }, 'Failed to send notification');
+      }
 
       // Registrar error en contact.events
       await prisma.contactEvent.create({
