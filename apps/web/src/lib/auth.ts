@@ -24,9 +24,13 @@ export interface AuthResponse {
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
+  // Log para debuggear
+  console.log('🔍 Login attempt:', { email, apiUrl: API_URL });
+  
   // 🔥 TEMPORAL: Usuario fake para desarrollo sin backend
   // TODO: Remover cuando Railway esté funcionando
   if (email === 'admin@constanza.com' && password === 'admin123') {
+    console.log('✅ Usando usuario fake');
     const fakeToken = 'fake-token-' + Date.now();
     return {
       token: fakeToken,
@@ -42,12 +46,20 @@ export async function login(email: string, password: string): Promise<AuthRespon
 
   // Intenta login real con backend
   try {
+    console.log('🌐 Intentando login con backend:', `${API_URL}/auth/login`);
     const response = await axios.post(`${API_URL}/auth/login`, {
       email,
       password,
     });
+    console.log('✅ Login exitoso:', response.data);
     return response.data;
   } catch (error: any) {
+    console.error('❌ Error en login:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url,
+    });
     // Si falla el backend, permite el usuario fake
     throw error;
   }

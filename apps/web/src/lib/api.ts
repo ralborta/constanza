@@ -6,6 +6,13 @@ import { getToken } from './auth';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 
   (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : '');
 
+// Log para debuggear (solo en cliente)
+if (typeof window !== 'undefined') {
+  console.log('🔍 API_URL configurada:', API_URL);
+  console.log('🔍 NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+  console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
+}
+
 // Validar en producción que la variable esté configurada
 if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_API_URL) {
   console.error('❌ ERROR: NEXT_PUBLIC_API_URL no está configurada en Vercel. Las requests fallarán.');
