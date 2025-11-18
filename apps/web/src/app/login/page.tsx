@@ -19,17 +19,21 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🔍 handleSubmit llamado', { email, password, isCustomer });
     setError('');
     setLoading(true);
 
     try {
+      console.log('🔍 Intentando login...');
       const response = isCustomer
         ? await loginCustomer(email, password)
         : await login(email, password);
 
+      console.log('✅ Login exitoso, guardando token y redirigiendo...', response);
       setToken(response.token);
       router.push('/dashboard');
     } catch (err: any) {
+      console.error('❌ Error en login:', err);
       setError(err.response?.data?.error || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
