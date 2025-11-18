@@ -31,25 +31,12 @@ const server: FastifyInstance = Fastify({
 const logger = server.log as unknown as SimpleLogger;
 
 // Plugins
-// CORS MARTILLO: Configuración que SÍ O SÍ funciona
+// CORS: @fastify/cors maneja automáticamente los OPTIONS (preflight)
 await server.register(cors, {
-  origin: true, // PERMITE TODOS LOS ORIGENES (para sacar el problema)
+  origin: true, // PERMITE TODOS LOS ORIGENES
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-});
-
-// Handler explícito para OPTIONS (preflight) - ANTES de registrar rutas
-server.options('*', async (request, reply) => {
-  try {
-    reply
-      .code(204)
-      .header('Content-Length', '0')
-      .send();
-  } catch (error) {
-    logger.error({ error }, 'Error en handler OPTIONS');
-    reply.code(500).send({ error: 'Internal server error' });
-  }
 });
 
 await server.register(helmet, {
@@ -92,9 +79,9 @@ server.setErrorHandler((error, request, reply) => {
 
 // Hook para verificar que esta versión está corriendo
 server.addHook('onReady', async () => {
-  logger.info('🚀 API-GATEWAY vCORS-TEST DESPLEGADO');
+  logger.info('🚀 API-GATEWAY vCORS-FIX DESPLEGADO');
   logger.info('✅ CORS configurado con origin: true');
-  logger.info('✅ Handler OPTIONS registrado');
+  logger.info('✅ @fastify/cors maneja OPTIONS automáticamente');
 });
 
 // Hook para loggear errores de requests
