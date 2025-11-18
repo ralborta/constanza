@@ -19,30 +19,53 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🔍 handleSubmit llamado', { email, password, isCustomer });
-    
-    // Validación básica
-    if (!email || !password) {
-      console.warn('⚠️ Email o password vacíos');
-      setError('Por favor completa todos los campos');
-      return;
-    }
+    console.log('🔍 FORM SUBMIT ejecutado', { email, password, isCustomer });
     
     setError('');
     setLoading(true);
 
     try {
-      console.log('🔍 Intentando login...');
-      const response = isCustomer
-        ? await loginCustomer(email, password)
-        : await login(email, password);
-
-      console.log('✅ Login exitoso, guardando token y redirigiendo...', response);
-      setToken(response.token);
+      // PASO 1: Test con httpbin para verificar que fetch funciona
+      console.log('🔍 Test fetch a httpbin...');
+      const testRes = await fetch('https://httpbin.org/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: 'ok' }),
+      });
+      console.log('🔍 Resultado httpbin:', testRes.status);
+      
+      // PASO 2: Si httpbin funciona, intentar con el backend real
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      console.log('🔍 API_URL:', apiUrl);
+      
+      if (!apiUrl) {
+        throw new Error('NEXT_PUBLIC_API_URL no está configurada');
+      }
+      
+      console.log('🔍 Intentando login con backend:', `${apiUrl}/auth/login`);
+      const response = await fetch(`${apiUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      console.log('🔍 Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Error login:', response.status, errorData);
+        setError(errorData.error || 'Error al iniciar sesión');
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('✅ Login exitoso:', data);
+      
+      setToken(data.token);
       router.push('/dashboard');
     } catch (err: any) {
       console.error('❌ Error en login:', err);
-      setError(err.response?.data?.error || 'Error al iniciar sesión');
+      setError(err.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
@@ -58,7 +81,11 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form 
+            className="space-y-4" 
+            onSubmit={handleSubmit}
+            // IMPORTANTE: que el form envuelva todo el contenido de login
+          >
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">
                 Email
@@ -114,7 +141,9 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              onClick={() => console.log('🔍 Botón clickeado')}
+              onClick={() => {
+                console.log('🔍 BUTTON CLICK');
+              }}
               className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg font-semibold"
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
