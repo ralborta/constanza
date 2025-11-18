@@ -21,38 +21,74 @@ export async function authRoutes(fastify: FastifyInstance) {
     // 🔥 TEMPORAL: Usuario fake para desarrollo sin DB
     // TODO: Remover cuando la DB esté lista
     if (body.email === 'admin@constanza.com' && body.password === 'admin123') {
-      // Intentar obtener un tenant real de la DB primero
+      // Intentar obtener un tenant y usuario real de la DB primero
       let tenantId: string;
+      let userId: string;
+      
       try {
         const tenant = await prisma.tenant.findFirst({
           orderBy: { createdAt: 'asc' },
         });
+        
         if (tenant) {
           tenantId = tenant.id;
           fastify.log.info({ tenantId }, 'Using real tenant from DB for fake user');
+          
+          // Intentar obtener un usuario admin real de la DB
+          const adminUser = await prisma.user.findFirst({
+            where: {
+              tenantId: tenant.id,
+              perfil: 'ADM',
+              activo: true,
+            },
+            orderBy: { createdAt: 'asc' },
+          });
+          
+          if (adminUser) {
+            userId = adminUser.id;
+            fastify.log.info({ userId }, 'Using real admin user from DB');
+          } else {
+            // Si no hay usuario admin, usar el primer usuario disponible
+            const anyUser = await prisma.user.findFirst({
+              where: {
+                tenantId: tenant.id,
+                activo: true,
+              },
+              orderBy: { createdAt: 'asc' },
+            });
+            
+            if (anyUser) {
+              userId = anyUser.id;
+              fastify.log.warn({ userId }, 'Using first available user from DB (not admin)');
+            } else {
+              // Si no hay usuarios, usar UUID temporal (fallará al crear batchJob, pero al menos el login funciona)
+              userId = '00000000-0000-0000-0000-000000000002';
+              fastify.log.warn('No users found in DB, using temporary UUID (batchJob creation will fail)');
+            }
+          }
         } else {
-          // Si no hay tenant, usar un UUID válido temporal
+          // Si no hay tenant, usar UUIDs temporales
           tenantId = '00000000-0000-0000-0000-000000000001';
-          fastify.log.warn('No tenant found in DB, using temporary UUID');
+          userId = '00000000-0000-0000-0000-000000000002';
+          fastify.log.warn('No tenant found in DB, using temporary UUIDs');
         }
       } catch (error) {
-        // Si falla la DB, usar UUID válido temporal
+        // Si falla la DB, usar UUIDs temporales
         tenantId = '00000000-0000-0000-0000-000000000001';
-        fastify.log.warn({ error }, 'DB error, using temporary UUID for fake user');
+        userId = '00000000-0000-0000-0000-000000000002';
+        fastify.log.warn({ error }, 'DB error, using temporary UUIDs for fake user');
       }
-      
-      const fakeUserId = '00000000-0000-0000-0000-000000000002';
       
       const token = fastify.jwt.sign({
         tenant_id: tenantId,
-        user_id: fakeUserId,
+        user_id: userId,
         perfil: 'ADM' as const,
       });
 
       return {
         token,
         user: {
-          id: fakeUserId,
+          id: userId,
           nombre: 'Admin',
           apellido: 'Sistema',
           email: 'admin@constanza.com',

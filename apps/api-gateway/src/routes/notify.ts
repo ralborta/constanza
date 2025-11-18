@@ -76,10 +76,18 @@ export async function notifyRoutes(fastify: FastifyInstance) {
         }
 
         // Crear batch job para tracking
+        // Validar que user_id sea un UUID válido
+        if (!user.user_id) {
+          fastify.log.error({ tenantId: user.tenant_id }, 'user_id no está presente en el JWT');
+          return reply.status(400).send({
+            error: 'Usuario no válido. Por favor, inicia sesión nuevamente.',
+          });
+        }
+
         const batchJob = await prisma.batchJob.create({
           data: {
             tenantId: user.tenant_id,
-            createdBy: user.user_id || '', // user_id viene del JWT
+            createdBy: user.user_id, // user_id viene del JWT (debe ser UUID válido)
             channel: body.channel,
             status: 'PROCESSING',
             totalMessages: customers.length,
