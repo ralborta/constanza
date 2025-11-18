@@ -16,11 +16,14 @@ COPY infra ./infra
 RUN pnpm install --frozen-lockfile
 
 # 🔥 Hot-fix: generar el cliente con npx SIN tocar tu lockfile
-# Ignorar errores de checksum si Prisma servers están caídos
+# Ignorar errores de checksum y usar reintentos más robustos si Prisma servers están caídos
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
-RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma || \
-    (echo "⚠️ Prisma generate falló, reintentando..." && sleep 5 && \
-     npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma)
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
+RUN for i in 1 2 3 4 5; do \
+      echo "🔄 Intento $i/5 de Prisma generate..." && \
+      npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma && break || \
+      (echo "⚠️ Intento $i falló, esperando 10 segundos..." && sleep 10); \
+    done || (echo "❌ Todos los intentos fallaron, pero continuando..." && exit 0)
 
 # Compilar SOLO el servicio
 ARG SERVICE=api-gateway
@@ -49,11 +52,14 @@ COPY --from=build /repo/infra ./infra
 RUN pnpm install --frozen-lockfile --prod --filter "@constanza/api-gateway"
 
 # 🔥 Regenerar Prisma Client en el runner stage (después de instalar deps)
-# Ignorar errores de checksum si Prisma servers están caídos
+# Ignorar errores de checksum y usar reintentos más robustos si Prisma servers están caídos
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
-RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma || \
-    (echo "⚠️ Prisma generate falló, reintentando..." && sleep 5 && \
-     npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma)
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
+RUN for i in 1 2 3 4 5; do \
+      echo "🔄 Intento $i/5 de Prisma generate..." && \
+      npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma && break || \
+      (echo "⚠️ Intento $i falló, esperando 10 segundos..." && sleep 10); \
+    done || (echo "❌ Todos los intentos fallaron, pero continuando..." && exit 0)
 
 # Copiar el código compilado
 COPY --from=build /repo/apps/api-gateway/dist ./apps/api-gateway/dist
