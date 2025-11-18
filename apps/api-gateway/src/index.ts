@@ -39,12 +39,17 @@ await server.register(cors, {
   credentials: true,
 });
 
-// Handler explícito para OPTIONS (preflight)
+// Handler explícito para OPTIONS (preflight) - ANTES de registrar rutas
 server.options('*', async (request, reply) => {
-  reply
-    .code(204)
-    .header('Content-Length', '0')
-    .send();
+  try {
+    reply
+      .code(204)
+      .header('Content-Length', '0')
+      .send();
+  } catch (error) {
+    logger.error({ error }, 'Error en handler OPTIONS');
+    reply.code(500).send({ error: 'Internal server error' });
+  }
 });
 
 await server.register(helmet, {
@@ -88,6 +93,18 @@ server.setErrorHandler((error, request, reply) => {
 // Hook para verificar que esta versión está corriendo
 server.addHook('onReady', async () => {
   logger.info('🚀 API-GATEWAY vCORS-TEST DESPLEGADO');
+  logger.info('✅ CORS configurado con origin: true');
+  logger.info('✅ Handler OPTIONS registrado');
+});
+
+// Hook para loggear errores de requests
+server.addHook('onError', async (request, reply, error) => {
+  logger.error({ 
+    url: request.url, 
+    method: request.method,
+    error: error.message,
+    stack: error.stack 
+  }, 'Error en request');
 });
 
 const start = async () => {
