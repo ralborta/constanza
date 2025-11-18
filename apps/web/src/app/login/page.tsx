@@ -20,6 +20,14 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('🔍 handleSubmit llamado', { email, password, isCustomer });
+    
+    // Validación básica
+    if (!email || !password) {
+      console.warn('⚠️ Email o password vacíos');
+      setError('Por favor completa todos los campos');
+      return;
+    }
+    
     setError('');
     setLoading(true);
 
@@ -106,6 +114,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
+              onClick={() => console.log('🔍 Botón clickeado')}
               className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg font-semibold"
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
