@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { MainLayout } from '@/components/layout/main-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,9 +16,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Mail, MessageSquare, Phone, Send, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { 
+  Mail, 
+  MessageSquare, 
+  Phone, 
+  Send, 
+  AlertCircle, 
+  CheckCircle2, 
+  Loader2,
+  Eye,
+  EyeOff,
+  Users,
+  Sparkles,
+  FileText
+} from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 interface Customer {
   id: string;
@@ -39,10 +54,12 @@ interface BatchResult {
 export default function NotifyPage() {
   const queryClient = useQueryClient();
   const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set());
-  const [channel, setChannel] = useState<'EMAIL' | 'WHATSAPP'>('EMAIL');
+  const [channel, setChannel] = useState<'EMAIL' | 'WHATSAPP' | 'VOICE'>('EMAIL');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [messageTemplate, setMessageTemplate] = useState('');
 
   const { data: customers, isLoading: customersLoading } = useQuery<{ customers: Customer[] }>({
     queryKey: ['customers'],
@@ -55,7 +72,7 @@ export default function NotifyPage() {
   const sendBatchMutation = useMutation({
     mutationFn: async (data: {
       customerIds: string[];
-      channel: 'EMAIL' | 'WHATSAPP';
+      channel: 'EMAIL' | 'WHATSAPP' | 'VOICE';
       message: { text?: string; body?: string; subject?: string };
     }) => {
       const response = await api.post('/v1/notify/batch', data);
@@ -67,8 +84,32 @@ export default function NotifyPage() {
       setSelectedCustomers(new Set());
       setMessage('');
       setSubject('');
+      setMessageTemplate('');
+      setShowPreview(false);
     },
   });
+
+  // Plantillas de mensajes comunes
+  const messageTemplates = {
+    EMAIL: {
+      'Recordatorio de pago': 'Estimado/a {nombre_cliente},\n\nLe recordamos que tiene una factura pendiente de pago.\n\nPor favor, realice el pago a la brevedad para evitar intereses.\n\nSaludos cordiales.',
+      'Factura vencida': 'Estimado/a {nombre_cliente},\n\nSu factura se encuentra vencida. Por favor, contáctenos para regularizar su situación.\n\nSaludos cordiales.',
+      'Confirmación de pago': 'Estimado/a {nombre_cliente},\n\nHemos recibido su pago correctamente. Muchas gracias.\n\nSaludos cordiales.',
+    },
+    WHATSAPP: {
+      'Recordatorio corto': 'Hola {nombre_cliente}, te recordamos que tienes una factura pendiente. Por favor, realiza el pago a la brevedad. Gracias!',
+      'Factura vencida': 'Hola {nombre_cliente}, tu factura está vencida. Por favor contáctanos para regularizar. Gracias!',
+      'Confirmación': 'Hola {nombre_cliente}, hemos recibido tu pago. ¡Gracias!',
+    },
+    VOICE: {
+      'Recordatorio': 'Hola {nombre_cliente}, te recordamos que tienes una factura pendiente de pago. Por favor, realiza el pago a la brevedad. Gracias.',
+    },
+  };
+
+  const handleTemplateSelect = (template: string) => {
+    setMessage(template);
+    setMessageTemplate(template);
+  };
 
   const handleToggleCustomer = (customerId: string) => {
     const newSelected = new Set(selectedCustomers);
@@ -122,7 +163,7 @@ export default function NotifyPage() {
     
     // Filtrar según canal
     if (channel === 'EMAIL' && !customer.email) return false;
-    if (channel === 'WHATSAPP' && !customer.telefono) return false;
+    if ((channel === 'WHATSAPP' || channel === 'VOICE') && !customer.telefono) return false;
 
     const search = searchTerm.toLowerCase();
     return (
@@ -132,71 +173,121 @@ export default function NotifyPage() {
     );
   }) || [];
 
-  const canSend = selectedCustomers.size > 0 && message.trim() && (channel === 'WHATSAPP' || subject.trim());
+  const canSend = selectedCustomers.size > 0 && message.trim() && (channel !== 'EMAIL' || subject.trim());
+  
+  // Contador de caracteres (WhatsApp tiene límite de 4096)
+  const charCount = message.length;
+  const charLimit = channel === 'WHATSAPP' ? 4096 : channel === 'EMAIL' ? 10000 : 5000;
+  const isCharLimitExceeded = charCount > charLimit;
 
   return (
     <MainLayout>
-      <div className="p-8">
+      <div className="p-6 md:p-8 max-w-7xl mx-auto">
+        {/* Header mejorado */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            Enviar Notificaciones
-          </h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Envía emails o mensajes de WhatsApp a múltiples clientes
-          </p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+              <Send className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                Enviar Mensajes
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Comunícate con tus clientes por Email, WhatsApp o Llamada
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Panel izquierdo: Selección de clientes */}
-          <div className="lg:col-span-2">
-            <Card className="border-0 shadow-lg bg-white">
-              <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-gray-800">Seleccionar Clientes</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-green-600" />
+                    <CardTitle className="text-lg">Seleccionar Clientes</CardTitle>
+                  </div>
                   <Button variant="outline" size="sm" onClick={handleSelectAll}>
                     {selectedCustomers.size === filteredCustomers.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
                   </Button>
                 </div>
+                <CardDescription>
+                  Busca y selecciona los clientes que recibirán el mensaje
+                </CardDescription>
                 <div className="mt-4">
                   <Input
-                    placeholder="Buscar clientes..."
+                    placeholder="Buscar por nombre, email o código..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full"
                   />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
                   {customersLoading ? (
-                    <p className="text-center text-gray-500 py-8">Cargando clientes...</p>
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">Cargando clientes...</span>
+                    </div>
                   ) : filteredCustomers.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">
-                      {searchTerm ? 'No se encontraron clientes' : 'No hay clientes disponibles'}
-                    </p>
+                    <div className="text-center py-12">
+                      <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        {searchTerm ? 'No se encontraron clientes' : `No hay clientes con ${channel === 'EMAIL' ? 'email' : 'teléfono'} configurado`}
+                      </p>
+                    </div>
                   ) : (
                     filteredCustomers.map((customer) => (
                       <div
                         key={customer.id}
-                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 border"
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                          selectedCustomers.has(customer.id)
+                            ? 'bg-green-50 border-green-200 shadow-sm'
+                            : 'hover:bg-muted/50 border-border'
+                        }`}
+                        onClick={() => handleToggleCustomer(customer.id)}
                       >
                         <Checkbox
                           checked={selectedCustomers.has(customer.id)}
                           onCheckedChange={() => handleToggleCustomer(customer.id)}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">{customer.razonSocial}</p>
-                          <p className="text-xs text-gray-500">
-                            {channel === 'EMAIL' ? customer.email : customer.telefono || 'Sin teléfono'}
-                          </p>
+                          <p className="text-sm font-medium text-foreground">{customer.razonSocial}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {channel === 'EMAIL' ? (
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                            ) : (
+                              <Phone className="h-3 w-3 text-muted-foreground" />
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {channel === 'EMAIL' ? customer.email : customer.telefono || 'Sin teléfono'}
+                            </p>
+                          </div>
                         </div>
-                        <span className="text-xs text-gray-400">{customer.codigoUnico}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {customer.codigoUnico}
+                        </Badge>
                       </div>
                     ))
                   )}
                 </div>
                 {filteredCustomers.length > 0 && (
-                  <div className="mt-4 text-sm text-gray-500">
-                    {selectedCustomers.size} de {filteredCustomers.length} clientes seleccionados
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        <Users className="h-4 w-4 inline mr-1" />
+                        {selectedCustomers.size} de {filteredCustomers.length} seleccionados
+                      </span>
+                      {selectedCustomers.size > 0 && (
+                        <Badge variant="secondary" className="bg-green-100 text-green-700">
+                          {selectedCustomers.size} cliente{selectedCustomers.size !== 1 ? 's' : ''}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -205,101 +296,248 @@ export default function NotifyPage() {
 
           {/* Panel derecho: Configuración y envío */}
           <div className="space-y-6">
-            <Card className="border-0 shadow-lg bg-white">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-                <CardTitle className="text-gray-800">Configuración</CardTitle>
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  <CardTitle className="text-lg">Componer Mensaje</CardTitle>
+                </div>
+                <CardDescription>
+                  Configura el canal y redacta tu mensaje
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Canal</Label>
-                  <Select value={channel} onValueChange={(value: 'EMAIL' | 'WHATSAPP') => setChannel(value)}>
+              <CardContent className="space-y-5">
+                {/* Selector de canal */}
+                <div className="space-y-2">
+                  <Label>Canal de comunicación</Label>
+                  <Select value={channel} onValueChange={(value: 'EMAIL' | 'WHATSAPP' | 'VOICE') => {
+                    setChannel(value);
+                    setMessage('');
+                    setSubject('');
+                  }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="EMAIL">
                         <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          Email
+                          <Mail className="h-4 w-4 text-blue-600" />
+                          <span>Email</span>
                         </div>
                       </SelectItem>
                       <SelectItem value="WHATSAPP">
                         <div className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" />
-                          WhatsApp
+                          <MessageSquare className="h-4 w-4 text-green-600" />
+                          <span>WhatsApp</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="VOICE">
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-purple-600" />
+                          <span>Llamada de voz</span>
                         </div>
                       </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
+                {/* Asunto (solo para EMAIL) */}
                 {channel === 'EMAIL' && (
-                  <div>
-                    <Label htmlFor="subject">Asunto</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="subject">Asunto del email</Label>
                     <Input
                       id="subject"
-                      placeholder="Asunto del email..."
+                      placeholder="Ej: Recordatorio de pago pendiente"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
+                      className={!subject.trim() && selectedCustomers.size > 0 ? 'border-orange-300' : ''}
                     />
                   </div>
                 )}
 
-                <div>
-                  <Label htmlFor="message">Mensaje</Label>
-                  <Textarea
-                    id="message"
-                    placeholder={
-                      channel === 'EMAIL'
-                        ? 'Escribe el mensaje del email...'
-                        : 'Escribe el mensaje de WhatsApp...'
-                    }
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    rows={6}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Puedes usar variables como {'{nombre_cliente}'}, {'{monto}'}, etc.
-                  </p>
+                {/* Plantillas */}
+                {Object.keys(messageTemplates[channel] || {}).length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Plantillas rápidas</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(messageTemplates[channel] || {}).map(([name, template]) => (
+                        <Button
+                          key={name}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleTemplateSelect(template)}
+                          className="text-xs"
+                        >
+                          <FileText className="h-3 w-3 mr-1" />
+                          {name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Editor de mensaje */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="message">
+                      {channel === 'EMAIL' ? 'Cuerpo del mensaje' : channel === 'WHATSAPP' ? 'Mensaje de WhatsApp' : 'Script de llamada'}
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowPreview(!showPreview)}
+                        className="h-7 text-xs"
+                      >
+                        {showPreview ? (
+                          <>
+                            <EyeOff className="h-3 w-3 mr-1" />
+                            Ocultar vista previa
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3 w-3 mr-1" />
+                            Vista previa
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {!showPreview ? (
+                    <>
+                      <Textarea
+                        id="message"
+                        placeholder={
+                          channel === 'EMAIL'
+                            ? 'Escribe el contenido del email...'
+                            : channel === 'WHATSAPP'
+                            ? 'Escribe el mensaje de WhatsApp...'
+                            : 'Escribe el script para la llamada...'
+                        }
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        rows={8}
+                        className={`font-mono text-sm ${
+                          isCharLimitExceeded ? 'border-red-300 focus-visible:ring-red-500' : ''
+                        }`}
+                      />
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">
+                          Variables disponibles: <code className="bg-muted px-1 rounded">{'{nombre_cliente}'}</code>,{' '}
+                          <code className="bg-muted px-1 rounded">{'{monto}'}</code>,{' '}
+                          <code className="bg-muted px-1 rounded">{'{fecha_vencimiento}'}</code>
+                        </p>
+                        <span className={`text-xs ${isCharLimitExceeded ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>
+                          {charCount.toLocaleString()} / {charLimit.toLocaleString()} caracteres
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="border rounded-lg p-4 bg-muted/30 min-h-[200px]">
+                      {channel === 'EMAIL' && subject && (
+                        <div className="mb-4 pb-4 border-b">
+                          <p className="text-xs text-muted-foreground mb-1">Asunto:</p>
+                          <p className="font-semibold">{subject}</p>
+                        </div>
+                      )}
+                      <div className="whitespace-pre-wrap text-sm">
+                        {message || <span className="text-muted-foreground italic">Escribe un mensaje para ver la vista previa...</span>}
+                      </div>
+                      {message && (
+                        <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
+                          <p>Este mensaje se enviará a {selectedCustomers.size} cliente{selectedCustomers.size !== 1 ? 's' : ''}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
+                <Separator />
+
+                {/* Botón de envío */}
                 <Button
                   onClick={handleSend}
-                  disabled={!canSend || sendBatchMutation.isPending}
-                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
+                  disabled={!canSend || sendBatchMutation.isPending || isCharLimitExceeded}
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-md"
                   size="lg"
                 >
                   {sendBatchMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Enviando...
+                      Enviando mensajes...
                     </>
                   ) : (
                     <>
                       <Send className="mr-2 h-4 w-4" />
-                      Enviar a {selectedCustomers.size} cliente{selectedCustomers.size !== 1 ? 's' : ''}
+                      Enviar a {selectedCustomers.size || 0} cliente{selectedCustomers.size !== 1 ? 's' : ''}
                     </>
                   )}
                 </Button>
 
-                {sendBatchMutation.isError && (
+                {/* Validaciones visuales */}
+                {selectedCustomers.size === 0 && (
+                  <Alert variant="default" className="border-orange-200 bg-orange-50">
+                    <AlertCircle className="h-4 w-4 text-orange-600" />
+                    <AlertDescription className="text-orange-800">
+                      Selecciona al menos un cliente para enviar el mensaje
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {selectedCustomers.size > 0 && !message.trim() && (
+                  <Alert variant="default" className="border-orange-200 bg-orange-50">
+                    <AlertCircle className="h-4 w-4 text-orange-600" />
+                    <AlertDescription className="text-orange-800">
+                      Escribe un mensaje antes de enviar
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {channel === 'EMAIL' && selectedCustomers.size > 0 && !subject.trim() && (
+                  <Alert variant="default" className="border-orange-200 bg-orange-50">
+                    <AlertCircle className="h-4 w-4 text-orange-600" />
+                    <AlertDescription className="text-orange-800">
+                      El asunto es obligatorio para emails
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {isCharLimitExceeded && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {(sendBatchMutation.error as any)?.response?.data?.error || 'Error al enviar mensajes'}
+                      El mensaje excede el límite de {charLimit.toLocaleString()} caracteres. Por favor, acórtalo.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Estados de éxito/error */}
+                {sendBatchMutation.isError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error al enviar</AlertTitle>
+                    <AlertDescription>
+                      {(sendBatchMutation.error as any)?.response?.data?.error || 'Error al enviar mensajes. Intenta nuevamente.'}
                     </AlertDescription>
                   </Alert>
                 )}
 
                 {sendBatchMutation.isSuccess && (
-                  <Alert>
-                    <CheckCircle2 className="h-4 w-4" />
-                    <AlertDescription>
-                      <div>
-                        <p className="font-medium">¡Mensajes en cola!</p>
-                        <p className="text-sm mt-1">
-                          {sendBatchMutation.data.totalMessages} mensajes se están enviando uno por uno.
-                          Puedes ver el progreso en el dashboard.
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertTitle className="text-green-800">¡Mensajes en cola!</AlertTitle>
+                    <AlertDescription className="text-green-700">
+                      <div className="space-y-1">
+                        <p>
+                          <strong>{sendBatchMutation.data.totalMessages}</strong> mensaje{sendBatchMutation.data.totalMessages !== 1 ? 's' : ''} se están enviando uno por uno.
+                        </p>
+                        <p className="text-xs">
+                          Puedes ver el progreso en el dashboard. Los mensajes aparecerán en el timeline de facturas.
                         </p>
                       </div>
                     </AlertDescription>
@@ -308,18 +546,41 @@ export default function NotifyPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg bg-white">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
-                <CardTitle className="text-gray-800">Información</CardTitle>
+            {/* Card de información */}
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Información útil
+                </CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-gray-600 space-y-2">
-                <p>
-                  • Los mensajes se envían <strong>uno por uno</strong> con rate limiting para no saturar los servicios
-                </p>
-                <p>
-                  • Solo se muestran clientes que tienen {channel === 'EMAIL' ? 'email' : 'teléfono'} configurado
-                </p>
-                <p>• Los mensajes se procesan en segundo plano y aparecerán en el timeline de facturas</p>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <div className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-600 mt-1.5 flex-shrink-0" />
+                  <p>
+                    Los mensajes se envían <strong>uno por uno</strong> con rate limiting para no saturar los servicios
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" />
+                  <p>
+                    Solo se muestran clientes que tienen {channel === 'EMAIL' ? 'email' : 'teléfono'} configurado
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-600 mt-1.5 flex-shrink-0" />
+                  <p>
+                    Los mensajes se procesan en segundo plano y aparecerán en el timeline de facturas
+                  </p>
+                </div>
+                {channel === 'WHATSAPP' && (
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-600 mt-1.5 flex-shrink-0" />
+                    <p>
+                      WhatsApp tiene un límite de <strong>4096 caracteres</strong> por mensaje
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
