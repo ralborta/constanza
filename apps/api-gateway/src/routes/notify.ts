@@ -205,6 +205,69 @@ export async function notifyRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // GET /notify/batches - Listar todos los batches
+  fastify.get(
+    '/notify/batches',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1', 'OPERADOR_2'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const { limit = 50, offset = 0 } = request.query as { limit?: number; offset?: number };
+
+      const [batches, total] = await Promise.all([
+        prisma.batchJob.findMany({
+          where: {
+            tenantId: user.tenant_id,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: limit,
+          skip: offset,
+          include: {
+            user: {
+              select: {
+                id: true,
+                nombre: true,
+                apellido: true,
+                email: true,
+              },
+            },
+          },
+        }),
+        prisma.batchJob.count({
+          where: {
+            tenantId: user.tenant_id,
+          },
+        }),
+      ]);
+
+      return {
+        batches: batches.map((batch) => ({
+          id: batch.id,
+          channel: batch.channel,
+          status: batch.status,
+          totalMessages: batch.totalMessages,
+          processed: batch.processed,
+          failed: batch.failed,
+          fileName: batch.fileName,
+          createdAt: batch.createdAt,
+          startedAt: batch.startedAt,
+          completedAt: batch.completedAt,
+          createdBy: batch.user
+            ? {
+                nombre: batch.user.nombre,
+                apellido: batch.user.apellido,
+                email: batch.user.email,
+              }
+            : null,
+        })),
+        total,
+      };
+    }
+  );
+
   // GET /notify/batch/:id - Estado de un batch
   fastify.get(
     '/notify/batch/:id',

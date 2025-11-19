@@ -22,6 +22,7 @@ import {
   Wallet,
   ArrowLeftRight,
   CheckCircle,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -36,9 +37,13 @@ const navigation = [
   { name: 'Cobranzas', href: '/dashboard', icon: LayoutDashboard, color: 'blue' },
   { name: 'Facturas', href: '/invoices', icon: FileText, color: 'purple' },
   { name: 'Clientes', href: '/customers', icon: Users, color: 'indigo' },
-  { name: 'Enviar Mensajes', href: '/notify', icon: Send, color: 'green' },
   { name: 'Cheques', href: '#', icon: CreditCard, color: 'yellow' },
   { name: 'Eventos', href: '#', icon: Bell, color: 'orange' },
+];
+
+const notifySubmenu = [
+  { name: 'Enviar Mensaje', href: '/notify', icon: Send },
+  { name: 'Progreso de Mensajes', href: '/notify/batches', icon: BarChart3 },
 ];
 
 const callsSubmenu = [
@@ -54,6 +59,9 @@ const paymentsSubmenu = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [notifyOpen, setNotifyOpen] = useState(
+    pathname?.startsWith('/notify') || false
+  );
   const [callsOpen, setCallsOpen] = useState(
     pathname?.startsWith('/calls') || false
   );
@@ -66,6 +74,7 @@ export function Sidebar() {
     window.location.href = '/login';
   };
 
+  const isNotifyActive = pathname?.startsWith('/notify');
   const isCallsActive = pathname?.startsWith('/calls');
   const isPaymentsActive = pathname?.startsWith('/payments');
 
@@ -114,6 +123,53 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Menú desplegable de Enviar Mensajes */}
+        <Collapsible open={notifyOpen} onOpenChange={setNotifyOpen}>
+          <CollapsibleTrigger
+            className={cn(
+              'w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+              isNotifyActive
+                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/50'
+                : 'text-green-300 hover:bg-green-500/20 hover:text-green-200'
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <Send className="h-5 w-5" />
+              <span>Enviar Mensajes</span>
+            </div>
+            {notifyOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pl-4 mt-2 space-y-1.5">
+            {notifySubmenu.map((item, index) => {
+              const isActive = pathname === item.href;
+              const submenuColors = [
+                { active: 'bg-gradient-to-r from-green-400 to-green-500', inactive: 'text-green-300 hover:bg-green-500/20' },
+                { active: 'bg-gradient-to-r from-emerald-400 to-emerald-500', inactive: 'text-emerald-300 hover:bg-emerald-500/20' },
+              ];
+              const colors = submenuColors[index % submenuColors.length];
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200',
+                    isActive
+                      ? `${colors.active} text-white shadow-md`
+                      : `${colors.inactive} hover:text-white`
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Menú desplegable de Llamadas */}
         <Collapsible open={callsOpen} onOpenChange={setCallsOpen}>
