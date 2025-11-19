@@ -305,6 +305,186 @@ export async function notifyRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // POST /notify/batch/:id/retry - Reenviar mensajes fallidos de un batch
+  fastify.post(
+    '/notify/batch/:id/retry',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const { id } = request.params as { id: string };
+
+      try {
+        // Verificar que el batch existe y pertenece al tenant
+        const batchJob = await prisma.batchJob.findFirst({
+          where: {
+            id,
+            tenantId: user.tenant_id,
+          },
+          include: {
+            events: {
+              where: {
+                status: 'FAILED',
+                direction: 'OUTBOUND',
+              },
+            },
+          },
+        });
+
+        if (!batchJob) {
+          return reply.status(404).send({ error: 'Batch no encontrado' });
+        }
+
+        // Obtener eventos fallidos
+        const failedEvents = await prisma.contactEvent.findMany({
+          where: {
+            batchId: id,
+            tenantId: user.tenant_id,
+            status: 'FAILED',
+            direction: 'OUTBOUND',
+          },
+          include: {
+            customer: true,
+          },
+        });
+
+        if (failedEvents.length === 0) {
+          return reply.status(400).send({
+            error: 'No hay mensajes fallidos para reenviar',
+            failedCount: 0,
+          });
+        }
+
+        // Verificar que el notifier esté disponible
+        try {
+          await axios.get(`${NOTIFIER_URL}/health`, { timeout: 5000 });
+        } catch (healthError: any) {
+          fastify.log.warn(
+            { NOTIFIER_URL, error: healthError.message },
+            'Notifier health check failed, pero continuando...'
+          );
+        }
+
+        // Reenviar cada mensaje fallido
+        const retriedJobs = [];
+        const errors = [];
+
+        for (const event of failedEvents) {
+          try {
+            // Validar que el cliente tenga los datos necesarios
+            if (batchJob.channel === 'EMAIL' && !event.customer.email) {
+              errors.push({
+                customerId: event.customerId,
+                error: 'Cliente no tiene email configurado',
+              });
+              continue;
+            }
+
+            if (
+              (batchJob.channel === 'WHATSAPP' || batchJob.channel === 'VOICE') &&
+              !event.customer.telefono
+            ) {
+              errors.push({
+                customerId: event.customerId,
+                error: 'Cliente no tiene teléfono configurado',
+              });
+              continue;
+            }
+
+            // Preparar el mensaje desde el evento original
+            const message: any = {};
+            if (event.messageText) {
+              message.text = event.messageText;
+              message.body = event.messageText;
+            }
+
+            // Enviar al notifier
+            const response = await axios.post(
+              `${NOTIFIER_URL}/notify/send`,
+              {
+                channel: batchJob.channel,
+                customerId: event.customerId,
+                invoiceId: event.invoiceId || undefined,
+                message,
+                templateId: event.templateId || batchJob.templateId || undefined,
+                variables: (event.payload as any)?.variables || undefined,
+                batchId: batchJob.id, // Mantener el mismo batchId
+                tenantId: user.tenant_id,
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                timeout: 10000,
+              }
+            );
+
+            retriedJobs.push({
+              customerId: event.customerId,
+              jobId: response.data.jobId,
+            });
+          } catch (error: any) {
+            fastify.log.error(
+              {
+                customerId: event.customerId,
+                error: error.message,
+                NOTIFIER_URL,
+              },
+              'Error reenviando mensaje fallido'
+            );
+            errors.push({
+              customerId: event.customerId,
+              error: error.message,
+            });
+          }
+        }
+
+        // Actualizar el batch job
+        await prisma.batchJob.update({
+          where: { id: batchJob.id },
+          data: {
+            status: 'PROCESSING', // Volver a procesar
+            failed: Math.max(0, batchJob.failed - retriedJobs.length), // Reducir contador de fallidos
+          },
+        });
+
+        fastify.log.info(
+          {
+            batchId: batchJob.id,
+            totalFailed: failedEvents.length,
+            retried: retriedJobs.length,
+            errors: errors.length,
+          },
+          'Retry batch completed'
+        );
+
+        return {
+          batchId: batchJob.id,
+          totalFailed: failedEvents.length,
+          retried: retriedJobs.length,
+          errors: errors.length,
+          retriedJobs,
+          errors: errors.length > 0 ? errors : undefined,
+        };
+      } catch (error: any) {
+        fastify.log.error(
+          {
+            batchId: id,
+            error: error.message,
+            stack: error.stack,
+          },
+          'Error retrying batch'
+        );
+
+        return reply.status(500).send({
+          error: 'Error al reenviar mensajes',
+          details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        });
+      }
+    }
+  );
+
   // POST /notify/send - Enviar mensaje a un solo cliente (wrapper del notifier)
   fastify.post(
     '/notify/send',
