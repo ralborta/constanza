@@ -269,43 +269,8 @@ export async function notifyRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET /notify/batch/:id - Estado de un batch
-  fastify.get(
-    '/notify/batch/:id',
-    {
-      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1', 'OPERADOR_2'])],
-    },
-    async (request, reply) => {
-      const user = request.user!;
-      const { id } = request.params as { id: string };
-
-      const batchJob = await prisma.batchJob.findFirst({
-        where: {
-          id,
-          tenantId: user.tenant_id,
-        },
-      });
-
-      if (!batchJob) {
-        return reply.status(404).send({ error: 'Batch no encontrado' });
-      }
-
-      return {
-        batch: {
-          id: batchJob.id,
-          channel: batchJob.channel,
-          status: batchJob.status,
-          totalMessages: batchJob.totalMessages,
-          processedMessages: batchJob.processed,
-          failedMessages: batchJob.failed,
-          createdAt: batchJob.createdAt,
-          updatedAt: batchJob.updatedAt,
-        },
-      };
-    }
-  );
-
   // POST /notify/batch/:id/retry - Reenviar mensajes fallidos de un batch
+  // IMPORTANTE: Esta ruta debe estar ANTES de /notify/batch/:id para que Fastify la reconozca
   fastify.post(
     '/notify/batch/:id/retry',
     {
@@ -482,6 +447,42 @@ export async function notifyRoutes(fastify: FastifyInstance) {
           details: process.env.NODE_ENV === 'development' ? error.message : undefined,
         });
       }
+    }
+  );
+
+  // GET /notify/batch/:id - Estado de un batch
+  fastify.get(
+    '/notify/batch/:id',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1', 'OPERADOR_2'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const { id } = request.params as { id: string };
+
+      const batchJob = await prisma.batchJob.findFirst({
+        where: {
+          id,
+          tenantId: user.tenant_id,
+        },
+      });
+
+      if (!batchJob) {
+        return reply.status(404).send({ error: 'Batch no encontrado' });
+      }
+
+      return {
+        batch: {
+          id: batchJob.id,
+          channel: batchJob.channel,
+          status: batchJob.status,
+          totalMessages: batchJob.totalMessages,
+          processedMessages: batchJob.processed,
+          failedMessages: batchJob.failed,
+          createdAt: batchJob.createdAt,
+          updatedAt: batchJob.updatedAt,
+        },
+      };
     }
   );
 
