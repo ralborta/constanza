@@ -76,10 +76,22 @@ function createTransporter() {
       user: process.env.SMTP_USER!,
       pass: process.env.SMTP_PASS!,
     },
-    // Timeouts para evitar que se cuelgue
-    connectionTimeout: 10000, // 10 segundos
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
+    // Timeouts aumentados para Railway (puede tener latencia de red)
+    connectionTimeout: 30000, // 30 segundos (aumentado de 10s)
+    greetingTimeout: 30000, // 30 segundos
+    socketTimeout: 30000, // 30 segundos
+    // Opciones adicionales para mejorar conexión
+    tls: {
+      // No rechazar certificados no autorizados (útil para algunos entornos)
+      rejectUnauthorized: false,
+      // Ciphers permitidos
+      ciphers: 'SSLv3',
+    },
+    // Requiere STARTTLS para puerto 587
+    requireTLS: port === 587,
+    // Debug (solo en desarrollo)
+    debug: process.env.NODE_ENV === 'development',
+    logger: process.env.NODE_ENV === 'development',
   });
 }
 
