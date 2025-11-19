@@ -29,13 +29,23 @@ async function resolveVariablesFromDB(
   tenantId: string,
   providedVariables?: Record<string, string>
 ): Promise<TemplateVariables> {
+  // Normalizar variables proporcionadas (remover llaves si las tienen)
+  const normalizedProvided: Record<string, string> = {};
+  if (providedVariables) {
+    for (const [key, value] of Object.entries(providedVariables)) {
+      // Remover llaves del nombre de la clave si las tiene
+      const normalizedKey = key.replace(/^\{|\}$/g, '');
+      normalizedProvided[normalizedKey] = value;
+    }
+  }
+
   const variables: TemplateVariables = {
     fecha_actual: new Date().toLocaleDateString('es-AR', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     }),
-    ...providedVariables,
+    ...normalizedProvided,
   };
 
   try {
@@ -45,7 +55,10 @@ async function resolveVariablesFromDB(
     });
 
     if (customer) {
-      variables.nombre_cliente = customer.razonSocial;
+      // Usar razonSocial o codigoUnico como fallback
+      variables.nombre_cliente = customer.razonSocial || customer.codigoUnico || 'Cliente';
+    } else {
+      variables.nombre_cliente = 'Cliente';
     }
 
     // Si hay invoiceId, obtener datos de la factura
@@ -61,18 +74,35 @@ async function resolveVariablesFromDB(
       if (invoice) {
         // Formatear monto (está en centavos)
         const montoPesos = (invoice.monto / 100).toFixed(2);
-        variables.monto = `$${montoPesos}`;
-        variables.numero_factura = invoice.numero;
+        variables.monto = new Intl.NumberFormat('es-AR', {
+          style: 'currency',
+          currency: 'ARS',
+        }).format(invoice.monto / 100);
+        variables.numero_factura = invoice.numero || '';
         variables.fecha_vencimiento = invoice.fechaVto.toLocaleDateString('es-AR', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
         });
+      } else {
+        // Si no se encuentra la factura, dejar valores vacíos
+        variables.monto = '';
+        variables.numero_factura = '';
+        variables.fecha_vencimiento = '';
       }
+    } else {
+      // Si no hay invoiceId, dejar valores vacíos
+      variables.monto = '';
+      variables.numero_factura = '';
+      variables.fecha_vencimiento = '';
     }
   } catch (error) {
     console.error('Error resolving variables from DB:', error);
     // Continuar con las variables que ya tenemos
+    // Asegurar que nombre_cliente tenga un valor por defecto
+    if (!variables.nombre_cliente) {
+      variables.nombre_cliente = 'Cliente';
+    }
   }
 
   return variables;
@@ -86,9 +116,16 @@ function replaceVariables(template: string, variables: TemplateVariables): strin
 
   // Reemplazar todas las variables {variable_name}
   for (const [key, value] of Object.entries(variables)) {
-    const placeholder = `{${key}}`;
-    const replacement = value || `[${key} no disponible]`;
-    result = result.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), replacement);
+    if (value === undefined || value === null) {
+      continue; // Saltar variables sin valor
+    }
+    
+    // Escapar caracteres especiales para regex
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const placeholder = new RegExp(`\\{${escapedKey}\\}`, 'g');
+    const replacement = value;
+    
+    result = result.replace(placeholder, replacement);
   }
 
   return result;
