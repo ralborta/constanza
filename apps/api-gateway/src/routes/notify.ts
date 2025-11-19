@@ -428,7 +428,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
           batchId: batchJob.id,
           totalFailed: failedEvents.length,
           retried: retriedJobs.length,
-          errors: errors.length,
+          errorsCount: errors.length,
           retriedJobs,
           errors: errors.length > 0 ? errors : undefined,
         };
