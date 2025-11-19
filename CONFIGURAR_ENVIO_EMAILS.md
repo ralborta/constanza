@@ -15,44 +15,87 @@ Se ha implementado la funcionalidad completa de envío de emails con:
 
 ## 🔧 Variables de Entorno Requeridas
 
-En **Railway**, para el servicio `@constanza/notifier`, configura estas variables:
+### 📍 Dónde Configurar: Railway → Servicio `@constanza/notifier`
+
+Ve a **Railway Dashboard** → Tu proyecto → `notifier` → **Variables** → **"Add Variable"**
 
 ### Variables Obligatorias
 
 ```env
-# Configuración SMTP
+# Configuración SMTP (REQUERIDAS)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=tu_email@gmail.com
-SMTP_PASS=tu_app_password_de_gmail
+SMTP_PASS=abcdefghijklmnop  # ⚠️ App Password de 16 caracteres SIN espacios
 
-# Remitente (opcional, usa SMTP_USER si no se especifica)
+# Remitente (Opcionales - si no las pones, usa SMTP_USER)
 SMTP_FROM_EMAIL=noreply@constanza.com
 SMTP_FROM_NAME=Constanza
 
-# Redis (ya debería estar configurado)
-REDIS_URL=redis://...
+# Base de datos (Railway la crea automáticamente)
+DATABASE_URL=postgresql://postgres:password@containers-us-west-xxx.railway.app:5432/railway
 
-# Database (ya debería estar configurado)
-DATABASE_URL=postgresql://...
+# Redis (Railway la crea automáticamente)
+REDIS_URL=redis://default:password@containers-us-west-xxx.railway.app:6379
+
+# Entorno
+NODE_ENV=production
 ```
 
-### Para Gmail Específicamente
+### 🔐 Cómo Generar App Password de Gmail (PASO CRÍTICO)
 
-1. **Habilitar autenticación de 2 factores** en tu cuenta de Gmail
-2. **Generar una App Password**:
+**⚠️ IMPORTANTE**: `SMTP_PASS` DEBE ser una App Password, NO tu contraseña normal de Gmail.
+
+#### Pasos:
+
+1. **Habilitar Verificación en 2 Pasos** (si no lo tienes):
+   - Ve a: https://myaccount.google.com/security
+   - Activa "Verificación en dos pasos"
+
+2. **Generar App Password**:
    - Ve a: https://myaccount.google.com/apppasswords
-   - Genera una contraseña de aplicación
-   - Úsala como `SMTP_PASS`
+   - Selecciona **"Correo"** como aplicación
+   - Selecciona **"Otro (nombre personalizado)"** como dispositivo
+   - Escribe: `Constanza Notifier`
+   - Click en **"Generar"**
+   - Google te mostrará una contraseña de **16 caracteres** (ej: `abcd efgh ijkl mnop`)
 
-**Ejemplo de configuración Gmail:**
-```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=tu_email@gmail.com
-SMTP_PASS=abcd efgh ijkl mnop  # App Password de 16 caracteres
-SMTP_FROM_NAME=Constanza
+3. **Copiar SIN espacios**:
+   - La contraseña viene con espacios: `abcd efgh ijkl mnop`
+   - Cópiala SIN espacios: `abcdefghijklmnop`
+   - Esta es la que vas a usar en `SMTP_PASS`
+
+4. **Configurar en Railway**:
+   - Ve a Railway → `notifier` → **Variables**
+   - Agrega: `SMTP_PASS` = `abcdefghijklmnop` (sin espacios)
+   - Railway redeploy automáticamente
+
+### ✅ Ejemplo Completo de Configuración en Railway
+
 ```
+Variable Name: SMTP_HOST
+Value: smtp.gmail.com
+
+Variable Name: SMTP_PORT
+Value: 587
+
+Variable Name: SMTP_USER
+Value: tu_email@gmail.com
+
+Variable Name: SMTP_PASS
+Value: abcdefghijklmnop  ← App Password de 16 caracteres SIN espacios
+
+Variable Name: SMTP_FROM_EMAIL
+Value: noreply@constanza.com
+
+Variable Name: SMTP_FROM_NAME
+Value: Constanza
+
+Variable Name: NODE_ENV
+Value: production
+```
+
+**Nota**: `DATABASE_URL` y `REDIS_URL` se agregan automáticamente por Railway cuando conectas esos servicios.
 
 ---
 
@@ -189,14 +232,38 @@ Para llevar esto a nivel "plataforma seria", se pueden agregar:
 
 ---
 
-## ✅ Checklist de Configuración
+## ✅ Checklist de Configuración en Railway
 
-- [ ] Variables SMTP configuradas en Railway (`notifier` service)
-- [ ] App Password de Gmail generada (si usas Gmail)
-- [ ] `REDIS_URL` configurada
-- [ ] `DATABASE_URL` configurada
+### Paso 1: Configurar Variables en Railway
+
+1. Ve a **Railway Dashboard** → Tu proyecto → `notifier` → **Variables**
+
+2. Agrega estas variables (una por una):
+   - [ ] `SMTP_HOST` = `smtp.gmail.com`
+   - [ ] `SMTP_PORT` = `587`
+   - [ ] `SMTP_USER` = `tu_email@gmail.com`
+   - [ ] `SMTP_PASS` = `abcdefghijklmnop` (App Password de 16 caracteres SIN espacios)
+   - [ ] `SMTP_FROM_EMAIL` = `noreply@constanza.com` (opcional)
+   - [ ] `SMTP_FROM_NAME` = `Constanza` (opcional)
+   - [ ] `NODE_ENV` = `production`
+
+3. Verifica que estas variables estén presentes (Railway las agrega automáticamente):
+   - [ ] `DATABASE_URL` (desde servicio Postgres)
+   - [ ] `REDIS_URL` (desde servicio Redis)
+
+### Paso 2: Generar App Password de Gmail
+
+- [ ] Verificación en 2 pasos habilitada en Gmail
+- [ ] App Password generada en https://myaccount.google.com/apppasswords
+- [ ] App Password copiada SIN espacios
+- [ ] App Password configurada en `SMTP_PASS` en Railway
+
+### Paso 3: Verificar Configuración
+
+- [ ] Railway redeploy automáticamente después de agregar variables
+- [ ] Verificar logs en Railway → `notifier` → **Logs** (no debería haber errores de SMTP)
 - [ ] Probar envío de un email de prueba desde el frontend
-- [ ] Verificar logs en Railway para confirmar envío exitoso
+- [ ] Verificar que el email llegue correctamente
 
 ---
 
@@ -218,4 +285,5 @@ Para llevar esto a nivel "plataforma seria", se pueden agregar:
 ---
 
 **Última actualización**: Implementación v1 completa y funcional ✅
+
 

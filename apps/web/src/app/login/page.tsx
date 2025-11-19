@@ -25,21 +25,13 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // PASO 1: Test con httpbin para verificar que fetch funciona
-      console.log('🔍 Test fetch a httpbin...');
-      const testRes = await fetch('https://httpbin.org/post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ test: 'ok' }),
-      });
-      console.log('🔍 Resultado httpbin:', testRes.status);
-      
-      // PASO 2: Si httpbin funciona, intentar con el backend real
+      // Verificar que la URL del API esté configurada
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       console.log('🔍 API_URL:', apiUrl);
       
       if (!apiUrl) {
-        throw new Error('NEXT_PUBLIC_API_URL no está configurada');
+        setError('Error de configuración: NEXT_PUBLIC_API_URL no está configurada. Por favor, contacta al administrador del sistema.');
+        return;
       }
       
       console.log('🔍 Intentando login con backend:', `${apiUrl}/auth/login`);
@@ -52,9 +44,16 @@ export default function LoginPage() {
       console.log('🔍 Response status:', response.status);
       
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Error login:', response.status, errorData);
-        setError(errorData.error || 'Error al iniciar sesión');
+        let errorMessage = 'Error al iniciar sesión';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // Si no se puede parsear el JSON, usar el mensaje por defecto
+          errorMessage = `Error del servidor (${response.status})`;
+        }
+        console.error('❌ Error login:', response.status, errorMessage);
+        setError(errorMessage);
         return;
       }
       
@@ -65,7 +64,22 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err: any) {
       console.error('❌ Error en login:', err);
-      setError(err.message || 'Error al iniciar sesión');
+      
+      // Mensajes de error más específicos
+      let errorMessage = 'Error al iniciar sesión';
+      
+      if (err.message === 'Failed to fetch') {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        if (!apiUrl) {
+          errorMessage = 'Error de configuración: La URL del servidor no está configurada. Por favor, contacta al administrador.';
+        } else {
+          errorMessage = `No se pudo conectar con el servidor (${apiUrl}). Verifica tu conexión a internet o contacta al administrador si el problema persiste.`;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

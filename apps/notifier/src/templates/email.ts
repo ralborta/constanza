@@ -14,6 +14,7 @@ interface TemplateVariables {
 
 interface RenderTemplateOptions {
   templateText: string;
+  subject?: string; // Subject del email (puede contener variables)
   variables?: Record<string, string>;
   customerId: string;
   invoiceId?: string;
@@ -246,7 +247,7 @@ function getEmailTemplate(content: string, preheader?: string): string {
 export async function renderEmailTemplate(
   options: RenderTemplateOptions
 ): Promise<{ html: string; text: string; subject: string }> {
-  const { templateText, variables: providedVariables, customerId, invoiceId, tenantId } = options;
+  const { templateText, subject: providedSubject, variables: providedVariables, customerId, invoiceId, tenantId } = options;
 
   // Resolver variables desde DB si hay invoiceId
   const resolvedVariables = await resolveVariablesFromDB(
@@ -258,8 +259,9 @@ export async function renderEmailTemplate(
 
   // Reemplazar variables en el template
   const resolvedText = replaceVariables(templateText, resolvedVariables);
+  // Reemplazar variables en el subject también
   const resolvedSubject = replaceVariables(
-    providedVariables?.subject || 'Notificación de Constanza',
+    providedSubject || 'Notificación de Constanza',
     resolvedVariables
   );
 

@@ -65,16 +65,17 @@ export const notifyWorker = new Worker(
         // Renderizar template con variables resueltas
         const rendered = await renderEmailTemplate({
           templateText: message.body || message.text || '',
+          subject: message.subject, // Pasar el subject para que también pueda usar variables
           variables: variables || {},
           customerId: customer.id,
           invoiceId: invoiceId || undefined,
           tenantId: tenantId || customer.tenantId,
         });
 
-        // Enviar email con HTML renderizado
+        // Enviar email con HTML renderizado (el subject ya tiene las variables reemplazadas)
         result = await sendEmail({
           to: customer.email!,
-          subject: message.subject || rendered.subject,
+          subject: rendered.subject,
           html: rendered.html,
           text: rendered.text,
         });
