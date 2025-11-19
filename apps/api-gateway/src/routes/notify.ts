@@ -255,6 +255,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
           createdAt: batch.createdAt,
           startedAt: batch.startedAt,
           completedAt: batch.completedAt,
+          errorSummary: batch.errorSummary,
           createdBy: batch.user
             ? {
                 nombre: batch.user.nombre,

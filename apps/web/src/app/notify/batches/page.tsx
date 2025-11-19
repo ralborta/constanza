@@ -38,6 +38,7 @@ interface Batch {
   createdAt: string;
   startedAt: string | null;
   completedAt: string | null;
+  errorSummary: any | null;
   createdBy: {
     nombre: string;
     apellido: string;
@@ -149,6 +150,7 @@ function NotifyBatchesContent() {
                     <TableHead>Fallidos</TableHead>
                     <TableHead>Creado</TableHead>
                     <TableHead>Creado por</TableHead>
+                    <TableHead>Error</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -174,7 +176,20 @@ function NotifyBatchesContent() {
                       </TableCell>
                       <TableCell>{batch.totalMessages}</TableCell>
                       <TableCell className="text-green-600">{batch.processed}</TableCell>
-                      <TableCell className="text-red-600">{batch.failed}</TableCell>
+                      <TableCell className="text-red-600">
+                        {batch.failed > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <span>{batch.failed}</span>
+                            {batch.errorSummary && (
+                              <span className="text-xs text-red-500" title={JSON.stringify(batch.errorSummary, null, 2)}>
+                                ⚠️
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          batch.failed
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-gray-500">
                         {format(new Date(batch.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
                       </TableCell>
@@ -182,6 +197,23 @@ function NotifyBatchesContent() {
                         {batch.createdBy
                           ? `${batch.createdBy.nombre} ${batch.createdBy.apellido}`
                           : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-xs text-red-600 max-w-xs">
+                        {batch.failed > 0 && batch.errorSummary ? (
+                          <div className="truncate" title={typeof batch.errorSummary === 'string' ? batch.errorSummary : JSON.stringify(batch.errorSummary, null, 2)}>
+                            {Array.isArray(batch.errorSummary) 
+                              ? batch.errorSummary.map((err: any, idx: number) => (
+                                  <div key={idx} className="truncate">
+                                    {err.code || err.message || 'Error desconocido'}
+                                  </div>
+                                )).slice(0, 1) // Mostrar solo el primer error
+                              : typeof batch.errorSummary === 'string'
+                              ? batch.errorSummary
+                              : batch.errorSummary.message || batch.errorSummary.error || 'Error desconocido'}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

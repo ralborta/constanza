@@ -148,11 +148,23 @@ export const notifyWorker = new Worker(
             errorCode: error.code,
             error: error.message,
             originalError: error.originalError?.message,
+            channel,
+            customerId,
+            stack: error.stack,
           },
-          'Failed to send email notification'
+          `❌ Failed to send ${channel} notification: ${error.code} - ${error.message}`
         );
       } else {
-        logger.error({ jobId: job.id, error: error.message, stack: error.stack }, 'Failed to send notification');
+        logger.error(
+          { 
+            jobId: job.id, 
+            error: error.message, 
+            stack: error.stack,
+            channel,
+            customerId,
+          }, 
+          `❌ Failed to send ${channel} notification: ${error.message}`
+        );
       }
 
       // Registrar error en contact.events
@@ -176,10 +188,31 @@ export const notifyWorker = new Worker(
       // Actualizar batch job con error si existe
       if (batchId && tenantId) {
         try {
+          // Obtener el batchJob actual para ver si ya tiene errorSummary
+          const currentBatch = await prisma.batchJob.findUnique({
+            where: { id: batchId },
+          });
+
+          const errorInfo = {
+            code: errorCode,
+            message: errorMessage,
+            channel,
+            customerId,
+            timestamp: new Date().toISOString(),
+          };
+
+          // Actualizar errorSummary: agregar el nuevo error a la lista
+          const existingErrors = currentBatch?.errorSummary 
+            ? (typeof currentBatch.errorSummary === 'object' && Array.isArray(currentBatch.errorSummary)
+                ? currentBatch.errorSummary 
+                : [currentBatch.errorSummary])
+            : [];
+
           await prisma.batchJob.update({
             where: { id: batchId },
             data: {
               failed: { increment: 1 },
+              errorSummary: [...existingErrors, errorInfo],
             },
           });
         } catch (err: any) {
