@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 // Errores semánticos para mejor debugging
 export enum EmailErrorCode {
@@ -61,14 +62,14 @@ function validateEmail(email: string): boolean {
 /**
  * Crea y configura el transporter de nodemailer
  */
-function createTransporter() {
+function createTransporter(): nodemailer.Transporter<SMTPTransport.SentMessageInfo> {
   validateSmtpConfig();
 
   const host = process.env.SMTP_HOST!;
   const port = Number(process.env.SMTP_PORT) || 587;
   const secure = port === 465; // Puerto 465 usa SSL, 587 usa STARTTLS
 
-  return nodemailer.createTransport({
+  const transporterOptions: SMTPTransport.Options = {
     host,
     port,
     secure,
@@ -93,7 +94,9 @@ function createTransporter() {
     // Debug (solo en desarrollo)
     debug: process.env.NODE_ENV === 'development',
     logger: process.env.NODE_ENV === 'development',
-  });
+  };
+
+  return nodemailer.createTransport(transporterOptions);
 }
 
 /**
@@ -203,12 +206,21 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
     }
 
     // Convertir Address[] a string[] si es necesario
-    const accepted = (info.accepted || []).map((addr) => 
-      typeof addr === 'string' ? addr : addr.address || String(addr)
-    );
-    const rejected = (info.rejected || []).map((addr) => 
-      typeof addr === 'string' ? addr : addr.address || String(addr)
-    );
+    const toEmailString = (addr: any): string => {
+      if (!addr) {
+        return '';
+      }
+      if (typeof addr === 'string') {
+        return addr;
+      }
+      if (typeof addr.address === 'string') {
+        return addr.address;
+      }
+      return String(addr);
+    };
+
+    const accepted = (info.accepted || []).map((addr: any) => toEmailString(addr)).filter(Boolean);
+    const rejected = (info.rejected || []).map((addr: any) => toEmailString(addr)).filter(Boolean);
 
     return {
       messageId: info.messageId || '',
