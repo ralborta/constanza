@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 // Errores semánticos para mejor debugging
 export enum EmailErrorCode {
@@ -62,14 +61,14 @@ function validateEmail(email: string): boolean {
 /**
  * Crea y configura el transporter de nodemailer
  */
-function createTransporter(): nodemailer.Transporter<SMTPTransport.SentMessageInfo> {
+function createTransporter() {
   validateSmtpConfig();
 
   const host = process.env.SMTP_HOST!;
   const port = Number(process.env.SMTP_PORT) || 587;
   const secure = port === 465; // Puerto 465 usa SSL, 587 usa STARTTLS
 
-  const transporterOptions: SMTPTransport.Options = {
+  const transporterOptions = {
     host,
     port,
     secure,
@@ -96,7 +95,7 @@ function createTransporter(): nodemailer.Transporter<SMTPTransport.SentMessageIn
     logger: process.env.NODE_ENV === 'development',
   };
 
-  return nodemailer.createTransport(transporterOptions);
+  return nodemailer.createTransport(transporterOptions as nodemailer.TransportOptions);
 }
 
 /**
@@ -195,7 +194,11 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
 
   // Enviar email
   try {
-    const info = await transporter.sendMail(mailOptions);
+    const info = (await transporter.sendMail(mailOptions)) as {
+      messageId?: string;
+      accepted?: Array<string | { address?: string }>;
+      rejected?: Array<string | { address?: string }>;
+    };
 
     // Verificar si fue rechazado
     if (info.rejected && info.rejected.length > 0) {
@@ -206,9 +209,9 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
     }
 
     // Convertir Address[] a string[] si es necesario
-    const toEmailString = (addr: any): string => {
+    const normalizeAddress = (addr?: string | { address?: string }): string | null => {
       if (!addr) {
-        return '';
+        return null;
       }
       if (typeof addr === 'string') {
         return addr;
@@ -216,11 +219,15 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
       if (typeof addr.address === 'string') {
         return addr.address;
       }
-      return String(addr);
+      return null;
     };
 
-    const accepted = (info.accepted || []).map((addr: any) => toEmailString(addr)).filter(Boolean);
-    const rejected = (info.rejected || []).map((addr: any) => toEmailString(addr)).filter(Boolean);
+    const accepted = (info.accepted || [])
+      .map((addr) => normalizeAddress(addr))
+      .filter((addr): addr is string => Boolean(addr));
+    const rejected = (info.rejected || [])
+      .map((addr) => normalizeAddress(addr))
+      .filter((addr): addr is string => Boolean(addr));
 
     return {
       messageId: info.messageId || '',
