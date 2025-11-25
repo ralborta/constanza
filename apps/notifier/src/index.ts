@@ -320,6 +320,14 @@ const start = async () => {
     logger.info(`🚀 Notifier running on http://${host}:${port}`);
     logger.info('📬 Worker started, processing notifications...');
     logger.info('🔗 Webhook endpoint: POST /wh/wa/incoming');
+    // Comprobación explícita de variables de BuilderBot (sin exponer secretos)
+    logger.info(
+      {
+        BUILDERBOT_BOT_ID_set: !!process.env.BUILDERBOT_BOT_ID,
+        BUILDERBOT_API_KEY_set: !!process.env.BUILDERBOT_API_KEY,
+      },
+      '[BuilderBot] Env check'
+    );
 
     // Iniciar polling de mensajes de WhatsApp como respaldo (si está habilitado)
     // Builderbot puede usar webhooks, pero el polling sirve como backup
