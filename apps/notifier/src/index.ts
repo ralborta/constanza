@@ -123,12 +123,30 @@ export const notifyWorker = new Worker(
       // Actualizar batch job si existe
       if (batchId && tenantId) {
         try {
+          // Incrementar procesados y asegurar startedAt
           await prisma.batchJob.update({
             where: { id: batchId },
             data: {
               processed: { increment: 1 },
+              startedAt: { set: new Date() },
             },
           });
+
+          // Verificar si el batch ya está completo (procesados + fallidos >= total)
+          const updated = await prisma.batchJob.findUnique({ where: { id: batchId } });
+          if (updated) {
+            const doneCount = (updated.processed || 0) + (updated.failed || 0);
+            if (doneCount >= updated.totalMessages && updated.status !== 'COMPLETED') {
+              await prisma.batchJob.update({
+                where: { id: batchId },
+                data: {
+                  status: 'COMPLETED',
+                  completedAt: new Date(),
+                },
+              });
+              logger.info({ batchId }, 'Batch completed');
+            }
+          }
         } catch (error: any) {
           logger.warn({ batchId, error: error.message }, 'Failed to update batch job');
         }
@@ -214,8 +232,25 @@ export const notifyWorker = new Worker(
             data: {
               failed: { increment: 1 },
               errorSummary: [...existingErrors, errorInfo],
+              startedAt: currentBatch?.startedAt ? undefined : new Date(),
             },
           });
+
+          // Verificar si el batch ya está completo (procesados + fallidos >= total)
+          const updated = await prisma.batchJob.findUnique({ where: { id: batchId } });
+          if (updated) {
+            const doneCount = (updated.processed || 0) + (updated.failed || 0);
+            if (doneCount >= updated.totalMessages && updated.status !== 'COMPLETED') {
+              await prisma.batchJob.update({
+                where: { id: batchId },
+                data: {
+                  status: 'COMPLETED',
+                  completedAt: new Date(),
+                },
+              });
+              logger.info({ batchId }, 'Batch completed (with some failures)');
+            }
+          }
         } catch (err: any) {
           logger.warn({ batchId, error: err.message }, 'Failed to update batch job on error');
         }
