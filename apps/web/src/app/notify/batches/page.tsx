@@ -214,15 +214,15 @@ function NotifyBatchesContent() {
                       </TableCell>
                       <TableCell>{getStatusBadge(batch.status)}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-green-500 h-2 rounded-full transition-all"
-                              style={{ width: `${getProgress(batch)}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-gray-500">{getProgress(batch)}%</span>
-                        </div>
+                        <span
+                          className={`text-xs ${
+                            getProgress(batch) === 100
+                              ? 'text-green-600 font-medium'
+                              : 'text-gray-600'
+                          }`}
+                        >
+                          {getProgress(batch)}%
+                        </span>
                       </TableCell>
                       <TableCell>{batch.totalMessages}</TableCell>
                       <TableCell className="text-green-600">{batch.processed}</TableCell>
