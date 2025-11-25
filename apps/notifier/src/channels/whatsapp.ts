@@ -13,7 +13,11 @@ interface SendWhatsAppParams {
  * - Requiere env vars: BUILDERBOT_API_KEY y BUILDERBOT_BOT_ID
  */
 export async function sendWhatsApp({ to, message }: SendWhatsAppParams) {
-  if (!process.env.BUILDERBOT_API_KEY || !process.env.BUILDERBOT_BOT_ID) {
+  // Validación en tiempo de ejecución (evita valores stale de import-time)
+  const hasKey = !!process.env.BUILDERBOT_API_KEY;
+  const hasBot = !!process.env.BUILDERBOT_BOT_ID;
+  if (!hasKey || !hasBot) {
+    // Dejar que el cliente lance un error más claro y homogéneo
     throw new Error('BUILDERBOT_API_KEY not configured');
   }
 

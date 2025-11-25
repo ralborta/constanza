@@ -2,15 +2,6 @@ import axios from 'axios';
 
 const BUILDERBOT_BASE_URL =
   process.env.BUILDERBOT_BASE_URL || 'https://app.builderbot.cloud';
-const BUILDERBOT_BOT_ID = process.env.BUILDERBOT_BOT_ID;
-const BUILDERBOT_API_KEY = process.env.BUILDERBOT_API_KEY;
-
-if (!BUILDERBOT_BOT_ID || !BUILDERBOT_API_KEY) {
-  // eslint-disable-next-line no-console
-  console.warn(
-    '[BuilderBot] Faltan variables de entorno BUILDERBOT_BOT_ID o BUILDERBOT_API_KEY'
-  );
-}
 
 export interface SendWhatsAppOptions {
   number: string; // número en formato internacional
@@ -26,13 +17,17 @@ export interface SendWhatsAppOptions {
 export async function sendWhatsAppMessage(options: SendWhatsAppOptions) {
   const { number, message, mediaUrl, checkIfExists = false } = options;
 
-  if (!BUILDERBOT_BOT_ID || !BUILDERBOT_API_KEY) {
+  // Leer SIEMPRE del entorno en tiempo de ejecución, no en import-time
+  const BOT_ID = process.env.BUILDERBOT_BOT_ID;
+  const API_KEY = process.env.BUILDERBOT_API_KEY;
+
+  if (!BOT_ID || !API_KEY) {
     throw new Error(
       'BuilderBot no configurado: define BUILDERBOT_BOT_ID y BUILDERBOT_API_KEY'
     );
   }
 
-  const url = `${BUILDERBOT_BASE_URL}/api/v2/${BUILDERBOT_BOT_ID}/messages`;
+  const url = `${BUILDERBOT_BASE_URL}/api/v2/${BOT_ID}/messages`;
 
   const body: Record<string, any> = {
     messages: {
@@ -48,7 +43,7 @@ export async function sendWhatsAppMessage(options: SendWhatsAppOptions) {
 
   const headers = {
     'Content-Type': 'application/json',
-    'x-api-builderbot': BUILDERBOT_API_KEY as string,
+    'x-api-builderbot': API_KEY as string,
   };
 
   const response = await axios.post(url, body, { headers, timeout: 30000 });
