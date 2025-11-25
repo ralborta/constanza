@@ -19,7 +19,8 @@ RUN pnpm install --frozen-lockfile
 RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
 
 # Elegimos el servicio a compilar desde Railway (Build Arg)
-ARG SERVICE
+# Valor por defecto para evitar fallos si no se pasa el build-arg
+ARG SERVICE=notifier
 ENV SERVICE=${SERVICE}
 
 # Compilar SOLO ese servicio
@@ -40,7 +41,7 @@ COPY --from=build /repo/apps/${SERVICE}/package.json ./apps/${SERVICE}/package.j
 COPY --from=build /repo/infra ./infra
 
 # Instalar SOLO las dependencias de producción del servicio específico
-ARG SERVICE
+ARG SERVICE=notifier
 ENV SERVICE=${SERVICE}
 RUN pnpm install --frozen-lockfile --prod --filter "@constanza/${SERVICE}"
 
