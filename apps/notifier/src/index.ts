@@ -7,6 +7,7 @@ import { sendWhatsApp } from './channels/whatsapp.js';
 import { sendVoice } from './channels/voice.js';
 import { renderEmailTemplate } from './templates/email.js';
 import { webhookRoutes } from './routes/webhooks.js';
+import { whatsappTestRoutes } from './routes/whatsapp-test.js';
 import { WhatsAppPoller } from './polling/whatsapp-poller.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
@@ -309,6 +310,8 @@ const start = async () => {
   try {
     // Registrar webhooks (builderbot puede enviar webhooks)
     await server.register(webhookRoutes, { prefix: '/wh' });
+    // Endpoint de prueba para enviar un único mensaje de WhatsApp
+    await server.register(whatsappTestRoutes);
 
     const port = Number(process.env.PORT) || 3001;
     const host = process.env.HOST || '0.0.0.0';
