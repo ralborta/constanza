@@ -18,8 +18,24 @@ export async function sendWhatsAppMessage(options: SendWhatsAppOptions) {
   const { number, message, mediaUrl, checkIfExists = false } = options;
 
   // Leer SIEMPRE del entorno en tiempo de ejecución, no en import-time
-  const BOT_ID = process.env.BUILDERBOT_BOT_ID;
-  const API_KEY = process.env.BUILDERBOT_API_KEY;
+  let BOT_ID =
+    (process.env.BUILDERBOT_BOT_ID ||
+      process.env.BUILDERBOT_BOTID ||
+      process.env.BUILDERBOT_ID ||
+      process.env.BOT_ID ||
+      process.env.BUILDERBOT_TEST_BOT_ID ||
+      '').trim();
+  const API_KEY =
+    (process.env.BUILDERBOT_API_KEY ||
+      process.env.BUILDERBOT_KEY ||
+      process.env.BB_API_KEY ||
+      process.env.BUILDERBOT_TEST_API_KEY ||
+      '').trim();
+
+  // Fallback temporal para pruebas si el BOT_ID no llega por entorno
+  if (!BOT_ID) {
+    BOT_ID = '5e3f81b5-8f3f-4684-b22c-03567371b6c1';
+  }
 
   if (!BOT_ID || !API_KEY) {
     throw new Error(
