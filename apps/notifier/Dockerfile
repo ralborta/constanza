@@ -1,3 +1,55 @@
+# syntax=docker/dockerfile:1
+FROM node:20-alpine AS build
+
+# Habilitar pnpm
+RUN apk add --no-cache openssl \
+ && corepack enable && corepack prepare pnpm@9.12.0 --activate
+
+WORKDIR /repo
+
+# Copiar manifiestos y código del monorepo (contexto: raíz del repo)
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.base.json types.d.ts ./
+COPY apps ./apps
+COPY packages ./packages
+COPY infra ./infra
+
+# Instalar dependencias bloqueadas por lockfile
+RUN pnpm install --frozen-lockfile
+
+# Generar cliente prisma (hot-fix)
+RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
+
+# Compilar únicamente el servicio notifier
+ARG SERVICE=notifier
+ENV SERVICE=${SERVICE}
+RUN pnpm --filter "@constanza/${SERVICE}" run build
+
+# Imagen final minimal
+FROM node:20-alpine AS runner
+
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+
+WORKDIR /app
+
+# Copiar manifiestos necesarios para instalar deps de producción del servicio
+COPY --from=build /repo/package.json ./
+COPY --from=build /repo/pnpm-workspace.yaml ./
+COPY --from=build /repo/pnpm-lock.yaml ./
+COPY --from=build /repo/apps/${SERVICE}/package.json ./apps/${SERVICE}/package.json
+COPY --from=build /repo/infra ./infra
+
+# Instalar solo prod deps del servicio específico
+ARG SERVICE=notifier
+ENV SERVICE=${SERVICE}
+RUN pnpm install --frozen-lockfile --prod --filter "@constanza/${SERVICE}"
+
+# Copiar el build del servicio
+COPY --from=build /repo/apps/${SERVICE}/dist ./apps/${SERVICE}/dist
+
+ENV NODE_ENV=production
+
+CMD ["sh", "-c", "node apps/${SERVICE}/dist/index.js"]
+
 # Dockerfile para notifier
 FROM node:20-alpine AS build
 
