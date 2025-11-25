@@ -72,6 +72,7 @@ function createTransporter() {
     host,
     port,
     secure,
+    family: 4, // Forzar IPv4 para evitar timeouts en entornos donde IPv6 está bloqueado
     auth: {
       user: process.env.SMTP_USER!,
       pass: process.env.SMTP_PASS!,
