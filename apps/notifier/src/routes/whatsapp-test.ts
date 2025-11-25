@@ -3,6 +3,16 @@ import { z } from 'zod';
 import { sendWhatsAppMessage } from '../lib/builderbot.js';
 
 export async function whatsappTestRoutes(server: FastifyInstance) {
+  // Chequeo de entorno (no expone secretos)
+  server.get('/wa/env', async () => {
+    return {
+      BUILDERBOT_BOT_ID_set: !!process.env.BUILDERBOT_BOT_ID,
+      BUILDERBOT_API_KEY_set: !!process.env.BUILDERBOT_API_KEY,
+      BUILDERBOT_BASE_URL: process.env.BUILDERBOT_BASE_URL || 'https://app.builderbot.cloud',
+      service: 'notifier',
+    };
+  });
+
   server.post(
     '/wa/test-send',
     async (request, reply) => {
