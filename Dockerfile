@@ -16,7 +16,9 @@ COPY infra ./infra
 RUN pnpm install --frozen-lockfile
 
 # 🔥 Hot-fix: generar el cliente con npx SIN tocar tu lockfile
-RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
+# Ejecutar el generate desde el workspace del servicio para garantizar que
+# escriba el client en el node_modules correcto bajo pnpm
+RUN cd apps/notifier && npx -y prisma@5.22.0 generate --schema=../../infra/prisma/schema.prisma && cd /app
 
 # Elegimos el servicio a compilar desde Railway (Build Arg)
 # Valor por defecto para evitar fallos si no se pasa el build-arg
