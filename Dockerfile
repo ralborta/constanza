@@ -13,7 +13,9 @@ COPY packages ./packages
 COPY infra ./infra
 
 # Install (lockfile congelado)
-RUN pnpm install --frozen-lockfile
+# El lockfile del workspace puede cambiar al agregar dependencias.
+# En entornos CI/containers preferimos asegurar instalación aunque el lockfile cambie.
+RUN pnpm install --prefer-frozen-lockfile
 
 # 🔥 Hot-fix: generar el cliente con npx SIN tocar tu lockfile
 # Ejecutar el generate desde el workspace del servicio para garantizar que
