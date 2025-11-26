@@ -37,18 +37,18 @@ WORKDIR /app
 COPY --from=build /repo/package.json ./
 COPY --from=build /repo/pnpm-workspace.yaml ./
 COPY --from=build /repo/pnpm-lock.yaml ./
-COPY --from=build /repo/apps/${SERVICE}/package.json ./apps/${SERVICE}/package.json
+COPY --from=build /repo/apps/notifier/package.json ./apps/notifier/package.json
 COPY --from=build /repo/infra ./infra
 
 # Instalar SOLO las dependencias de producción del servicio específico
 ARG SERVICE=notifier
 ENV SERVICE=${SERVICE}
-RUN pnpm install --frozen-lockfile --prod --filter "@constanza/${SERVICE}"
+RUN pnpm install --frozen-lockfile --prod --filter "@constanza/notifier"
 
 # Copiar el código compilado
-COPY --from=build /repo/apps/${SERVICE}/dist ./apps/${SERVICE}/dist
+COPY --from=build /repo/apps/notifier/dist ./apps/notifier/dist
 
 ENV NODE_ENV=production
 
 # Ejecutar desde /app (root del workspace)
-CMD sh -c "node apps/${SERVICE}/dist/index.js"
+CMD sh -c "node apps/notifier/dist/index.js"
