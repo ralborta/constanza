@@ -45,6 +45,10 @@ ARG SERVICE=notifier
 ENV SERVICE=${SERVICE}
 RUN pnpm install --frozen-lockfile --prod --filter "@constanza/notifier"
 
+# Generar Prisma Client dentro de la imagen final (la postinstall no encuentra el schema)
+# Ejecutamos de forma explícita contra nuestro path de schema
+RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
+
 # Copiar el código compilado
 COPY --from=build /repo/apps/notifier/dist ./apps/notifier/dist
 
