@@ -47,7 +47,7 @@ COPY --from=build /repo/infra ./infra
 # Instalar SOLO las dependencias de producción del servicio específico
 ARG SERVICE=notifier
 ENV SERVICE=${SERVICE}
-RUN pnpm install --frozen-lockfile --prod --filter "@constanza/notifier"
+RUN pnpm install --prefer-frozen-lockfile --prod --filter "@constanza/notifier"
 
 # Generar Prisma Client dentro de la imagen final (la postinstall no encuentra el schema)
 # Ejecutamos de forma explícita contra nuestro path de schema

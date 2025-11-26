@@ -13,8 +13,8 @@ COPY apps ./apps
 COPY packages ./packages
 COPY infra ./infra
 
-# Instalar dependencias bloqueadas por lockfile
-RUN pnpm install --frozen-lockfile
+# Instalar dependencias (preferir lockfile pero permitir resolver si quedó desfasado)
+RUN pnpm install --prefer-frozen-lockfile
 
 # Generar cliente prisma (hot-fix)
 RUN npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
@@ -41,7 +41,7 @@ COPY --from=build /repo/infra ./infra
 # Instalar solo prod deps del servicio específico
 ARG SERVICE=notifier
 ENV SERVICE=${SERVICE}
-RUN pnpm install --frozen-lockfile --prod --filter "@constanza/${SERVICE}"
+RUN pnpm install --prefer-frozen-lockfile --prod --filter "@constanza/${SERVICE}"
 
 # Copiar el build del servicio
 COPY --from=build /repo/apps/${SERVICE}/dist ./apps/${SERVICE}/dist
@@ -100,7 +100,7 @@ COPY --from=build /repo/apps/notifier/package.json ./apps/notifier/package.json
 COPY --from=build /repo/infra ./infra
 
 # Instalar SOLO las dependencias de producción del servicio
-RUN pnpm install --frozen-lockfile --prod --filter "@constanza/notifier"
+RUN pnpm install --prefer-frozen-lockfile --prod --filter "@constanza/notifier"
 
 # 🔥 Regenerar Prisma Client en el runner stage (después de instalar deps)
 # Ignorar errores de checksum y usar reintentos más robustos si Prisma servers están caídos
