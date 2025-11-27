@@ -26,7 +26,7 @@ export async function getNotifyQueueStats() {
 export function startNotifyWorker(logger: FastifyBaseLogger) {
   const worker = new Worker(
     'notify.send',
-    async (job) => {
+    async (job: any) => {
       const { channel, customerId, invoiceId, message, templateId, variables, batchId, tenantId } =
         job.data;
 
@@ -207,7 +207,7 @@ export function startNotifyWorker(logger: FastifyBaseLogger) {
     }
   );
 
-  worker.on('error', (err) => {
+  worker.on('error', (err: any) => {
     logger.error({ err }, '[notify] Worker error');
   });
 
