@@ -39,5 +39,27 @@ export async function healthRoutes(fastify: FastifyInstance) {
       };
     }
   });
+
+  // Alias con prefijo v1 por si el gateway se sirve bajo ese prefijo
+  fastify.get('/v1/health/notifier', async () => {
+    const NOTIFIER_URL = process.env.NOTIFIER_URL || 'http://localhost:3001';
+    try {
+      const resp = await axios.get(`${NOTIFIER_URL}/health`, { timeout: 5000 });
+      return {
+        ok: true,
+        url: NOTIFIER_URL,
+        status: resp.status,
+        data: resp.data,
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        url: NOTIFIER_URL,
+        error: err?.message,
+        code: err?.code,
+        errno: err?.errno,
+      };
+    }
+  });
 }
 
