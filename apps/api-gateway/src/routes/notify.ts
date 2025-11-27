@@ -10,8 +10,12 @@ if (!process.env.NOTIFIER_URL && process.env.NODE_ENV === 'production') {
   console.warn('⚠️ NOTIFIER_URL no está configurada. Los envíos de notificaciones fallarán.');
 }
 
+// Batch por facturas (preferido) o por clientes (legacy)
 const sendMessageSchema = z.object({
-  customerIds: z.array(z.string().uuid()),
+  // Nuevo flujo: selección por facturas
+  invoiceIds: z.array(z.string().uuid()).optional(),
+  // Legacy: selección por clientes (se mantiene compatibilidad)
+  customerIds: z.array(z.string().uuid()).optional(),
   channel: z.enum(['EMAIL', 'WHATSAPP', 'VOICE']),
   message: z.object({
     text: z.string().optional(),
@@ -20,7 +24,6 @@ const sendMessageSchema = z.object({
   }),
   templateId: z.string().uuid().optional(),
   variables: z.record(z.string()).optional(),
-  invoiceId: z.string().uuid().optional(),
 });
 
 export async function notifyRoutes(fastify: FastifyInstance) {
@@ -37,43 +40,100 @@ export async function notifyRoutes(fastify: FastifyInstance) {
       fastify.log.info({ NOTIFIER_URL }, '[notify.batch] Using NOTIFIER_URL');
 
       try {
-        // Verificar que todos los clientes existan y pertenezcan al tenant
-        const customers = await prisma.customer.findMany({
-          where: {
-            id: { in: body.customerIds },
-            tenantId: user.tenant_id,
-            activo: true,
-          },
-        });
-
-        if (customers.length !== body.customerIds.length) {
-          const foundIds = customers.map((c) => c.id);
-          const missingIds = body.customerIds.filter((id) => !foundIds.includes(id));
+        // Debe venir al menos uno de los dos: invoiceIds o customerIds (legacy)
+        if ((!body.invoiceIds || body.invoiceIds.length === 0) && (!body.customerIds || body.customerIds.length === 0)) {
           return reply.status(400).send({
-            error: 'Algunos clientes no existen o no pertenecen a tu tenant',
-            missingIds,
+            error: 'Debes enviar invoiceIds (preferido) o customerIds (legacy)',
           });
         }
 
-        // Validar que los clientes tengan los datos necesarios según el canal
-        if (body.channel === 'EMAIL') {
-          const withoutEmail = customers.filter((c) => !c.email);
-          if (withoutEmail.length > 0) {
-            return reply.status(400).send({
-              error: 'Algunos clientes no tienen email configurado',
-              customerIds: withoutEmail.map((c) => c.id),
-            });
-          }
-        }
+        // Flujo preferido: por facturas
+        let targets: Array<{ customerId: string; invoiceId: string; channelOk: boolean }> = [];
+        let totalMessages = 0;
 
-        if (body.channel === 'WHATSAPP' || body.channel === 'VOICE') {
-          const withoutPhone = customers.filter((c) => !c.telefono);
-          if (withoutPhone.length > 0) {
+        if (body.invoiceIds && body.invoiceIds.length > 0) {
+          const invoices = await prisma.invoice.findMany({
+            where: {
+              id: { in: body.invoiceIds },
+              tenantId: user.tenant_id,
+            },
+            include: {
+              customer: true,
+            },
+          });
+
+          if (invoices.length !== body.invoiceIds.length) {
+            const foundIds = invoices.map((i) => i.id);
+            const missing = body.invoiceIds.filter((id) => !foundIds.includes(id));
             return reply.status(400).send({
-              error: 'Algunos clientes no tienen teléfono configurado',
-              customerIds: withoutPhone.map((c) => c.id),
+              error: 'Algunas facturas no existen o no pertenecen a tu tenant',
+              missingInvoiceIds: missing,
             });
           }
+
+          // Validación de canal según datos del cliente
+          for (const inv of invoices) {
+            const cust = inv.customer;
+            if (!cust || !cust.activo) continue;
+            let ok = true;
+            if (body.channel === 'EMAIL') ok = !!cust.email;
+            if (body.channel === 'WHATSAPP' || body.channel === 'VOICE') ok = !!cust.telefono;
+            targets.push({ customerId: cust.id, invoiceId: inv.id, channelOk: ok });
+          }
+          totalMessages = targets.length;
+
+          // Si hay facturas cuyo cliente no tiene el dato requerido, cortar con 400 informativo
+          const bad = targets.filter((t) => !t.channelOk);
+          if (bad.length > 0) {
+            return reply.status(400).send({
+              error:
+                body.channel === 'EMAIL'
+                  ? 'Algunas facturas pertenecen a clientes sin email'
+                  : 'Algunas facturas pertenecen a clientes sin teléfono',
+              invoiceIds: bad.map((t) => t.invoiceId),
+            });
+          }
+        } else {
+          // Flujo legacy: por clientes
+          const customers = await prisma.customer.findMany({
+            where: {
+              id: { in: body.customerIds },
+              tenantId: user.tenant_id,
+              activo: true,
+            },
+          });
+
+          if (customers.length !== (body.customerIds || []).length) {
+            const foundIds = customers.map((c) => c.id);
+            const missingIds = (body.customerIds || []).filter((id) => !foundIds.includes(id));
+            return reply.status(400).send({
+              error: 'Algunos clientes no existen o no pertenecen a tu tenant',
+              missingIds,
+            });
+          }
+
+          if (body.channel === 'EMAIL') {
+            const withoutEmail = customers.filter((c) => !c.email);
+            if (withoutEmail.length > 0) {
+              return reply.status(400).send({
+                error: 'Algunos clientes no tienen email configurado',
+                customerIds: withoutEmail.map((c) => c.id),
+              });
+            }
+          }
+
+          if (body.channel === 'WHATSAPP' || body.channel === 'VOICE') {
+            const withoutPhone = customers.filter((c) => !c.telefono);
+            if (withoutPhone.length > 0) {
+              return reply.status(400).send({
+                error: 'Algunos clientes no tienen teléfono configurado',
+                customerIds: withoutPhone.map((c) => c.id),
+              });
+            }
+          }
+
+          targets = customers.map((c) => ({ customerId: c.id, invoiceId: null as unknown as string, channelOk: true }));
+          totalMessages = targets.length;
         }
 
         // Crear batch job para tracking
@@ -91,7 +151,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
             createdBy: user.user_id, // user_id viene del JWT (debe ser UUID válido)
             channel: body.channel,
             status: 'PROCESSING',
-            totalMessages: customers.length,
+            totalMessages,
             processed: 0,
             failed: 0,
           },
@@ -109,14 +169,14 @@ export async function notifyRoutes(fastify: FastifyInstance) {
 
         // Enviar cada mensaje al notifier (se procesarán uno por uno en cola)
         const jobs = [];
-        for (const customer of customers) {
+        for (const t of targets) {
           try {
             const response = await axios.post(
               `${NOTIFIER_URL}/notify/send`,
               {
                 channel: body.channel,
-                customerId: customer.id,
-                invoiceId: body.invoiceId,
+                customerId: t.customerId,
+                invoiceId: t.invoiceId || undefined,
                 message: body.message,
                 templateId: body.templateId,
                 variables: body.variables,
@@ -130,11 +190,12 @@ export async function notifyRoutes(fastify: FastifyInstance) {
                 timeout: 10000, // 10 segundos de timeout
               }
             );
-            jobs.push({ customerId: customer.id, jobId: response.data.jobId });
+            jobs.push({ customerId: t.customerId, invoiceId: t.invoiceId, jobId: response.data.jobId });
           } catch (error: any) {
             fastify.log.error(
               {
-                customerId: customer.id,
+                customerId: t.customerId,
+                invoiceId: t.invoiceId,
                 error: error.message,
                 NOTIFIER_URL,
                 response: error.response?.data,
@@ -147,9 +208,9 @@ export async function notifyRoutes(fastify: FastifyInstance) {
         }
 
         // Si ningún mensaje se pudo encolar, devolver error
-        if (jobs.length === 0 && customers.length > 0) {
+        if (jobs.length === 0 && totalMessages > 0) {
           fastify.log.error(
-            { NOTIFIER_URL, totalCustomers: customers.length },
+            { NOTIFIER_URL, totalTargets: totalMessages },
             'No se pudo encolar ningún mensaje. El servicio notifier puede estar caído.'
           );
           return reply.status(503).send({
@@ -159,13 +220,13 @@ export async function notifyRoutes(fastify: FastifyInstance) {
         }
 
         fastify.log.info(
-          { batchId: batchJob.id, total: customers.length, jobs: jobs.length },
+          { batchId: batchJob.id, total: totalMessages, jobs: jobs.length },
           'Batch notification queued'
         );
 
         return {
           batchId: batchJob.id,
-          totalMessages: customers.length,
+          totalMessages,
           queued: jobs.length,
           status: 'PROCESSING',
         };
