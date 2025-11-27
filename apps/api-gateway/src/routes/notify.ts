@@ -48,7 +48,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
         }
 
         // Flujo preferido: por facturas
-        let targets: Array<{ customerId: string; invoiceId: string; channelOk: boolean }> = [];
+        let targets: Array<{ customerId: string; invoiceId: string | null; channelOk: boolean; telefono?: string | null }> = [];
         let totalMessages = 0;
 
         if (body.invoiceIds && body.invoiceIds.length > 0) {
@@ -78,7 +78,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
             let ok = true;
             if (body.channel === 'EMAIL') ok = !!cust.email;
             if (body.channel === 'WHATSAPP' || body.channel === 'VOICE') ok = !!cust.telefono;
-            targets.push({ customerId: cust.id, invoiceId: inv.id, channelOk: ok });
+            targets.push({ customerId: cust.id, invoiceId: inv.id, channelOk: ok, telefono: cust.telefono });
           }
           totalMessages = targets.length;
 
@@ -132,7 +132,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
             }
           }
 
-          targets = customers.map((c) => ({ customerId: c.id, invoiceId: null as unknown as string, channelOk: true }));
+          targets = customers.map((c) => ({ customerId: c.id, invoiceId: null, channelOk: true, telefono: c.telefono }));
           totalMessages = targets.length;
         }
 
@@ -177,7 +177,9 @@ export async function notifyRoutes(fastify: FastifyInstance) {
                 channel: body.channel,
                 customerId: t.customerId,
                 invoiceId: t.invoiceId || undefined,
-                message: body.message,
+                message: body.message && body.channel === 'WHATSAPP'
+                  ? { ...body.message, to: t.telefono || undefined }
+                  : body.message,
                 templateId: body.templateId,
                 variables: body.variables,
                 batchId: batchJob.id,
