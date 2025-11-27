@@ -33,16 +33,12 @@ COPY --from=build /repo/pnpm-lock.yaml ./
 COPY --from=build /repo/apps/notifier/package.json ./apps/notifier/package.json
 COPY --from=build /repo/infra ./infra
 
-# Instalar solo prod deps del servicio específico
-RUN pnpm install --prefer-frozen-lockfile --prod --filter "@constanza/notifier"
+# Instalar solo prod deps del servicio específico dentro del propio workspace del servicio
+RUN cd apps/notifier && pnpm install --prefer-frozen-lockfile --prod
 
 # Limpiar engines antiguos y regenerar Prisma Client para Debian
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
-ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
-RUN rm -rf node_modules/.prisma && \
-    rm -rf node_modules/@prisma/client/runtime/* || true && \
-    rm -f node_modules/@prisma/client/*.so.node || true && \
-    npx -y prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
+RUN cd apps/notifier && npx -y prisma@5.22.0 generate --schema=../../infra/prisma/schema.prisma
 
 # Copiar el build del servicio
 COPY --from=build /repo/apps/notifier/dist ./apps/notifier/dist
