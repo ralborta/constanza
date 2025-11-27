@@ -68,7 +68,7 @@ export default function NotifyPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [messageTemplate, setMessageTemplate] = useState('');
-  const [estadoFiltro, setEstadoFiltro] = useState<string>(''); // sin filtro por defecto
+  const [estadoFiltro, setEstadoFiltro] = useState<string>('ALL'); // sin filtro por defecto
 
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery<{ invoices: Invoice[] }>({
     queryKey: ['invoices-for-notify'],
@@ -171,7 +171,7 @@ export default function NotifyPage() {
   const filteredInvoices = (invoicesData?.invoices || [])
     .filter((inv) => {
       // Filtro por estado si se elige alguno (e.g., ABIERTA, VENCIDA, PARCIAL, SALDADA)
-      if (estadoFiltro && inv.estado !== estadoFiltro) return false;
+      if (estadoFiltro !== 'ALL' && inv.estado !== estadoFiltro) return false;
       // Filtrar según canal: requerimos email/teléfono del cliente
       if (channel === 'EMAIL' && !inv.customer) return false; // email se valida en backend
       // Búsqueda por número, razón social o cuit
@@ -239,10 +239,10 @@ export default function NotifyPage() {
                   <Label>Estado</Label>
                   <Select value={estadoFiltro} onValueChange={(v: string) => setEstadoFiltro(v)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Todos" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="ALL">Todos</SelectItem>
                       <SelectItem value="ABIERTA">Abiertas</SelectItem>
                       <SelectItem value="VENCIDA">Vencidas</SelectItem>
                       <SelectItem value="PARCIAL">Parciales</SelectItem>
