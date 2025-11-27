@@ -6,8 +6,6 @@ import * as XLSX from 'xlsx';
 import axios from 'axios';
 import { getNotifierBaseUrl } from '../lib/config.js';
 
-const NOTIFIER_URL = getNotifierBaseUrl();
-
 const callRowSchema = z.object({
   customer_codigo_unico: z.string().optional(),
   customer_cuit: z.string().optional(),
@@ -248,6 +246,8 @@ export async function callRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
 
       try {
+        const NOTIFIER_URL = getNotifierBaseUrl();
+        fastify.log.info({ NOTIFIER_URL }, '[calls.execute] Using NOTIFIER_URL');
         const batchJob = await prisma.batchJob.findFirst({
           where: {
             id,

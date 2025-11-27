@@ -5,8 +5,6 @@ import { authenticate, requirePerfil } from '../middleware/auth.js';
 import axios from 'axios';
 import { getNotifierBaseUrl } from '../lib/config.js';
 
-const NOTIFIER_URL = getNotifierBaseUrl();
-
 // Validar que NOTIFIER_URL esté configurada en producción
 if (!process.env.NOTIFIER_URL && process.env.NODE_ENV === 'production') {
   console.warn('⚠️ NOTIFIER_URL no está configurada. Los envíos de notificaciones fallarán.');
@@ -35,6 +33,8 @@ export async function notifyRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const user = request.user!;
       const body = sendMessageSchema.parse(request.body);
+      const NOTIFIER_URL = getNotifierBaseUrl();
+      fastify.log.info({ NOTIFIER_URL }, '[notify.batch] Using NOTIFIER_URL');
 
       try {
         // Verificar que todos los clientes existan y pertenezcan al tenant
@@ -280,6 +280,8 @@ export async function notifyRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const user = request.user!;
       const { id } = request.params as { id: string };
+      const NOTIFIER_URL = getNotifierBaseUrl();
+      fastify.log.info({ NOTIFIER_URL }, '[notify.batch.retry] Using NOTIFIER_URL');
 
       try {
         // Verificar que el batch existe y pertenece al tenant
@@ -533,6 +535,8 @@ export async function notifyRoutes(fastify: FastifyInstance) {
       }
 
       try {
+        const NOTIFIER_URL = getNotifierBaseUrl();
+        fastify.log.info({ NOTIFIER_URL }, '[notify.send] Using NOTIFIER_URL');
         const response = await axios.post(
           `${NOTIFIER_URL}/notify/send`,
           {
