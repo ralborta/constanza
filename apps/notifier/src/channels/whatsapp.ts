@@ -14,13 +14,16 @@ interface SendWhatsAppParams {
  */
 export async function sendWhatsApp({ to, message }: SendWhatsAppParams) {
   // Normalizar número (quitar espacios y guiones)
-  const number = (to || '').replace(/\s|-/g, '');
+  let number = (to || '').replace(/[\s\-()+]/g, '');
+  // Si empieza con '+' quitarlo (BuilderBot acepta sin '+')
+  if (number.startsWith('+')) number = number.slice(1);
 
   // Delegar validación y resolución de env vars al cliente HTTP
   const result = await sendWhatsAppMessage({
     number,
-      message,
-    checkIfExists: false,
+    message,
+    // Validar existencia para detectar números inválidos temprano
+    checkIfExists: true,
   });
 
   // Intentar mapear un id estándar

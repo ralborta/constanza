@@ -37,7 +37,7 @@ export async function whatsappTestRoutes(server: FastifyInstance) {
           number: parsed.number,
           message: parsed.message,
           mediaUrl: parsed.mediaUrl,
-          checkIfExists: false,
+          checkIfExists: true,
         });
 
         return reply.send({ ok: true, result });
