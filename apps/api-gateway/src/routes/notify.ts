@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 import axios from 'axios';
+import { getNotifierBaseUrl } from '../lib/config.js';
 
-const NOTIFIER_URL = process.env.NOTIFIER_URL || 'http://localhost:3001';
+const NOTIFIER_URL = getNotifierBaseUrl();
 
 // Validar que NOTIFIER_URL esté configurada en producción
 if (!process.env.NOTIFIER_URL && process.env.NODE_ENV === 'production') {

@@ -4,8 +4,9 @@ import { prisma } from '../lib/prisma.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 import * as XLSX from 'xlsx';
 import axios from 'axios';
+import { getNotifierBaseUrl } from '../lib/config.js';
 
-const NOTIFIER_URL = process.env.NOTIFIER_URL || 'http://localhost:3001';
+const NOTIFIER_URL = getNotifierBaseUrl();
 
 const callRowSchema = z.object({
   customer_codigo_unico: z.string().optional(),

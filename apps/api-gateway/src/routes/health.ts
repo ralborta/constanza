@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import axios from 'axios';
+import { getNotifierBaseUrl } from '../lib/config.js';
 
 export async function healthRoutes(fastify: FastifyInstance) {
   fastify.get('/health', async (request, reply) => {
@@ -20,7 +21,7 @@ export async function healthRoutes(fastify: FastifyInstance) {
 
   // Diagnóstico: verificar conectividad hacia el servicio notifier desde el servidor
   fastify.get('/health/notifier', async () => {
-    const NOTIFIER_URL = process.env.NOTIFIER_URL || 'http://localhost:3001';
+    const NOTIFIER_URL = getNotifierBaseUrl();
     try {
       const resp = await axios.get(`${NOTIFIER_URL}/health`, { timeout: 5000 });
       return {
@@ -42,7 +43,7 @@ export async function healthRoutes(fastify: FastifyInstance) {
 
   // Alias con prefijo v1 por si el gateway se sirve bajo ese prefijo
   fastify.get('/v1/health/notifier', async () => {
-    const NOTIFIER_URL = process.env.NOTIFIER_URL || 'http://localhost:3001';
+    const NOTIFIER_URL = getNotifierBaseUrl();
     try {
       const resp = await axios.get(`${NOTIFIER_URL}/health`, { timeout: 5000 });
       return {
