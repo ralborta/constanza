@@ -62,5 +62,26 @@ export async function healthRoutes(fastify: FastifyInstance) {
       };
     }
   });
+
+  // Proxy diagnóstico: BuilderBot env desde notifier (sin exponer secretos)
+  fastify.get('/wa/env', async () => {
+    const NOTIFIER_URL = getNotifierBaseUrl();
+    try {
+      const resp = await axios.get(`${NOTIFIER_URL}/wa/env`, { timeout: 5000 });
+      return { ok: true, url: `${NOTIFIER_URL}/wa/env`, data: resp.data };
+    } catch (err: any) {
+      return { ok: false, url: `${NOTIFIER_URL}/wa/env`, error: err?.message, code: err?.code };
+    }
+  });
+
+  fastify.get('/v1/wa/env', async () => {
+    const NOTIFIER_URL = getNotifierBaseUrl();
+    try {
+      const resp = await axios.get(`${NOTIFIER_URL}/wa/env`, { timeout: 5000 });
+      return { ok: true, url: `${NOTIFIER_URL}/wa/env`, data: resp.data };
+    } catch (err: any) {
+      return { ok: false, url: `${NOTIFIER_URL}/wa/env`, error: err?.message, code: err?.code };
+    }
+  });
 }
 
