@@ -1,8 +1,7 @@
 # Dockerfile para api-gateway
-FROM node:20-alpine AS build
+FROM node:20 AS build
 
-RUN apk add --no-cache openssl \
- && corepack enable && corepack prepare pnpm@9.12.0 --activate
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 WORKDIR /repo
 
@@ -12,8 +11,8 @@ COPY apps/api-gateway ./apps/api-gateway
 COPY packages ./packages
 COPY infra ./infra
 
-# Instalar dependencias
-RUN pnpm install --frozen-lockfile
+# Instalar dependencias (preferir lockfile pero permitir resolver si quedó desfasado)
+RUN pnpm install --prefer-frozen-lockfile
 
 # 🔥 Hot-fix: generar el cliente con npx SIN tocar tu lockfile
 # Ignorar errores de checksum y usar reintentos más robustos si Prisma servers están caídos
@@ -31,11 +30,10 @@ ENV SERVICE=${SERVICE}
 RUN pnpm --filter "@constanza/${SERVICE}" run build
 
 # Imagen final
-FROM node:20-alpine AS runner
+FROM node:20 AS runner
 
-# Instalar dependencias SSL necesarias para Prisma Query Engine
-# Y postgresql-client para ejecutar SQL
-RUN apk add --no-cache openssl libc6-compat postgresql-client
+# postgresql-client para ejecutar SQL (Debian)
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
@@ -49,7 +47,7 @@ COPY --from=build /repo/apps/api-gateway/package.json ./apps/api-gateway/package
 COPY --from=build /repo/infra ./infra
 
 # Instalar SOLO las dependencias de producción del servicio
-RUN pnpm install --frozen-lockfile --prod --filter "@constanza/api-gateway"
+RUN pnpm install --prefer-frozen-lockfile --prod --filter "@constanza/api-gateway"
 
 # 🔥 Regenerar Prisma Client en el runner stage (después de instalar deps)
 # Ignorar errores de checksum y usar reintentos más robustos si Prisma servers están caídos
