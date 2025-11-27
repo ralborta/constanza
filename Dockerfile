@@ -1,8 +1,7 @@
 # syntax=docker/dockerfile:1
-FROM node:20-alpine AS build
+FROM node:20 AS build
 
-RUN apk add --no-cache openssl \
- && corepack enable && corepack prepare pnpm@9.12.0 --activate
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 WORKDIR /repo
 
@@ -30,7 +29,7 @@ ENV SERVICE=${SERVICE}
 RUN pnpm --filter "@constanza/${SERVICE}" run build
 
 # Imagen final
-FROM node:20-alpine AS runner
+FROM node:20 AS runner
 
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
