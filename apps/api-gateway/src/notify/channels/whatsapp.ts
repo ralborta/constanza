@@ -32,6 +32,7 @@ export async function sendWhatsApp({ to, message }: SendWhatsAppParams) {
   return {
     messageId,
     status: 'QUEUED',
+    to: number,
   };
 }
 

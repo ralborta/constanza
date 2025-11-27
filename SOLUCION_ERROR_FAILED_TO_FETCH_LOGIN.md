@@ -101,3 +101,6 @@ Si después de configurar `NEXT_PUBLIC_API_URL` sigue fallando:
 
 **El problema es que `NEXT_PUBLIC_API_URL` no está configurada en Vercel. Una vez que la configures y hagas redeploy, el login debería funcionar.**
 
+
+
+

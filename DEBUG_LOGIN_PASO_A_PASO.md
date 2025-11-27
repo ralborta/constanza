@@ -219,3 +219,7 @@ Con esa información podré darte la solución exacta.
 - [ ] Response revisada (si hay)
 - [ ] Logs de Railway revisados (si Status es 502)
 
+
+
+
+

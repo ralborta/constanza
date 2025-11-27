@@ -49,3 +49,7 @@ echo "   git push origin main"
 echo ""
 echo "✅ Vercel hará deploy automáticamente"
 
+
+
+
+

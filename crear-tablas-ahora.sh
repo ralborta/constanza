@@ -62,3 +62,7 @@ echo "   railway run --service @constanza/api-gateway sh -c 'cd infra/prisma && 
 
 
 
+
+
+
+

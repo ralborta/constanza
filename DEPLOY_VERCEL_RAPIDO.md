@@ -133,3 +133,7 @@ NEXT_PUBLIC_API_URL=https://constanzaapi-gateway-production.up.railway.app
 - **Railway Dashboard:** https://railway.app
 - **API Gateway Health:** https://constanzaapi-gateway-production.up.railway.app/health
 
+
+
+
+
