@@ -14,7 +14,7 @@ interface SendWhatsAppParams {
  */
 export async function sendWhatsApp({ to, message }: SendWhatsAppParams) {
   // Normalizar número (quitar espacios y guiones)
-  let number = (to || '').replace(/[\s\-()+]/g, '');
+  let number = (to || '').replace(/[\s\-\(\)]+/g, '');
   // Si empieza con '+' quitarlo (BuilderBot acepta sin '+')
   if (number.startsWith('+')) number = number.slice(1);
 
@@ -22,8 +22,8 @@ export async function sendWhatsApp({ to, message }: SendWhatsAppParams) {
   const result = await sendWhatsAppMessage({
     number,
     message,
-    // Validar existencia para detectar números inválidos temprano
-    checkIfExists: true,
+    // Podemos validar existencia en otra capa; aquí enviamos directo
+    checkIfExists: false,
   });
 
   // Intentar mapear un id estándar

@@ -171,15 +171,21 @@ export async function notifyRoutes(fastify: FastifyInstance) {
         const jobs = [];
         for (const t of targets) {
           try {
+            const rawMessage: any = body.message;
+            const whatsappMessage =
+              body.channel === 'WHATSAPP'
+                ? (typeof rawMessage === 'string'
+                    ? { text: rawMessage, to: t.telefono || undefined }
+                    : { ...(rawMessage || {}), to: t.telefono || undefined })
+                : rawMessage;
+
             const response = await axios.post(
               `${NOTIFIER_URL}/notify/send`,
               {
                 channel: body.channel,
                 customerId: t.customerId,
                 invoiceId: t.invoiceId || undefined,
-                message: body.message && body.channel === 'WHATSAPP'
-                  ? { ...body.message, to: t.telefono || undefined }
-                  : body.message,
+                message: whatsappMessage,
                 templateId: body.templateId,
                 variables: body.variables,
                 batchId: batchJob.id,
