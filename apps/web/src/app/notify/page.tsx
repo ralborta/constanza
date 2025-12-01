@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { MainLayout } from '@/components/layout/main-layout';
@@ -44,6 +44,14 @@ interface Customer {
   activo: boolean;
 }
 
+interface InvoiceSummary {
+  id: string;
+  numero: string;
+  monto: number;
+  fechaVto: string;
+  estado: string;
+}
+
 interface BatchResult {
   batchId: string;
   totalMessages: number;
@@ -60,6 +68,9 @@ export default function NotifyPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [messageTemplate, setMessageTemplate] = useState('');
+  const [selectedInvoices, setSelectedInvoices] = useState<Record<string, string[]>>({});
+  const [invoicesByCustomer, setInvoicesByCustomer] = useState<Record<string, InvoiceSummary[]>>({});
+  const [includeInvoiceSummary, setIncludeInvoiceSummary] = useState(true);
 
   const { data: customers, isLoading: customersLoading } = useQuery<{ customers: Customer[] }>({
     queryKey: ['customers'],
@@ -86,6 +97,8 @@ export default function NotifyPage() {
       setSubject('');
       setMessageTemplate('');
       setShowPreview(false);
+      setSelectedInvoices({});
+      setInvoicesByCustomer({});
     },
   });
 
@@ -115,6 +128,18 @@ export default function NotifyPage() {
     const newSelected = new Set(selectedCustomers);
     if (newSelected.has(customerId)) {
       newSelected.delete(customerId);
+      setSelectedInvoices((prev) => {
+        if (!prev[customerId]) return prev;
+        const updated = { ...prev };
+        delete updated[customerId];
+        return updated;
+      });
+      setInvoicesByCustomer((prev) => {
+        if (!prev[customerId]) return prev;
+        const updated = { ...prev };
+        delete updated[customerId];
+        return updated;
+      });
     } else {
       newSelected.add(customerId);
     }
@@ -134,17 +159,28 @@ export default function NotifyPage() {
       return;
     }
 
-    if (!message.trim()) {
-      return;
-    }
-
     if (channel === 'EMAIL' && !subject.trim()) {
       return;
     }
 
+    const invoiceSummaryText = buildInvoiceSummaryText({
+      includeInvoiceSummary,
+      selectedCustomers,
+      selectedInvoices,
+      invoicesByCustomer,
+    });
+
+    const combinedMessage = `${message}`.trim().length > 0
+      ? `${message.trim()}${invoiceSummaryText}`
+      : invoiceSummaryText.trim();
+
+    if (!combinedMessage) {
+      return;
+    }
+
     const messageData: { text?: string; body?: string; subject?: string } = {
-      text: message,
-      body: message,
+      text: combinedMessage,
+      body: combinedMessage,
     };
 
     if (channel === 'EMAIL') {
@@ -173,10 +209,26 @@ export default function NotifyPage() {
     );
   }) || [];
 
-  const canSend = selectedCustomers.size > 0 && message.trim() && (channel !== 'EMAIL' || subject.trim());
+  const invoiceSummaryText = useMemo(
+    () =>
+      buildInvoiceSummaryText({
+        includeInvoiceSummary,
+        selectedCustomers,
+        selectedInvoices,
+        invoicesByCustomer,
+      }),
+    [includeInvoiceSummary, selectedCustomers, selectedInvoices, invoicesByCustomer]
+  );
+
+  const messageWithSummary = `${message}`.trim().length > 0
+    ? `${message.trim()}${invoiceSummaryText}`
+    : invoiceSummaryText;
+
+  const canSend =
+    selectedCustomers.size > 0 && messageWithSummary.trim() && (channel !== 'EMAIL' || subject.trim());
   
   // Contador de caracteres (WhatsApp tiene límite de 4096)
-  const charCount = message.length;
+  const charCount = messageWithSummary.length;
   const charLimit = channel === 'WHATSAPP' ? 4096 : channel === 'EMAIL' ? 10000 : 5000;
   const isCharLimitExceeded = charCount > charLimit;
 
@@ -242,35 +294,62 @@ export default function NotifyPage() {
                     </div>
                   ) : (
                     filteredCustomers.map((customer) => (
-                      <div
-                        key={customer.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
-                          selectedCustomers.has(customer.id)
-                            ? 'bg-green-50 border-green-200 shadow-sm'
-                            : 'hover:bg-muted/50 border-border'
-                        }`}
-                        onClick={() => handleToggleCustomer(customer.id)}
-                      >
-                        <Checkbox
-                          checked={selectedCustomers.has(customer.id)}
-                          onCheckedChange={() => handleToggleCustomer(customer.id)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground">{customer.razonSocial}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            {channel === 'EMAIL' ? (
-                              <Mail className="h-3 w-3 text-muted-foreground" />
-                            ) : (
-                              <Phone className="h-3 w-3 text-muted-foreground" />
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              {channel === 'EMAIL' ? customer.email : customer.telefono || 'Sin teléfono'}
-                            </p>
+                      <div key={customer.id} className="space-y-2">
+                        <div
+                          className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                            selectedCustomers.has(customer.id)
+                              ? 'bg-green-50 border-green-200 shadow-sm'
+                              : 'hover:bg-muted/50 border-border'
+                          }`}
+                          onClick={() => handleToggleCustomer(customer.id)}
+                        >
+                          <Checkbox
+                            checked={selectedCustomers.has(customer.id)}
+                            onCheckedChange={() => handleToggleCustomer(customer.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground">{customer.razonSocial}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {channel === 'EMAIL' ? (
+                                <Mail className="h-3 w-3 text-muted-foreground" />
+                              ) : (
+                                <Phone className="h-3 w-3 text-muted-foreground" />
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                {channel === 'EMAIL' ? customer.email : customer.telefono || 'Sin teléfono'}
+                              </p>
+                            </div>
                           </div>
+                          <Badge variant="outline" className="text-xs">
+                            {customer.codigoUnico}
+                          </Badge>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {customer.codigoUnico}
-                        </Badge>
+                        {selectedCustomers.has(customer.id) && (
+                          <CustomerInvoices
+                            customerId={customer.id}
+                            selectedInvoices={selectedInvoices[customer.id] || []}
+                            onToggleInvoice={(invoiceId) => {
+                              setSelectedInvoices((prev) => {
+                                const current = new Set(prev[customer.id] || []);
+                                if (current.has(invoiceId)) {
+                                  current.delete(invoiceId);
+                                } else {
+                                  current.add(invoiceId);
+                                }
+                                return {
+                                  ...prev,
+                                  [customer.id]: Array.from(current),
+                                };
+                              });
+                            }}
+                            onInvoicesLoaded={(invoices) =>
+                              setInvoicesByCustomer((prev) => ({
+                                ...prev,
+                                [customer.id]: invoices,
+                              }))
+                            }
+                          />
+                        )}
                       </div>
                     ))
                   )}
@@ -446,7 +525,9 @@ export default function NotifyPage() {
                         </div>
                       )}
                       <div className="whitespace-pre-wrap text-sm">
-                        {message || <span className="text-muted-foreground italic">Escribe un mensaje para ver la vista previa...</span>}
+                        {messageWithSummary
+                          ? messageWithSummary
+                          : <span className="text-muted-foreground italic">Escribe un mensaje para ver la vista previa...</span>}
                       </div>
                       {message && (
                         <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
@@ -454,6 +535,24 @@ export default function NotifyPage() {
                         </div>
                       )}
                     </div>
+                  )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      id="include-invoice-summary"
+                      checked={includeInvoiceSummary}
+                      onCheckedChange={(checked) => setIncludeInvoiceSummary(Boolean(checked))}
+                    />
+                    <Label htmlFor="include-invoice-summary" className="text-sm font-normal">
+                      Incluir detalle de facturas seleccionadas al final del mensaje
+                    </Label>
+                  </div>
+                  {invoiceSummaryText && (
+                    <Alert className="bg-muted/40 border-dashed">
+                      <AlertTitle className="text-sm font-semibold">Detalle que se agregará</AlertTitle>
+                      <AlertDescription className="whitespace-pre-wrap text-xs">
+                        {invoiceSummaryText.trim()}
+                      </AlertDescription>
+                    </Alert>
                   )}
                 </div>
 
@@ -489,7 +588,7 @@ export default function NotifyPage() {
                   </Alert>
                 )}
 
-                {selectedCustomers.size > 0 && !message.trim() && (
+                {selectedCustomers.size > 0 && !messageWithSummary.trim() && (
                   <Alert variant="default" className="border-orange-200 bg-orange-50">
                     <AlertCircle className="h-4 w-4 text-orange-600" />
                     <AlertDescription className="text-orange-800">
@@ -588,5 +687,115 @@ export default function NotifyPage() {
       </div>
     </MainLayout>
   );
+}
+
+interface CustomerInvoicesProps {
+  customerId: string;
+  selectedInvoices: string[];
+  onToggleInvoice: (invoiceId: string) => void;
+  onInvoicesLoaded: (invoices: InvoiceSummary[]) => void;
+}
+
+function CustomerInvoices({
+  customerId,
+  selectedInvoices,
+  onToggleInvoice,
+  onInvoicesLoaded,
+}: CustomerInvoicesProps) {
+  const { data, isLoading } = useQuery<{ invoices: InvoiceSummary[] }>({
+    queryKey: ['customerInvoices', customerId],
+    queryFn: async () => {
+      const response = await api.get('/v1/invoices', {
+        params: { customer_id: customerId },
+      });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      onInvoicesLoaded(data.invoices.filter((inv) => inv.estado !== 'SALDADA'));
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const pendingInvoices = (data?.invoices || []).filter((inv) => inv.estado !== 'SALDADA');
+
+  return (
+    <div className="ml-6 border-l pl-4 pb-3">
+      <p className="text-xs font-semibold text-muted-foreground mb-2">Facturas pendientes</p>
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Cargando facturas...
+        </div>
+      ) : pendingInvoices.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No hay facturas pendientes.</p>
+      ) : (
+        <div className="space-y-2">
+          {pendingInvoices.map((invoice) => (
+            <div key={invoice.id} className="flex items-center justify-between text-xs">
+              <div>
+                <div className="font-medium">#{invoice.numero}</div>
+                <div className="text-muted-foreground">
+                  {formatCurrency(invoice.monto)} · vence {formatDate(invoice.fechaVto)}
+                </div>
+              </div>
+              <Checkbox
+                checked={selectedInvoices.includes(invoice.id)}
+                onCheckedChange={() => onToggleInvoice(invoice.id)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function buildInvoiceSummaryText({
+  includeInvoiceSummary,
+  selectedCustomers,
+  selectedInvoices,
+  invoicesByCustomer,
+}: {
+  includeInvoiceSummary: boolean;
+  selectedCustomers: Set<string>;
+  selectedInvoices: Record<string, string[]>;
+  invoicesByCustomer: Record<string, InvoiceSummary[]>;
+}) {
+  if (!includeInvoiceSummary) return '';
+
+  const lines: string[] = [];
+
+  Array.from(selectedCustomers).forEach((customerId) => {
+    const invoices = invoicesByCustomer[customerId] || [];
+    const selected = new Set(selectedInvoices[customerId] || []);
+
+    invoices
+      .filter((inv) => selected.has(inv.id))
+      .forEach((inv) => {
+        lines.push(
+          `• Factura #${inv.numero} – ${formatCurrency(inv.monto)} – vence ${formatDate(inv.fechaVto)}`
+        );
+      });
+  });
+
+  if (lines.length === 0) return '';
+
+  return `\n\nDetalle de facturas pendientes:\n${lines.join('\n')}`;
+}
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 2,
+  }).format(amount / 100);
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(value));
 }
 
