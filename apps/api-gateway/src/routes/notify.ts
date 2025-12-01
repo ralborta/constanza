@@ -12,6 +12,9 @@ if (!process.env.NOTIFIER_URL && process.env.NODE_ENV === 'production') {
 
 const sendMessageSchema = z.object({
   customerIds: z.array(z.string().uuid()),
+  invoiceIdsByCustomer: z
+    .record(z.string().uuid(), z.array(z.string().uuid()))
+    .optional(),
   channel: z.enum(['EMAIL', 'WHATSAPP', 'VOICE']),
   message: z.object({
     text: z.string().optional(),
@@ -20,8 +23,9 @@ const sendMessageSchema = z.object({
   }),
   templateId: z.string().uuid().optional(),
   variables: z.record(z.string()).optional(),
-  invoiceId: z.string().uuid().optional(),
 });
+
+type SendMessagePayload = z.infer<typeof sendMessageSchema>;
 
 export async function notifyRoutes(fastify: FastifyInstance) {
   // POST /notify/batch - Enviar mensajes a múltiples clientes
@@ -33,6 +37,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const user = request.user!;
       const body = sendMessageSchema.parse(request.body);
+      const invoiceIdsByCustomer = normalizeInvoiceMap(body);
       const NOTIFIER_URL = getNotifierBaseUrl();
       fastify.log.info({ NOTIFIER_URL }, '[notify.batch] Using NOTIFIER_URL');
 
@@ -53,6 +58,58 @@ export async function notifyRoutes(fastify: FastifyInstance) {
             error: 'Algunos clientes no existen o no pertenecen a tu tenant',
             missingIds,
           });
+        }
+
+        const invalidInvoiceCustomers = Object.keys(invoiceIdsByCustomer).filter(
+          (customerId) => !body.customerIds.includes(customerId)
+        );
+
+        if (invalidInvoiceCustomers.length > 0) {
+          return reply.status(400).send({
+            error: 'Se enviaron facturas para clientes no seleccionados',
+            customerIds: invalidInvoiceCustomers,
+          });
+        }
+
+        const invoiceIdsFlat = Object.values(invoiceIdsByCustomer).flat();
+        if (invoiceIdsFlat.length > 0) {
+          const invoices = await prisma.invoice.findMany({
+            where: {
+              id: { in: invoiceIdsFlat },
+              tenantId: user.tenant_id,
+            },
+            select: {
+              id: true,
+              customerId: true,
+            },
+          });
+
+          const invoiceMap = new Map(invoices.map((inv) => [inv.id, inv.customerId]));
+
+          const missingInvoices = invoiceIdsFlat.filter((id) => !invoiceMap.has(id));
+          if (missingInvoices.length > 0) {
+            return reply.status(400).send({
+              error: 'Algunas facturas no existen o no pertenecen a tu tenant',
+              invoiceIds: missingInvoices,
+            });
+          }
+
+          const mismatched: { invoiceId: string; customerId: string }[] = [];
+          for (const [customerId, invoiceIds] of Object.entries(invoiceIdsByCustomer)) {
+            for (const invoiceId of invoiceIds) {
+              const owner = invoiceMap.get(invoiceId);
+              if (owner !== customerId) {
+                mismatched.push({ invoiceId, customerId });
+              }
+            }
+          }
+
+          if (mismatched.length > 0) {
+            return reply.status(400).send({
+              error: 'Algunas facturas no pertenecen a los clientes seleccionados',
+              mismatched,
+            });
+          }
         }
 
         // Validar que los clientes tengan los datos necesarios según el canal
@@ -111,12 +168,16 @@ export async function notifyRoutes(fastify: FastifyInstance) {
         const jobs = [];
         for (const customer of customers) {
           try {
+            const invoiceIds = resolveInvoiceIdsForCustomer(invoiceIdsByCustomer, customer.id);
+            const invoiceId = resolveInvoiceIdForCustomer(invoiceIds);
+
             const response = await axios.post(
               `${NOTIFIER_URL}/notify/send`,
               {
                 channel: body.channel,
                 customerId: customer.id,
-                invoiceId: body.invoiceId,
+                invoiceId,
+                invoiceIds,
                 message: body.message,
                 templateId: body.templateId,
                 variables: body.variables,
@@ -568,5 +629,31 @@ export async function notifyRoutes(fastify: FastifyInstance) {
       }
     }
   );
+}
+
+type InvoiceMap = Record<string, string[]>;
+
+function normalizeInvoiceMap(body: SendMessagePayload): InvoiceMap {
+  const map: InvoiceMap = {};
+  if (!body.invoiceIdsByCustomer) {
+    return map;
+  }
+
+  for (const [customerId, invoiceIds] of Object.entries(body.invoiceIdsByCustomer)) {
+    const unique = Array.from(new Set(invoiceIds));
+    if (unique.length > 0) {
+      map[customerId] = unique;
+    }
+  }
+
+  return map;
+}
+
+function resolveInvoiceIdsForCustomer(invoiceMap: InvoiceMap, customerId: string): string[] {
+  return invoiceMap[customerId] || [];
+}
+
+function resolveInvoiceIdForCustomer(invoiceIds: string[]): string | undefined {
+  return invoiceIds.length > 0 ? invoiceIds[0] : undefined;
 }
 

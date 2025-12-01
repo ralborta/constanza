@@ -112,6 +112,7 @@ export default function NotifyPage() {
       customerIds: string[];
       channel: 'EMAIL' | 'WHATSAPP' | 'VOICE';
       message: { text?: string; body?: string; subject?: string };
+      invoiceIdsByCustomer?: Record<string, string[]>;
     }) => {
       const response = await api.post('/v1/notify/batch', data);
       return response.data as BatchResult;
@@ -214,10 +215,15 @@ export default function NotifyPage() {
       messageData.subject = subject;
     }
 
+    const invoiceIdsByCustomerPayload = buildInvoiceIdsPayload(selectedCustomers, selectedInvoices);
+
     sendBatchMutation.mutate({
       customerIds: Array.from(selectedCustomers),
       channel,
       message: messageData,
+      invoiceIdsByCustomer: Object.keys(invoiceIdsByCustomerPayload).length
+        ? invoiceIdsByCustomerPayload
+        : undefined,
     });
   };
 
@@ -363,9 +369,14 @@ export default function NotifyPage() {
                                 } else {
                                   current.add(invoiceId);
                                 }
+                                const next = Array.from(current);
+                                if (next.length === 0) {
+                                  const { [customer.id]: _, ...rest } = prev;
+                                  return rest;
+                                }
                                 return {
                                   ...prev,
-                                  [customer.id]: Array.from(current),
+                                  [customer.id]: next,
                                 };
                               });
                             }}
@@ -825,5 +836,21 @@ function formatDate(value: string) {
     month: '2-digit',
     year: 'numeric',
   }).format(new Date(value));
+}
+
+function buildInvoiceIdsPayload(
+  selectedCustomers: Set<string>,
+  selectedInvoices: Record<string, string[]>
+): Record<string, string[]> {
+  const payload: Record<string, string[]> = {};
+
+  selectedCustomers.forEach((customerId) => {
+    const invoices = selectedInvoices[customerId];
+    if (invoices && invoices.length > 0) {
+      payload[customerId] = invoices;
+    }
+  });
+
+  return payload;
 }
 

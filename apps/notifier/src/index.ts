@@ -43,7 +43,22 @@ export const notifyQueue = new Queue('notify.send', {
 export const notifyWorker = new Worker(
   'notify.send',
   async (job) => {
-    const { channel, customerId, invoiceId, message, templateId, variables, batchId, tenantId } = job.data;
+    const {
+      channel,
+      customerId,
+      invoiceId,
+      invoiceIds,
+      message,
+      templateId,
+      variables,
+      batchId,
+      tenantId,
+    } = job.data;
+
+    const invoiceIdsArray: string[] = Array.isArray(invoiceIds)
+      ? invoiceIds.filter((id: string) => typeof id === 'string')
+      : [];
+    const primaryInvoiceId = invoiceIdsArray.length > 0 ? invoiceIdsArray[0] : invoiceId;
 
     logger.info({ jobId: job.id, channel, customerId }, 'Processing notification');
 
@@ -69,7 +84,7 @@ export const notifyWorker = new Worker(
           subject: message.subject, // Pasar el subject para que también pueda usar variables
           variables: variables || {},
           customerId: customer.id,
-          invoiceId: invoiceId || undefined,
+          invoiceId: primaryInvoiceId || undefined,
           tenantId: tenantId || customer.tenantId,
         });
 
@@ -84,7 +99,7 @@ export const notifyWorker = new Worker(
       } else if (channel === 'WHATSAPP') {
         const resolvedVars = await resolveVariablesFromDB(
           customer.id,
-          invoiceId || undefined,
+          primaryInvoiceId || undefined,
           tenantId || customer.tenantId,
           variables
         );
@@ -99,7 +114,7 @@ export const notifyWorker = new Worker(
       } else if (channel === 'VOICE') {
         const resolvedVars = await resolveVariablesFromDB(
           customer.id,
-          invoiceId || undefined,
+          primaryInvoiceId || undefined,
           tenantId || customer.tenantId,
           variables
         );
@@ -116,22 +131,27 @@ export const notifyWorker = new Worker(
       }
 
       // Registrar en contact.events
-      await prisma.contactEvent.create({
-        data: {
-          tenantId: customer.tenantId,
-          customerId: customer.id,
-          invoiceId: invoiceId || null,
-          batchId: batchId || null,
-          channel,
-          direction: 'OUTBOUND',
-          isManual: false,
-          templateId: templateId || null,
-          messageText: message.text || message.body,
-          status,
-          externalMessageId,
-          ts: new Date(),
-        },
-      });
+      const contactInvoiceIds =
+        invoiceIdsArray.length > 0 ? invoiceIdsArray : primaryInvoiceId ? [primaryInvoiceId] : [null];
+
+      for (const contactInvoiceId of contactInvoiceIds) {
+        await prisma.contactEvent.create({
+          data: {
+            tenantId: customer.tenantId,
+            customerId: customer.id,
+            invoiceId: contactInvoiceId || null,
+            batchId: batchId || null,
+            channel,
+            direction: 'OUTBOUND',
+            isManual: false,
+            templateId: templateId || null,
+            messageText: message.text || message.body,
+            status,
+            externalMessageId,
+            ts: new Date(),
+          },
+        });
+      }
 
       logger.info({ jobId: job.id, channel, customerId }, 'Notification sent successfully');
 
@@ -202,22 +222,27 @@ export const notifyWorker = new Worker(
       }
 
       // Registrar error en contact.events
-      await prisma.contactEvent.create({
-        data: {
-          tenantId: tenantId || job.data.tenantId,
-          customerId,
-          invoiceId: invoiceId || null,
-          batchId: batchId || null,
-          channel,
-          direction: 'OUTBOUND',
-          isManual: false,
-          templateId: templateId || null,
-          messageText: message.text || message.body,
-          status: 'FAILED',
-          errorReason: error.message,
-          ts: new Date(),
-        },
-      });
+      const contactInvoiceIds =
+        invoiceIdsArray.length > 0 ? invoiceIdsArray : primaryInvoiceId ? [primaryInvoiceId] : [null];
+
+      for (const contactInvoiceId of contactInvoiceIds) {
+        await prisma.contactEvent.create({
+          data: {
+            tenantId: tenantId || job.data.tenantId,
+            customerId,
+            invoiceId: contactInvoiceId || null,
+            batchId: batchId || null,
+            channel,
+            direction: 'OUTBOUND',
+            isManual: false,
+            templateId: templateId || null,
+            messageText: message.text || message.body,
+            status: 'FAILED',
+            errorReason: error.message,
+            ts: new Date(),
+          },
+        });
+      }
 
       // Actualizar batch job con error si existe
       if (batchId && tenantId) {
