@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { sendEmail, EmailError, EmailErrorCode } from './channels/email.js';
 import { sendWhatsApp } from './channels/whatsapp.js';
 import { sendVoice } from './channels/voice.js';
-import { renderEmailTemplate } from './templates/email.js';
+import { renderEmailTemplate, replaceVariables, resolveVariablesFromDB } from './templates/email.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { whatsappTestRoutes } from './routes/whatsapp-test.js';
 import { WhatsAppPoller } from './polling/whatsapp-poller.js';
@@ -82,17 +82,31 @@ export const notifyWorker = new Worker(
         });
         externalMessageId = result.messageId;
       } else if (channel === 'WHATSAPP') {
+        const resolvedVars = await resolveVariablesFromDB(
+          customer.id,
+          invoiceId || undefined,
+          tenantId || customer.tenantId,
+          variables
+        );
+        const renderedMessage = replaceVariables(message.text || message.body || '', resolvedVars);
         result = await sendWhatsApp({
           to: customer.telefono || '',
-          message: message.text || message.body,
+          message: renderedMessage,
           templateId,
           variables,
         });
         externalMessageId = result.messageId;
       } else if (channel === 'VOICE') {
+        const resolvedVars = await resolveVariablesFromDB(
+          customer.id,
+          invoiceId || undefined,
+          tenantId || customer.tenantId,
+          variables
+        );
+        const renderedScript = replaceVariables(message.text || message.body || '', resolvedVars);
         result = await sendVoice({
           to: customer.telefono || '',
-          script: message.text || message.body,
+          script: renderedScript,
           agentId: process.env.ELEVENLABS_AGENT_ID,
           variables,
         });

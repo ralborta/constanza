@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-interface TemplateVariables {
+export interface TemplateVariables {
   nombre_cliente?: string;
   monto?: string;
   fecha_vencimiento?: string;
@@ -24,7 +24,7 @@ interface RenderTemplateOptions {
 /**
  * Resuelve variables dinámicas desde la base de datos si hay invoiceId
  */
-async function resolveVariablesFromDB(
+export async function resolveVariablesFromDB(
   customerId: string,
   invoiceId: string | undefined,
   tenantId: string,
@@ -112,7 +112,7 @@ async function resolveVariablesFromDB(
 /**
  * Reemplaza variables en el texto del template
  */
-function replaceVariables(template: string, variables: TemplateVariables): string {
+export function replaceVariables(template: string, variables: TemplateVariables): string {
   let result = template;
 
   // Reemplazar todas las variables {variable_name}
