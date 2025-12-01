@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { MainLayout } from '@/components/layout/main-layout';
@@ -71,6 +71,33 @@ export default function NotifyPage() {
   const [selectedInvoices, setSelectedInvoices] = useState<Record<string, string[]>>({});
   const [invoicesByCustomer, setInvoicesByCustomer] = useState<Record<string, InvoiceSummary[]>>({});
   const [includeInvoiceSummary, setIncludeInvoiceSummary] = useState(true);
+
+  const handleInvoicesLoaded = useCallback((customerId: string, invoices: InvoiceSummary[]) => {
+    setInvoicesByCustomer((prev) => {
+      const existing = prev[customerId];
+      const isSame =
+        existing &&
+        existing.length === invoices.length &&
+        existing.every((inv, idx) => {
+          const next = invoices[idx];
+          return (
+            inv.id === next.id &&
+            inv.estado === next.estado &&
+            inv.monto === next.monto &&
+            inv.fechaVto === next.fechaVto
+          );
+        });
+
+      if (isSame) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [customerId]: invoices,
+      };
+    });
+  }, []);
 
   const { data: customers, isLoading: customersLoading } = useQuery<{ customers: Customer[] }>({
     queryKey: ['customers'],
@@ -342,12 +369,7 @@ export default function NotifyPage() {
                                 };
                               });
                             }}
-                            onInvoicesLoaded={(invoices) =>
-                              setInvoicesByCustomer((prev) => ({
-                                ...prev,
-                                [customer.id]: invoices,
-                              }))
-                            }
+                            onInvoicesLoaded={handleInvoicesLoaded}
                           />
                         )}
                       </div>
@@ -693,7 +715,7 @@ interface CustomerInvoicesProps {
   customerId: string;
   selectedInvoices: string[];
   onToggleInvoice: (invoiceId: string) => void;
-  onInvoicesLoaded: (invoices: InvoiceSummary[]) => void;
+  onInvoicesLoaded: (customerId: string, invoices: InvoiceSummary[]) => void;
 }
 
 function CustomerInvoices({
@@ -710,11 +732,17 @@ function CustomerInvoices({
       });
       return response.data;
     },
-    onSuccess: (data) => {
-      onInvoicesLoaded(data.invoices.filter((inv) => inv.estado !== 'SALDADA'));
-    },
     staleTime: 1000 * 60 * 5,
   });
+
+  useEffect(() => {
+    if (data?.invoices) {
+      onInvoicesLoaded(
+        customerId,
+        data.invoices.filter((inv) => inv.estado !== 'SALDADA')
+      );
+    }
+  }, [customerId, data, onInvoicesLoaded]);
 
   const pendingInvoices = (data?.invoices || []).filter((inv) => inv.estado !== 'SALDADA');
 
