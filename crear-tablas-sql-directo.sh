@@ -25,7 +25,3 @@ echo "✅ Comando ejecutado"
 
 
 
-
-
-
-

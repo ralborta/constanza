@@ -133,11 +133,11 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
     const [response] = await sgMail.send(mailOptions);
 
     if (response.statusCode >= 400) {
-    throw new EmailError(
+      throw new EmailError(
         EmailErrorCode.SMTP_SEND_FAILED,
         `SendGrid respondió con status ${response.statusCode}`
-    );
-  }
+      );
+    }
 
     return {
       messageId:
@@ -153,7 +153,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
     const detailedMessage = Array.isArray(responseErrors) && responseErrors.length > 0
       ? responseErrors.map((err: any) => err.message).join('; ')
       : error.message;
-    
+
     if (statusCode === 401 || statusCode === 403) {
       throw new EmailError(
         EmailErrorCode.SMTP_AUTH_FAILED,
@@ -161,7 +161,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
         error
       );
     }
-    
+
     if (statusCode === 429) {
       throw new EmailError(
         EmailErrorCode.RATE_LIMIT,

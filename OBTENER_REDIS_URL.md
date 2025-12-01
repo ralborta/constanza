@@ -70,7 +70,3 @@ Si después de esperar no aparece, puedes:
 
 
 
-
-
-
-

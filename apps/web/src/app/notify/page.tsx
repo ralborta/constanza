@@ -29,27 +29,19 @@ import {
   EyeOff,
   Users,
   Sparkles,
-  FileText,
-  CalendarDays,
-  DollarSign,
+  FileText
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-// Estructuras mínimas para selección por facturas
-interface Invoice {
+interface Customer {
   id: string;
-  numero: string;
-  monto: number;
-  montoAplicado: number;
-  fechaVto: string;
-  estado: string;
-  customer: {
-    id: string;
-    razonSocial: string;
-    cuit?: string;
-  };
+  codigoUnico: string;
+  razonSocial: string;
+  email: string;
+  telefono?: string;
+  activo: boolean;
 }
 
 interface BatchResult {
@@ -61,27 +53,25 @@ interface BatchResult {
 
 export default function NotifyPage() {
   const queryClient = useQueryClient();
-  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+  const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set());
   const [channel, setChannel] = useState<'EMAIL' | 'WHATSAPP' | 'VOICE'>('EMAIL');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [messageTemplate, setMessageTemplate] = useState('');
-  const [estadoFiltro, setEstadoFiltro] = useState<string>('ALL'); // sin filtro por defecto
 
-  const { data: invoicesData, isLoading: invoicesLoading } = useQuery<{ invoices: Invoice[] }>({
-    queryKey: ['invoices-for-notify'],
+  const { data: customers, isLoading: customersLoading } = useQuery<{ customers: Customer[] }>({
+    queryKey: ['customers'],
     queryFn: async () => {
-      // Traemos todas y filtramos en cliente (estados pueden variar por tenant)
-      const response = await api.get('/v1/invoices');
+      const response = await api.get('/v1/customers');
       return response.data;
     },
   });
 
   const sendBatchMutation = useMutation({
     mutationFn: async (data: {
-      invoiceIds: string[];
+      customerIds: string[];
       channel: 'EMAIL' | 'WHATSAPP' | 'VOICE';
       message: { text?: string; body?: string; subject?: string };
     }) => {
@@ -89,9 +79,9 @@ export default function NotifyPage() {
       return response.data as BatchResult;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices-for-notify'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
       // Limpiar formulario
-      setSelectedInvoices(new Set());
+      setSelectedCustomers(new Set());
       setMessage('');
       setSubject('');
       setMessageTemplate('');
@@ -121,26 +111,26 @@ export default function NotifyPage() {
     setMessageTemplate(template);
   };
 
-  const handleToggleInvoice = (invoiceId: string) => {
-    const newSelected = new Set(selectedInvoices);
-    if (newSelected.has(invoiceId)) {
-      newSelected.delete(invoiceId);
+  const handleToggleCustomer = (customerId: string) => {
+    const newSelected = new Set(selectedCustomers);
+    if (newSelected.has(customerId)) {
+      newSelected.delete(customerId);
     } else {
-      newSelected.add(invoiceId);
+      newSelected.add(customerId);
     }
-    setSelectedInvoices(newSelected);
+    setSelectedCustomers(newSelected);
   };
 
   const handleSelectAll = () => {
-    if (selectedInvoices.size === filteredInvoices.length) {
-      setSelectedInvoices(new Set());
+    if (selectedCustomers.size === filteredCustomers.length) {
+      setSelectedCustomers(new Set());
     } else {
-      setSelectedInvoices(new Set(filteredInvoices.map((i) => i.id)));
+      setSelectedCustomers(new Set(filteredCustomers.map((c) => c.id)));
     }
   };
 
   const handleSend = async () => {
-    if (selectedInvoices.size === 0) {
+    if (selectedCustomers.size === 0) {
       return;
     }
 
@@ -162,28 +152,28 @@ export default function NotifyPage() {
     }
 
     sendBatchMutation.mutate({
-      invoiceIds: Array.from(selectedInvoices),
+      customerIds: Array.from(selectedCustomers),
       channel,
       message: messageData,
     });
   };
 
-  const filteredInvoices = (invoicesData?.invoices || [])
-    .filter((inv) => {
-      // Filtro por estado si se elige alguno (e.g., ABIERTA, VENCIDA, PARCIAL, SALDADA)
-      if (estadoFiltro !== 'ALL' && inv.estado !== estadoFiltro) return false;
-      // Filtrar según canal: requerimos email/teléfono del cliente
-      if (channel === 'EMAIL' && !inv.customer) return false; // email se valida en backend
-      // Búsqueda por número, razón social o cuit
-      const s = searchTerm.toLowerCase();
-      return (
-        inv.numero.toLowerCase().includes(s) ||
-        inv.customer.razonSocial.toLowerCase().includes(s) ||
-        (inv.customer.cuit || '').toLowerCase().includes(s)
-      );
-    });
+  const filteredCustomers = customers?.customers.filter((customer) => {
+    if (!customer.activo) return false;
+    
+    // Filtrar según canal
+    if (channel === 'EMAIL' && !customer.email) return false;
+    if ((channel === 'WHATSAPP' || channel === 'VOICE') && !customer.telefono) return false;
 
-  const canSend = selectedInvoices.size > 0 && message.trim() && (channel !== 'EMAIL' || subject.trim());
+    const search = searchTerm.toLowerCase();
+    return (
+      customer.razonSocial.toLowerCase().includes(search) ||
+      customer.email.toLowerCase().includes(search) ||
+      customer.codigoUnico.toLowerCase().includes(search)
+    );
+  }) || [];
+
+  const canSend = selectedCustomers.size > 0 && message.trim() && (channel !== 'EMAIL' || subject.trim());
   
   // Contador de caracteres (WhatsApp tiene límite de 4096)
   const charCount = message.length;
@@ -211,108 +201,90 @@ export default function NotifyPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Panel izquierdo: Selección de facturas */}
+          {/* Panel izquierdo: Selección de clientes */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="border shadow-sm">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-green-600" />
-                    <CardTitle className="text-lg">Seleccionar Facturas</CardTitle>
+                    <Users className="h-5 w-5 text-green-600" />
+                    <CardTitle className="text-lg">Seleccionar Clientes</CardTitle>
                   </div>
                   <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                    {selectedInvoices.size === filteredInvoices.length ? 'Deseleccionar todas' : 'Seleccionar todas'}
+                    {selectedCustomers.size === filteredCustomers.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
                   </Button>
                 </div>
                 <CardDescription>
-                  Busca y selecciona las facturas a las que se enviará el mensaje de cobranza
+                  Busca y selecciona los clientes que recibirán el mensaje
                 </CardDescription>
                 <div className="mt-4">
                   <Input
-                    placeholder="Buscar por número, razón social o CUIT..."
+                    placeholder="Buscar por nombre, email o código..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full"
                   />
                 </div>
-                <div className="mt-3">
-                  <Label>Estado</Label>
-                  <Select value={estadoFiltro} onValueChange={(v: string) => setEstadoFiltro(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Todos</SelectItem>
-                      <SelectItem value="ABIERTA">Abiertas</SelectItem>
-                      <SelectItem value="VENCIDA">Vencidas</SelectItem>
-                      <SelectItem value="PARCIAL">Parciales</SelectItem>
-                      <SelectItem value="SALDADA">Saldadas</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                  {invoicesLoading ? (
+                  {customersLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                      <span className="ml-2 text-sm text-muted-foreground">Cargando facturas...</span>
+                      <span className="ml-2 text-sm text-muted-foreground">Cargando clientes...</span>
                     </div>
-                  ) : filteredInvoices.length === 0 ? (
+                  ) : filteredCustomers.length === 0 ? (
                     <div className="text-center py-12">
                       <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground">
-                        {searchTerm ? 'No se encontraron facturas' : 'No hay facturas para mostrar con el filtro seleccionado'}
+                        {searchTerm ? 'No se encontraron clientes' : `No hay clientes con ${channel === 'EMAIL' ? 'email' : 'teléfono'} configurado`}
                       </p>
                     </div>
                   ) : (
-                    filteredInvoices.map((inv) => (
+                    filteredCustomers.map((customer) => (
                       <div
-                        key={inv.id}
+                        key={customer.id}
                         className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
-                          selectedInvoices.has(inv.id)
+                          selectedCustomers.has(customer.id)
                             ? 'bg-green-50 border-green-200 shadow-sm'
                             : 'hover:bg-muted/50 border-border'
                         }`}
-                        onClick={() => handleToggleInvoice(inv.id)}
+                        onClick={() => handleToggleCustomer(customer.id)}
                       >
                         <Checkbox
-                          checked={selectedInvoices.has(inv.id)}
-                          onCheckedChange={() => handleToggleInvoice(inv.id)}
+                          checked={selectedCustomers.has(customer.id)}
+                          onCheckedChange={() => handleToggleCustomer(customer.id)}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground">
-                            {inv.customer.razonSocial}
-                          </p>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1">
-                              <FileText className="h-3 w-3" /> {inv.numero}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" /> ${(inv.monto / 100).toLocaleString('es-AR')}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <CalendarDays className="h-3 w-3" /> {new Date(inv.fechaVto).toLocaleDateString('es-AR')}
-                            </span>
+                          <p className="text-sm font-medium text-foreground">{customer.razonSocial}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {channel === 'EMAIL' ? (
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                            ) : (
+                              <Phone className="h-3 w-3 text-muted-foreground" />
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {channel === 'EMAIL' ? customer.email : customer.telefono || 'Sin teléfono'}
+                            </p>
                           </div>
                         </div>
                         <Badge variant="outline" className="text-xs">
-                          {inv.estado}
+                          {customer.codigoUnico}
                         </Badge>
                       </div>
                     ))
                   )}
                 </div>
-                {filteredInvoices.length > 0 && (
+                {filteredCustomers.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">
-                        <FileText className="h-4 w-4 inline mr-1" />
-                        {selectedInvoices.size} de {filteredInvoices.length} seleccionadas
+                        <Users className="h-4 w-4 inline mr-1" />
+                        {selectedCustomers.size} de {filteredCustomers.length} seleccionados
                       </span>
-                      {selectedInvoices.size > 0 && (
+                      {selectedCustomers.size > 0 && (
                         <Badge variant="secondary" className="bg-green-100 text-green-700">
-                          {selectedInvoices.size} factura{selectedInvoices.size !== 1 ? 's' : ''}
+                          {selectedCustomers.size} cliente{selectedCustomers.size !== 1 ? 's' : ''}
                         </Badge>
                       )}
                     </div>
@@ -378,7 +350,7 @@ export default function NotifyPage() {
                       placeholder="Ej: Recordatorio de pago pendiente"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
-                      className={!subject.trim() && selectedInvoices.size > 0 ? 'border-orange-300' : ''}
+                      className={!subject.trim() && selectedCustomers.size > 0 ? 'border-orange-300' : ''}
                     />
                   </div>
                 )}
@@ -478,7 +450,7 @@ export default function NotifyPage() {
                       </div>
                       {message && (
                         <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
-                          <p>Este mensaje se enviará a {selectedInvoices.size} factura{selectedInvoices.size !== 1 ? 's' : ''}</p>
+                          <p>Este mensaje se enviará a {selectedCustomers.size} cliente{selectedCustomers.size !== 1 ? 's' : ''}</p>
                         </div>
                       )}
                     </div>
@@ -502,22 +474,22 @@ export default function NotifyPage() {
                   ) : (
                     <>
                       <Send className="mr-2 h-4 w-4" />
-                      Enviar a {selectedInvoices.size || 0} factura{selectedInvoices.size !== 1 ? 's' : ''}
+                      Enviar a {selectedCustomers.size || 0} cliente{selectedCustomers.size !== 1 ? 's' : ''}
                     </>
                   )}
                 </Button>
 
                 {/* Validaciones visuales */}
-                {selectedInvoices.size === 0 && (
+                {selectedCustomers.size === 0 && (
                   <Alert variant="default" className="border-orange-200 bg-orange-50">
                     <AlertCircle className="h-4 w-4 text-orange-600" />
                     <AlertDescription className="text-orange-800">
-                      Selecciona al menos una factura para enviar el mensaje
+                      Selecciona al menos un cliente para enviar el mensaje
                     </AlertDescription>
                   </Alert>
                 )}
 
-                {selectedInvoices.size > 0 && !message.trim() && (
+                {selectedCustomers.size > 0 && !message.trim() && (
                   <Alert variant="default" className="border-orange-200 bg-orange-50">
                     <AlertCircle className="h-4 w-4 text-orange-600" />
                     <AlertDescription className="text-orange-800">
@@ -526,7 +498,7 @@ export default function NotifyPage() {
                   </Alert>
                 )}
 
-                {channel === 'EMAIL' && selectedInvoices.size > 0 && !subject.trim() && (
+                {channel === 'EMAIL' && selectedCustomers.size > 0 && !subject.trim() && (
                   <Alert variant="default" className="border-orange-200 bg-orange-50">
                     <AlertCircle className="h-4 w-4 text-orange-600" />
                     <AlertDescription className="text-orange-800">
@@ -565,7 +537,7 @@ export default function NotifyPage() {
                           <strong>{sendBatchMutation.data.totalMessages}</strong> mensaje{sendBatchMutation.data.totalMessages !== 1 ? 's' : ''} se están enviando uno por uno.
                         </p>
                         <p className="text-xs">
-                          Puedes ver el progreso en el dashboard. Los mensajes aparecerán en el timeline de cada factura.
+                          Puedes ver el progreso en el dashboard. Los mensajes aparecerán en el timeline de facturas.
                         </p>
                       </div>
                     </AlertDescription>

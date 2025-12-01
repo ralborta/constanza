@@ -147,6 +147,3 @@ Debería responder:
 
 **Con los logs mejorados que acabo de agregar, ahora verás mensajes de error más específicos que te dirán exactamente qué está fallando.**
 
-
-
-

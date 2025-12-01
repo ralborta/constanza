@@ -82,32 +82,9 @@ export const notifyWorker = new Worker(
         });
         externalMessageId = result.messageId;
       } else if (channel === 'WHATSAPP') {
-        // Preferir destino explícito (gateway) y hacer fallback a teléfono del cliente
-        const explicitTo: string | undefined =
-          (typeof message === 'object' && message ? (message as any)?.to : undefined) ||
-          (job.data?.to as string | undefined);
-        const destination =
-          (explicitTo && typeof explicitTo === 'string' && explicitTo.trim().length > 0
-            ? explicitTo
-            : (customer?.telefono ?? '')
-          );
-
-        // Normalizar contenido del mensaje
-        let messageText: string | undefined;
-        if (typeof message === 'string') {
-          messageText = message;
-        } else if (message && typeof message === 'object') {
-          const msgObj: any = message;
-          messageText = msgObj.text || msgObj.body || msgObj.message || msgObj.content;
-        }
-        if (!messageText || typeof messageText !== 'string' || !messageText.trim()) {
-          logger.error({ jobId: job.id, raw: message }, '[WhatsApp] Mensaje vacío o inválido');
-          throw new Error('Mensaje de WhatsApp vacío o inválido');
-        }
-
         result = await sendWhatsApp({
-          to: destination,
-          message: messageText,
+          to: customer.telefono || '',
+          message: message.text || message.body,
           templateId,
           variables,
         });
@@ -135,7 +112,7 @@ export const notifyWorker = new Worker(
           direction: 'OUTBOUND',
           isManual: false,
           templateId: templateId || null,
-          messageText: typeof message === 'string' ? message : (message?.text || message?.body),
+          messageText: message.text || message.body,
           status,
           externalMessageId,
           ts: new Date(),
@@ -221,7 +198,7 @@ export const notifyWorker = new Worker(
           direction: 'OUTBOUND',
           isManual: false,
           templateId: templateId || null,
-          messageText: typeof message === 'string' ? message : (message?.text || message?.body),
+          messageText: message.text || message.body,
           status: 'FAILED',
           errorReason: error.message,
           ts: new Date(),

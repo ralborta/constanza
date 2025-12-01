@@ -218,7 +218,3 @@ Debería mostrar: `https://constanzaapi-gateway-production.up.railway.app`
 3. **El build puede tardar 2-5 minutos** la primera vez
 4. **Usa Preview Deployments** para probar cambios antes de production
 
-
-
-
-

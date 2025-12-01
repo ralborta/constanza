@@ -178,6 +178,3 @@ SMTP_FROM_EMAIL=tu_email@gmail.com
 
 Después de esto, el envío de emails debería funcionar.
 
-
-
-

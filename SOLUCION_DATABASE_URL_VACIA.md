@@ -175,7 +175,3 @@ Si después de configurar `DATABASE_URL` sigue fallando, comparte:
 1. Los logs de `api-gateway` en Railway
 2. El error exacto que aparece al cargar el archivo
 
-
-
-
-

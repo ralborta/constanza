@@ -245,7 +245,6 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
               direction: event.direction,
               message: event.messageText,
               status: event.status,
-                  payload: event.payload,
               ts: event.ts,
             })),
             ...invoice.promises.map((promise) => ({

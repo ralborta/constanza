@@ -13,7 +13,6 @@ import { seedRoutes } from './routes/seed.js';
 import { notifyRoutes } from './routes/notify.js';
 import { callRoutes } from './routes/calls.js';
 import { paymentRoutes } from './routes/payments.js';
-import { startNotifyWorker } from './notify/worker.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const server: FastifyInstance = Fastify({
@@ -83,8 +82,6 @@ server.addHook('onReady', async () => {
   logger.info('🚀 API-GATEWAY vCORS-FIX DESPLEGADO');
   logger.info('✅ CORS configurado con origin: true');
   logger.info('✅ @fastify/cors maneja OPTIONS automáticamente');
-  // Iniciar el worker de notificaciones embebido (monolito)
-  startNotifyWorker(server.log);
 });
 
 // Hook para loggear errores de requests

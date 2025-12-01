@@ -61,7 +61,3 @@ Después de configurar `REDIS_URL` y redeploy:
 
 
 
-
-
-
-

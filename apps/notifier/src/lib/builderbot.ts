@@ -1,51 +1,69 @@
 import axios from 'axios';
 
-// URL completa provista por BuilderBot (copiada del panel) – sin construir a mano
-const BUILDERBOT_MESSAGES_URL = (process.env.BUILDERBOT_MESSAGES_URL || '').trim();
+const BUILDERBOT_BASE_URL =
+  process.env.BUILDERBOT_BASE_URL || 'https://app.builderbot.cloud';
 
 export interface SendWhatsAppOptions {
   number: string; // número en formato internacional
   message: string; // contenido del mensaje
   mediaUrl?: string; // opcional
-  checkIfExists?: boolean; // no usado aquí
+  checkIfExists?: boolean; // default false
 }
 
 /**
- * Envía UN mensaje de WhatsApp vía BuilderBot usando la URL completa del panel.
- * - Un único destinatario por llamada (sin batch).
+ * Envía UN mensaje de WhatsApp vía BuilderBot Cloud (API v2).
+ * - Unico destinatario por llamada (sin batch).
  */
 export async function sendWhatsAppMessage(options: SendWhatsAppOptions) {
-  const { number, message, mediaUrl } = options;
+  const { number, message, mediaUrl, checkIfExists = false } = options;
 
+  // Leer SIEMPRE del entorno en tiempo de ejecución, no en import-time
+  let BOT_ID =
+    (process.env.BUILDERBOT_BOT_ID ||
+      process.env.BUILDERBOT_BOTID ||
+      process.env.BUILDERBOT_ID ||
+      process.env.BOT_ID ||
+      process.env.BUILDERBOT_TEST_BOT_ID ||
+      '').trim();
   const API_KEY =
     (process.env.BUILDERBOT_API_KEY ||
       process.env.BUILDERBOT_KEY ||
       process.env.BB_API_KEY ||
+      process.env.BUILDERBOT_TEST_API_KEY ||
       '').trim();
 
-  if (!BUILDERBOT_MESSAGES_URL) {
-    throw new Error('BUILDERBOT_MESSAGES_URL no configurada');
-  }
-  if (!API_KEY) {
-    throw new Error('BUILDERBOT_API_KEY no configurada');
+  // Fallback temporal para pruebas si el BOT_ID no llega por entorno
+  if (!BOT_ID) {
+    BOT_ID = '5e3f81b5-8f3f-4684-b22c-03567371b6c1';
   }
 
-  const body: Record<string, any> = { number, message };
-  if (mediaUrl) body.media = mediaUrl;
+  if (!BOT_ID || !API_KEY) {
+    throw new Error(
+      'BuilderBot no configurado: define BUILDERBOT_BOT_ID y BUILDERBOT_API_KEY'
+    );
+  }
+
+  const url = `${BUILDERBOT_BASE_URL}/api/v2/${BOT_ID}/messages`;
+
+  const body: Record<string, any> = {
+    messages: {
+      content: message,
+    },
+    number,
+    checkIfExists,
+  };
+
+  if (mediaUrl) {
+    body.messages.mediaUrl = mediaUrl;
+  }
 
   const headers = {
     'Content-Type': 'application/json',
-    'api-key': API_KEY,
-    'x-api-builderbot': API_KEY,
+    'x-api-builderbot': API_KEY as string,
   };
 
-  try {
-    const response = await axios.post(BUILDERBOT_MESSAGES_URL, body, { headers, timeout: 30000 });
-    return response.data;
-  } catch (error: any) {
-    console.error('🔥 [BuilderBot] Error al enviar:', error?.response?.data || error.message);
-    console.error('   URL:', BUILDERBOT_MESSAGES_URL);
-    throw error;
-  }
+  const response = await axios.post(url, body, { headers, timeout: 30000 });
+  return response.data;
 }
+
 

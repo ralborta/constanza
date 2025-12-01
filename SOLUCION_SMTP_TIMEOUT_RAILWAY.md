@@ -215,5 +215,3 @@ Esto debería ayudar si el problema es solo de latencia, pero si Railway bloquea
 
 **Prueba primero con puerto 465, y si no funciona, migra a SendGrid que es la solución más confiable para producción.**
 
-
-

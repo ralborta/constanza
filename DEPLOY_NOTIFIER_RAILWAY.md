@@ -282,6 +282,3 @@ Antes de considerar el deploy completo:
 
 **Última actualización**: Después de implementar templates y variables dinámicas ✅
 
-
-
-

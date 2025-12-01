@@ -67,5 +67,3 @@ curl https://notifier-production.up.railway.app/health
 - **Guía completa**: `CONFIGURAR_VARIABLES_RAILWAY_VERCEL.md`
 - **Configuración de emails**: `CONFIGURAR_ENVIO_EMAILS.md`
 
-
-

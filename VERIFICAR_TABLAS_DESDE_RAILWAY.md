@@ -97,7 +97,3 @@ Si después de verificar con Prisma Studio o SQL queries no ves las tablas:
 
 
 
-
-
-
-

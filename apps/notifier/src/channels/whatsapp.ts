@@ -14,15 +14,12 @@ interface SendWhatsAppParams {
  */
 export async function sendWhatsApp({ to, message }: SendWhatsAppParams) {
   // Normalizar número (quitar espacios y guiones)
-  let number = (to || '').replace(/[\s\-\(\)]+/g, '');
-  // Si empieza con '+' quitarlo (BuilderBot acepta sin '+')
-  if (number.startsWith('+')) number = number.slice(1);
+  const number = (to || '').replace(/\s|-/g, '');
 
   // Delegar validación y resolución de env vars al cliente HTTP
   const result = await sendWhatsAppMessage({
     number,
-    message,
-    // Podemos validar existencia en otra capa; aquí enviamos directo
+      message,
     checkIfExists: false,
   });
 
