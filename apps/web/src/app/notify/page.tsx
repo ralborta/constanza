@@ -215,7 +215,7 @@ export default function NotifyPage() {
       messageData.subject = subject;
     }
 
-    const invoiceIdsByCustomerPayload = buildInvoiceIdsPayload(selectedCustomers, selectedInvoices);
+    const invoiceIdsByCustomerPayload = buildInvoiceIdsPayload(selectedCustomers, selectedInvoices, invoicesByCustomer);
 
     sendBatchMutation.mutate({
       customerIds: Array.from(selectedCustomers),
@@ -840,14 +840,22 @@ function formatDate(value: string) {
 
 function buildInvoiceIdsPayload(
   selectedCustomers: Set<string>,
-  selectedInvoices: Record<string, string[]>
+  selectedInvoices: Record<string, string[]>,
+  invoicesByCustomer: Record<string, InvoiceSummary[]>
 ): Record<string, string[]> {
   const payload: Record<string, string[]> = {};
 
   selectedCustomers.forEach((customerId) => {
-    const invoices = selectedInvoices[customerId];
-    if (invoices && invoices.length > 0) {
-      payload[customerId] = invoices;
+    const selected = selectedInvoices[customerId];
+    if (selected && selected.length > 0) {
+      // Usar facturas seleccionadas específicamente
+      payload[customerId] = selected;
+    } else {
+      // Si no hay selección específica, incluir todas las facturas del cliente
+      const allInvoices = invoicesByCustomer[customerId];
+      if (allInvoices && allInvoices.length > 0) {
+        payload[customerId] = allInvoices.map((inv) => inv.id);
+      }
     }
   });
 
