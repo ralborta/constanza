@@ -6,6 +6,28 @@ import * as XLSX from 'xlsx';
 import axios from 'axios';
 import { getNotifierBaseUrl } from '../lib/config.js';
 
+// Configuración de ElevenLabs
+const ELEVENLABS_API_URL = process.env.ELEVENLABS_API_URL || 'https://api.elevenlabs.io';
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
+const ELEVENLABS_PHONE_NUMBER_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID;
+
+/**
+ * Formatea número de teléfono para ElevenLabs (formato E.164)
+ */
+function formatPhoneNumber(phone: string): string {
+  if (!phone) return '';
+  let cleaned = phone.replace(/[\s\-\(\)]/g, '');
+  if (!cleaned.startsWith('+')) {
+    if (cleaned.startsWith('54')) {
+      cleaned = '+' + cleaned;
+    } else {
+      cleaned = '+54' + cleaned;
+    }
+  }
+  return cleaned;
+}
+
 const callRowSchema = z.object({
   customer_codigo_unico: z.string().optional(),
   customer_cuit: z.string().optional(),
@@ -272,6 +294,13 @@ export async function callRoutes(fastify: FastifyInstance) {
           return reply.status(400).send({ error: 'El batch no tiene datos para ejecutar' });
         }
 
+        // Validar configuración de ElevenLabs
+        if (!ELEVENLABS_API_KEY || !ELEVENLABS_AGENT_ID || !ELEVENLABS_PHONE_NUMBER_ID) {
+          return reply.status(500).send({
+            error: 'Configuración de ElevenLabs incompleta. Verifique las variables de entorno.',
+          });
+        }
+
         // Actualizar estado a PROCESSING
         await prisma.batchJob.update({
           where: { id: batchJob.id },
@@ -281,49 +310,81 @@ export async function callRoutes(fastify: FastifyInstance) {
           },
         });
 
-        // Enviar cada llamada al notifier
-        const jobs = [];
-        for (const row of batchData.rows) {
-          try {
-            const response = await axios.post(
-              `${NOTIFIER_URL}/notify/send`,
-              {
-                channel: 'VOICE',
-                customerId: row.customerId,
-                invoiceId: row.invoiceId,
-                message: {
-                  text: row.script,
-                  body: row.script,
-                },
-                variables: row.variables,
-                batchId: batchJob.id,
-                tenantId: user.tenant_id,
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              }
-            );
-            jobs.push({ customerId: row.customerId, jobId: response.data.jobId });
-          } catch (error: any) {
-            fastify.log.error(
-              { customerId: row.customerId, error: error.message },
-              'Error queuing call'
-            );
-            // Continuar con los demás
-          }
-        }
+        // Preparar contactos para ElevenLabs Batch Calling
+        const recipients = batchData.rows.map((row: any) => ({
+          phone_number: formatPhoneNumber(row.telefono),
+          conversation_initiation_client_data: {
+            type: 'conversation_initiation_client_data',
+            dynamic_variables: row.variables || {},
+          },
+        }));
+
+        // Ejecutar batch con ElevenLabs
+        const requestBody = {
+          call_name: batchJob.fileName || `Batch ${batchJob.id}`,
+          agent_id: ELEVENLABS_AGENT_ID,
+          agent_phone_number_id: ELEVENLABS_PHONE_NUMBER_ID,
+          scheduled_time_unix: Math.floor(Date.now() / 1000),
+          recipients,
+        };
 
         fastify.log.info(
-          { batchId: batchJob.id, total: batchData.rows.length, jobs: jobs.length },
-          'Call batch queued'
+          { batchId: batchJob.id, recipientsCount: recipients.length },
+          'Ejecutando batch con ElevenLabs'
+        );
+
+        const elevenLabsResponse = await axios.post(
+          `${ELEVENLABS_API_URL}/v1/convai/batch-calling/submit`,
+          requestBody,
+          {
+            headers: {
+              'xi-api-key': ELEVENLABS_API_KEY,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        const elevenLabsBatchId = elevenLabsResponse.data.batch_id || elevenLabsResponse.data.id;
+
+        // Guardar el ID del batch de ElevenLabs en errorSummary para referencia futura
+        await prisma.batchJob.update({
+          where: { id: batchJob.id },
+          data: {
+            errorSummary: {
+              ...batchData,
+              elevenLabsBatchId,
+            } as any,
+          },
+        });
+
+        // Crear registros de ContactEvent para cada llamada
+        const eventsToCreate = batchData.rows.map((row: any) => ({
+          tenantId: user.tenant_id,
+          batchId: batchJob.id,
+          customerId: row.customerId,
+          invoiceId: row.invoiceId || null,
+          channel: 'VOICE',
+          direction: 'OUTBOUND',
+          isManual: false,
+          messageText: row.script,
+          status: 'PENDING',
+          externalMessageId: null, // Se actualizará cuando llegue el webhook
+          ts: new Date(),
+        }));
+
+        await prisma.contactEvent.createMany({
+          data: eventsToCreate,
+        });
+
+        fastify.log.info(
+          { batchId: batchJob.id, elevenLabsBatchId, totalCalls: recipients.length },
+          'Batch ejecutado exitosamente con ElevenLabs'
         );
 
         return {
           batchId: batchJob.id,
-          totalCalls: batchData.rows.length,
-          queued: jobs.length,
+          elevenLabsBatchId,
+          totalCalls: recipients.length,
           status: 'PROCESSING',
         };
       } catch (error: any) {
@@ -539,6 +600,102 @@ export async function callRoutes(fastify: FastifyInstance) {
             : null,
         },
       };
+    }
+  );
+
+  // POST /calls/webhooks/elevenlabs - Webhook de ElevenLabs para recibir datos de llamadas completadas
+  fastify.post(
+    '/calls/webhooks/elevenlabs',
+    async (request, reply) => {
+      try {
+        const body = request.body as any;
+        fastify.log.info({ body }, 'Webhook de ElevenLabs recibido');
+
+        const {
+          conversation_id,
+          type,
+          transcript,
+          analysis,
+          messages,
+          conversation_initiation_client_data,
+          audio_url,
+          summary,
+          phone_number,
+          status,
+          duration,
+        } = body;
+
+        if (!conversation_id) {
+          return reply.status(400).send({ error: 'conversation_id es requerido' });
+        }
+
+        // Extraer transcripción de múltiples fuentes posibles
+        let finalTranscript = transcript;
+        if (!finalTranscript && analysis?.transcript) {
+          finalTranscript = analysis.transcript;
+        } else if (!finalTranscript && messages && Array.isArray(messages)) {
+          finalTranscript = messages
+            .filter((msg: any) => msg.content || msg.message)
+            .map((msg: any) => `${msg.role}: ${msg.content || msg.message || ''}`)
+            .join('\n');
+        }
+
+        // Extraer resumen
+        let finalSummary = summary;
+        if (!finalSummary && analysis?.transcript_summary) {
+          finalSummary = analysis.transcript_summary;
+        }
+
+        // Buscar el ContactEvent por externalMessageId (conversation_id)
+        const contactEvent = await prisma.contactEvent.findFirst({
+          where: {
+            externalMessageId: conversation_id,
+          },
+          include: {
+            batch: true,
+          },
+        });
+
+        if (contactEvent) {
+          // Actualizar el evento existente
+          await prisma.contactEvent.update({
+            where: { id: contactEvent.id },
+            data: {
+              transcription: finalTranscript || null,
+              callSummary: finalSummary || null,
+              callDuration: duration || null,
+              status: status === 'completed' ? 'SENT' : status === 'failed' ? 'FAILED' : 'PENDING',
+              mediaUrl: audio_url || null,
+              payload: body,
+            },
+          });
+
+          fastify.log.info(
+            { contactEventId: contactEvent.id, conversationId: conversation_id },
+            'ContactEvent actualizado desde webhook'
+          );
+        } else {
+          // Si no encontramos el evento, podría ser una llamada que no se registró previamente
+          // En este caso, solo logueamos el webhook
+          fastify.log.warn(
+            { conversationId: conversation_id },
+            'Webhook recibido pero no se encontró ContactEvent correspondiente'
+          );
+        }
+
+        return reply.status(200).send({
+          received: true,
+          conversation_id,
+          transcript_saved: !!finalTranscript,
+          summary_saved: !!finalSummary,
+        });
+      } catch (error: any) {
+        fastify.log.error({ error: error.message }, 'Error procesando webhook de ElevenLabs');
+        return reply.status(500).send({
+          error: 'Error procesando webhook',
+          message: error.message,
+        });
+      }
     }
   );
 }
