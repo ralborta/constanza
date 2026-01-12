@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
+import { authenticate } from '../middleware/auth.js';
 import {
   generateInvoiceSummary,
   generateCustomerSummary,
@@ -11,14 +12,13 @@ const prisma = new PrismaClient();
 
 export async function summaryRoutes(fastify: FastifyInstance) {
   // GET /v1/invoices/:id/summary - Obtener resumen de una factura
-  fastify.get('/invoices/:id/summary', async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      const tenantId = (request as any).tenantId; // Asumimos que viene del JWT
-
-      if (!tenantId) {
-        return reply.status(401).send({ error: 'No autorizado' });
-      }
+  fastify.get(
+    '/invoices/:id/summary',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+        const tenantId = request.user.tenant_id;
 
       // Verificar que la factura existe y pertenece al tenant
       const invoice = await prisma.invoice.findFirst({
@@ -50,14 +50,13 @@ export async function summaryRoutes(fastify: FastifyInstance) {
   });
 
   // POST /v1/invoices/:id/summary/update - Actualizar resumen de una factura
-  fastify.post('/invoices/:id/summary/update', async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      const tenantId = (request as any).tenantId;
-
-      if (!tenantId) {
-        return reply.status(401).send({ error: 'No autorizado' });
-      }
+  fastify.post(
+    '/invoices/:id/summary/update',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+        const tenantId = request.user.tenant_id;
 
       // Verificar que la factura existe
       const invoice = await prisma.invoice.findFirst({
@@ -89,14 +88,13 @@ export async function summaryRoutes(fastify: FastifyInstance) {
   });
 
   // GET /v1/customers/:id/summary - Obtener resumen de un cliente
-  fastify.get('/customers/:id/summary', async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      const tenantId = (request as any).tenantId;
-
-      if (!tenantId) {
-        return reply.status(401).send({ error: 'No autorizado' });
-      }
+  fastify.get(
+    '/customers/:id/summary',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+        const tenantId = request.user.tenant_id;
 
       // Verificar que el cliente existe
       const customer = await prisma.customer.findFirst({
@@ -128,14 +126,13 @@ export async function summaryRoutes(fastify: FastifyInstance) {
   });
 
   // POST /v1/customers/:id/summary/update - Actualizar resumen de un cliente
-  fastify.post('/customers/:id/summary/update', async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      const tenantId = (request as any).tenantId;
-
-      if (!tenantId) {
-        return reply.status(401).send({ error: 'No autorizado' });
-      }
+  fastify.post(
+    '/customers/:id/summary/update',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+        const tenantId = request.user.tenant_id;
 
       // Verificar que el cliente existe
       const customer = await prisma.customer.findFirst({

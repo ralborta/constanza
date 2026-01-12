@@ -50,9 +50,20 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token inválido, redirigir a login
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+      // Token inválido o expirado
+      // Solo redirigir si no estamos ya en la página de login
+      // y si la URL no es un endpoint opcional (como summary que puede fallar)
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        const url = error.config?.url || '';
+        // Endpoints opcionales que pueden fallar sin redirigir
+        const optionalEndpoints = ['/summary', '/summary/update'];
+        const isOptionalEndpoint = optionalEndpoints.some(endpoint => url.includes(endpoint));
+        
+        if (!isOptionalEndpoint) {
+          // Limpiar token y redirigir
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
