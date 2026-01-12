@@ -27,19 +27,30 @@ interface SummaryResult {
 
 /**
  * Genera un resumen inteligente de las interacciones de una factura
+ * 
+ * IMPORTANTE: Incluye TODAS las interacciones (inbound y outbound):
+ * - Mensajes enviados (outbound): Email, WhatsApp, Voice
+ * - Mensajes recibidos (inbound): Respuestas del cliente por cualquier canal
+ * - Llamadas salientes y entrantes
+ * - Promesas de pago
+ * - Cualquier otro evento relacionado con la factura
+ * 
+ * El resumen es ÚNICO y consolidado, considerando todo el historial completo.
  */
 export async function generateInvoiceSummary(
   invoiceId: string,
   tenantId: string
 ): Promise<SummaryResult> {
-  // Obtener todos los eventos relacionados con la factura
+  // Obtener TODOS los eventos relacionados con la factura (inbound y outbound)
+  // Sin filtrar por dirección - incluye todo el historial completo
   const events = await prisma.contactEvent.findMany({
     where: {
       invoiceId,
       tenantId,
+      // NO filtramos por direction - queremos TODAS las interacciones
     },
     orderBy: {
-      ts: 'asc',
+      ts: 'asc', // Orden cronológico para construir la conversación completa
     },
   });
 
@@ -61,12 +72,20 @@ export async function generateInvoiceSummary(
 
 /**
  * Genera un resumen inteligente de las interacciones de un cliente
+ * 
+ * IMPORTANTE: Incluye TODAS las interacciones (inbound y outbound):
+ * - Mensajes enviados y recibidos por todos los canales
+ * - Llamadas salientes y entrantes
+ * - Interacciones relacionadas con todas las facturas del cliente
+ * 
+ * El resumen es ÚNICO y consolidado, considerando todo el historial reciente.
  */
 export async function generateCustomerSummary(
   customerId: string,
   tenantId: string
 ): Promise<SummaryResult> {
-  // Obtener todos los eventos relacionados con el cliente (últimos 90 días)
+  // Obtener TODOS los eventos relacionados con el cliente (últimos 90 días)
+  // Sin filtrar por dirección - incluye todo el historial completo
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
@@ -77,11 +96,12 @@ export async function generateCustomerSummary(
       ts: {
         gte: ninetyDaysAgo,
       },
+      // NO filtramos por direction - queremos TODAS las interacciones
     },
     orderBy: {
-      ts: 'asc',
+      ts: 'asc', // Orden cronológico para construir la conversación completa
     },
-    take: 100, // Limitar a los últimos 100 eventos
+    take: 100, // Limitar a los últimos 100 eventos para mantener el contexto manejable
   });
 
   if (events.length === 0) {
@@ -101,7 +121,10 @@ export async function generateCustomerSummary(
 }
 
 /**
- * Construye el contexto de conversación a partir de los eventos
+ * Construye el contexto de conversación a partir de TODOS los eventos
+ * 
+ * Incluye tanto interacciones inbound (del cliente) como outbound (del sistema),
+ * construyendo una línea de tiempo completa de la conversación.
  */
 function buildConversationContext(events: TimelineEvent[]): string {
   const lines: string[] = [];
@@ -109,6 +132,7 @@ function buildConversationContext(events: TimelineEvent[]): string {
   events.forEach((event) => {
     const date = new Date(event.ts).toLocaleString('es-AR');
     const channel = event.channel;
+    // Identificar si es inbound (cliente) o outbound (sistema)
     const direction = event.direction === 'INBOUND' ? 'Cliente' : 'Sistema';
 
     let content = '';
@@ -123,9 +147,11 @@ function buildConversationContext(events: TimelineEvent[]): string {
     }
 
     const status = event.status;
+    // Construir línea con: fecha, dirección (cliente/sistema), canal, estado y contenido
     lines.push(`[${date}] ${direction} (${channel}) [${status}]: ${content}`);
   });
 
+  // Retornar contexto completo ordenado cronológicamente
   return lines.join('\n\n');
 }
 
