@@ -37,9 +37,9 @@ export default function JobsPage() {
   const [lastResults, setLastResults] = useState<Record<string, JobResponse | null>>({});
 
   const staleConversationsMutation = useMutation({
-    mutationFn: async (daysWithoutResponse?: number) => {
+    mutationFn: async () => {
       const response = await api.post('/v1/jobs/stale-conversations', {
-        daysWithoutResponse: daysWithoutResponse || 3,
+        daysWithoutResponse: 3,
       });
       return response.data as JobResponse;
     },
@@ -49,9 +49,9 @@ export default function JobsPage() {
   });
 
   const recalculateInvoiceSummariesMutation = useMutation({
-    mutationFn: async (limit?: number) => {
+    mutationFn: async () => {
       const response = await api.post('/v1/jobs/recalculate-invoice-summaries', {
-        limit: limit || 50,
+        limit: 50,
       });
       return response.data as JobResponse;
     },
@@ -61,9 +61,9 @@ export default function JobsPage() {
   });
 
   const recalculateCustomerSummariesMutation = useMutation({
-    mutationFn: async (limit?: number) => {
+    mutationFn: async () => {
       const response = await api.post('/v1/jobs/recalculate-customer-summaries', {
-        limit: limit || 50,
+        limit: 50,
       });
       return response.data as JobResponse;
     },
