@@ -6,7 +6,6 @@ import { healthRoutes } from './routes/health.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const prisma = new PrismaClient();
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 const server: FastifyInstance = Fastify({
   logger: {
@@ -22,6 +21,51 @@ const server: FastifyInstance = Fastify({
 });
 
 const logger = server.log as unknown as SimpleLogger;
+
+// Inicializar Redis de forma opcional con manejo de errores
+let redis: Redis | null = null;
+if (process.env.REDIS_URL) {
+  try {
+    redis = new Redis(process.env.REDIS_URL, {
+      retryStrategy: (times) => {
+        // Reintentar hasta 3 veces, luego dar un delay más largo
+        if (times < 3) {
+          return Math.min(times * 50, 2000);
+        }
+        return null; // No reintentar más
+      },
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue: false, // No encolar comandos si está offline
+      lazyConnect: true, // No conectar automáticamente
+    });
+
+    redis.on('error', (error) => {
+      logger.warn({ error: error.message }, 'Redis connection error (continuing without idempotency)');
+    });
+
+    redis.on('connect', () => {
+      logger.info('Redis connected successfully');
+    });
+
+    redis.on('close', () => {
+      logger.warn('Redis connection closed');
+    });
+
+    // Intentar conectar
+    redis.connect().catch((error) => {
+      logger.warn({ error: error.message }, 'Failed to connect to Redis (continuing without idempotency)');
+      redis = null;
+    });
+  } catch (error: any) {
+    logger.warn({ error: error.message }, 'Failed to initialize Redis (continuing without idempotency)');
+    redis = null;
+  }
+} else {
+  logger.warn('REDIS_URL not configured - idempotency will be disabled');
+}
+
+// Exponer redis en el contexto de Fastify
+server.decorate('redis', redis);
 
 // Routes
 await server.register(healthRoutes);

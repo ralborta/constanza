@@ -5,7 +5,6 @@ import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 
 const prisma = new PrismaClient();
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 const paymentAppliedSchema = z.object({
   payment_id: z.string(),
@@ -36,6 +35,7 @@ function verifyHMAC(payload: string, signature: string, secret: string): boolean
 }
 
 export async function webhookRoutes(fastify: FastifyInstance) {
+  const redis = (fastify as any).redis as Redis | null;
   // POST /wh/cucuru/payment.applied
   fastify.post('/payment.applied', async (request, reply) => {
     const signature = request.headers['x-cucuru-signature'] as string;
@@ -63,16 +63,22 @@ export async function webhookRoutes(fastify: FastifyInstance) {
     // Validar payload
     const data = paymentAppliedSchema.parse(body);
 
-    // Idempotencia con Redis
-    const eventId = `cucuru:payment.applied:${data.payment_id}`;
-    const isDuplicate = await redis.setnx(eventId, '1');
-    
-    if (!isDuplicate) {
-      fastify.log.info({ payment_id: data.payment_id }, 'Duplicate webhook, ignoring');
-      return reply.status(200).send({ status: 'duplicate' });
-    }
+    // Idempotencia con Redis (si está disponible)
+    if (redis) {
+      try {
+        const eventId = `cucuru:payment.applied:${data.payment_id}`;
+        const isDuplicate = await redis.setnx(eventId, '1');
+        
+        if (!isDuplicate) {
+          fastify.log.info({ payment_id: data.payment_id }, 'Duplicate webhook, ignoring');
+          return reply.status(200).send({ status: 'duplicate' });
+        }
 
-    await redis.expire(eventId, 3600); // 1 hora
+        await redis.expire(eventId, 3600); // 1 hora
+      } catch (error: any) {
+        fastify.log.warn({ error: error.message }, 'Redis error during idempotency check (continuing)');
+      }
+    }
 
     try {
       // TODO: Obtener tenant_id desde el payment_id o desde algún campo del webhook
@@ -151,15 +157,22 @@ export async function webhookRoutes(fastify: FastifyInstance) {
 
     const data = paymentSettledSchema.parse(body);
 
-    // Idempotencia
-    const eventId = `cucuru:payment.settled:${data.payment_id}`;
-    const isDuplicate = await redis.setnx(eventId, '1');
-    
-    if (!isDuplicate) {
-      return reply.status(200).send({ status: 'duplicate' });
-    }
+    // Idempotencia con Redis (si está disponible)
+    if (redis) {
+      try {
+        const eventId = `cucuru:payment.settled:${data.payment_id}`;
+        const isDuplicate = await redis.setnx(eventId, '1');
+        
+        if (!isDuplicate) {
+          fastify.log.info({ payment_id: data.payment_id }, 'Duplicate webhook, ignoring');
+          return reply.status(200).send({ status: 'duplicate' });
+        }
 
-    await redis.expire(eventId, 3600);
+        await redis.expire(eventId, 3600); // 1 hora
+      } catch (error: any) {
+        fastify.log.warn({ error: error.message }, 'Redis error during idempotency check (continuing)');
+      }
+    }
 
     try {
       // Buscar payment por external_ref
