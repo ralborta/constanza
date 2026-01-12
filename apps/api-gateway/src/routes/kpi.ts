@@ -131,5 +131,174 @@ export async function kpiRoutes(fastify: FastifyInstance) {
       };
     }
   );
+
+  // GET /v1/kpi/interaction-metrics - Métricas operativas de interacciones
+  fastify.get(
+    '/kpi/interaction-metrics',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1', 'OPERADOR_2'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const tenantId = user.tenant_id as string;
+
+      const today = new Date();
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      // Total de interacciones por canal (últimos 30 días)
+      const events30d = await prisma.contactEvent.findMany({
+        where: {
+          tenantId,
+          ts: {
+            gte: thirtyDaysAgo,
+          },
+        },
+      });
+
+      // Interacciones outbound por canal
+      const outboundByChannel = events30d
+        .filter((e) => e.direction === 'OUTBOUND')
+        .reduce((acc, e) => {
+          acc[e.channel] = (acc[e.channel] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+      // Interacciones inbound por canal
+      const inboundByChannel = events30d
+        .filter((e) => e.direction === 'INBOUND')
+        .reduce((acc, e) => {
+          acc[e.channel] = (acc[e.channel] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+      // Tasa de respuesta por canal
+      const responseRateByChannel: Record<string, { sent: number; responded: number; rate: number }> = {};
+
+      for (const channel of ['WHATSAPP', 'EMAIL', 'VOICE']) {
+        const outbound = events30d.filter(
+          (e) => e.channel === channel && e.direction === 'OUTBOUND'
+        );
+        const sent = outbound.length;
+
+        // Para cada outbound, verificar si hay inbound posterior del mismo cliente/factura
+        let responded = 0;
+        for (const outEvent of outbound) {
+          const hasResponse = events30d.some(
+            (e) =>
+              e.channel === channel &&
+              e.direction === 'INBOUND' &&
+              e.customerId === outEvent.customerId &&
+              (outEvent.invoiceId ? e.invoiceId === outEvent.invoiceId : true) &&
+              e.ts > outEvent.ts
+          );
+          if (hasResponse) {
+            responded++;
+          }
+        }
+
+        responseRateByChannel[channel] = {
+          sent,
+          responded,
+          rate: sent > 0 ? Math.round((responded / sent) * 10000) / 100 : 0,
+        };
+      }
+
+      // Conversaciones estancadas (sin respuesta en 3+ días)
+      const threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+      const staleOutbound = events30d.filter(
+        (e) =>
+          e.direction === 'OUTBOUND' &&
+          e.status === 'SENT' &&
+          e.ts <= threeDaysAgo &&
+          !events30d.some(
+            (resp) =>
+              resp.direction === 'INBOUND' &&
+              resp.customerId === e.customerId &&
+              (e.invoiceId ? resp.invoiceId === e.invoiceId : true) &&
+              resp.ts > e.ts
+          )
+      );
+
+      // Volumen de casos en seguimiento (facturas con interacciones recientes)
+      const invoicesWithRecentEvents = await prisma.contactEvent.findMany({
+        where: {
+          tenantId,
+          invoiceId: {
+            not: null,
+          },
+          ts: {
+            gte: sevenDaysAgo,
+          },
+        },
+        select: {
+          invoiceId: true,
+        },
+        distinct: ['invoiceId'],
+      });
+
+      // Efectividad por canal (delivered/sent)
+      const effectivenessByChannel: Record<string, { sent: number; delivered: number; rate: number }> = {};
+
+      for (const channel of ['WHATSAPP', 'EMAIL', 'VOICE']) {
+        const channelEvents = events30d.filter((e) => e.channel === channel && e.direction === 'OUTBOUND');
+        const sent = channelEvents.length;
+        const delivered = channelEvents.filter((e) => e.status === 'SENT' || e.status === 'DELIVERED').length;
+
+        effectivenessByChannel[channel] = {
+          sent,
+          delivered,
+          rate: sent > 0 ? Math.round((delivered / sent) * 10000) / 100 : 0,
+        };
+      }
+
+      // Tiempo promedio de respuesta (solo para inbound que responden a outbound)
+      let totalResponseTime = 0;
+      let responseCount = 0;
+
+      for (const inbound of events30d.filter((e) => e.direction === 'INBOUND')) {
+        // Buscar el outbound más reciente anterior a este inbound
+        const relatedOutbound = events30d
+          .filter(
+            (e) =>
+              e.direction === 'OUTBOUND' &&
+              e.channel === inbound.channel &&
+              e.customerId === inbound.customerId &&
+              (inbound.invoiceId ? e.invoiceId === inbound.invoiceId : true) &&
+              e.ts < inbound.ts
+          )
+          .sort((a, b) => b.ts.getTime() - a.ts.getTime())[0];
+
+        if (relatedOutbound) {
+          const responseTime = inbound.ts.getTime() - relatedOutbound.ts.getTime();
+          totalResponseTime += responseTime;
+          responseCount++;
+        }
+      }
+
+      const avgResponseTimeHours = responseCount > 0 ? totalResponseTime / responseCount / (1000 * 60 * 60) : 0;
+
+      return {
+        period: {
+          start: thirtyDaysAgo.toISOString(),
+          end: today.toISOString(),
+        },
+        volume: {
+          outbound: outboundByChannel,
+          inbound: inboundByChannel,
+          total: events30d.length,
+        },
+        responseRate: responseRateByChannel,
+        effectiveness: effectivenessByChannel,
+        staleConversations: staleOutbound.length,
+        casesInFollowUp: invoicesWithRecentEvents.length,
+        avgResponseTimeHours: Math.round(avgResponseTimeHours * 100) / 100,
+      };
+    }
+  );
 }
 
