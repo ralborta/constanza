@@ -16,11 +16,11 @@ export async function summaryRoutes(fastify: FastifyInstance) {
     '/invoices/:id/summary',
     { preHandler: [authenticate] },
     async (request, reply) => {
-      try {
-        const { id } = request.params as { id: string };
-        const tenantId = request.user.tenant_id;
+      const { id } = request.params as { id: string };
+      const tenantId = request.user.tenant_id;
 
-      // Verificar que la factura existe y pertenece al tenant
+      try {
+        // Verificar que la factura existe y pertenece al tenant
       const invoice = await prisma.invoice.findFirst({
         where: {
           id,
