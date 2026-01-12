@@ -439,7 +439,7 @@ export default function InvoiceDetailPage() {
               <div className="text-center py-8">
                 <Sparkles className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                 <p className="text-gray-500 font-medium">No hay resumen disponible</p>
-                <p className="text-sm text-gray-400 mt-1">Haz clic en "Actualizar" para generar uno</p>
+                <p className="text-sm text-gray-400 mt-1">Haz clic en &quot;Actualizar&quot; para generar uno</p>
               </div>
             )}
           </CardContent>
