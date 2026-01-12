@@ -181,7 +181,7 @@ export default function InvoiceDetailPage() {
     },
   });
 
-  const { data: summaryData, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<{
+  const { data: summaryData, isLoading: summaryLoading, error: summaryError, refetch: refetchSummary } = useQuery<{
     invoiceId: string;
     summary: InvoiceSummary;
     generatedAt: string;
@@ -192,6 +192,7 @@ export default function InvoiceDetailPage() {
       return response.data;
     },
     enabled: !!invoiceId,
+    retry: false, // No reintentar si falla
   });
 
   const handleUpdateSummary = async () => {
@@ -199,8 +200,10 @@ export default function InvoiceDetailPage() {
     try {
       await api.post(`/v1/invoices/${invoiceId}/summary/update`);
       await refetchSummary();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error actualizando resumen:', error);
+      // Mostrar error al usuario
+      alert(`Error al actualizar resumen: ${error.response?.data?.message || error.message || 'Error desconocido'}`);
     } finally {
       setIsUpdatingSummary(false);
     }
@@ -434,6 +437,19 @@ export default function InvoiceDetailPage() {
                     Generado: {format(new Date(summaryData.generatedAt), 'dd/MM/yyyy HH:mm')}
                   </p>
                 )}
+              </div>
+            ) : summaryError ? (
+              <div className="text-center py-8">
+                <Sparkles className="h-8 w-8 text-orange-300 mx-auto mb-2" />
+                <p className="text-orange-600 font-medium">Error al generar resumen</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {(summaryError as any)?.response?.data?.message || 
+                   (summaryError as any)?.message || 
+                   'Error desconocido'}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Verifica que OPENAI_API_KEY esté configurada en el servidor
+                </p>
               </div>
             ) : (
               <div className="text-center py-8">

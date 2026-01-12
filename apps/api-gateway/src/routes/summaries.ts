@@ -32,8 +32,37 @@ export async function summaryRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Factura no encontrada' });
       }
 
+      // Verificar que hay eventos antes de generar resumen
+      const eventCount = await prisma.contactEvent.count({
+        where: {
+          invoiceId: id,
+          tenantId,
+        },
+      });
+
+      fastify.log.info(
+        { invoiceId: id, tenantId, eventCount },
+        'Generando resumen de factura'
+      );
+
+      if (eventCount === 0) {
+        return reply.status(200).send({
+          invoiceId: id,
+          summary: {
+            summary: 'No hay interacciones registradas para esta factura.',
+            keyPoints: [],
+          },
+          generatedAt: new Date().toISOString(),
+        });
+      }
+
       // Generar resumen
       const summary = await generateInvoiceSummary(id, tenantId);
+
+      fastify.log.info(
+        { invoiceId: id, summaryLength: summary.summary.length },
+        'Resumen generado exitosamente'
+      );
 
       return reply.status(200).send({
         invoiceId: id,
@@ -41,7 +70,15 @@ export async function summaryRoutes(fastify: FastifyInstance) {
         generatedAt: new Date().toISOString(),
       });
     } catch (error: any) {
-      fastify.log.error({ error: error.message }, 'Error generando resumen de factura');
+      fastify.log.error(
+        { 
+          error: error.message, 
+          stack: error.stack,
+          invoiceId: id,
+          tenantId 
+        }, 
+        'Error generando resumen de factura'
+      );
       return reply.status(500).send({
         error: 'Error generando resumen',
         message: error.message,

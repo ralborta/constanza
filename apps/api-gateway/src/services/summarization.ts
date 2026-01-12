@@ -54,6 +54,8 @@ export async function generateInvoiceSummary(
     },
   });
 
+  console.log(`[Summarization] Encontrados ${events.length} eventos para factura ${invoiceId}`);
+
   if (events.length === 0) {
     return {
       summary: 'No hay interacciones registradas para esta factura.',
@@ -63,9 +65,11 @@ export async function generateInvoiceSummary(
 
   // Construir contexto de la conversación
   const conversationContext = buildConversationContext(events);
+  console.log(`[Summarization] Contexto construido: ${conversationContext.length} caracteres`);
 
   // Generar resumen con OpenAI
   const summary = await generateSummaryWithOpenAI(conversationContext, 'invoice');
+  console.log(`[Summarization] Resumen generado: ${summary.summary.length} caracteres`);
 
   return summary;
 }
