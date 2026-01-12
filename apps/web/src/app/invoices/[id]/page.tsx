@@ -8,7 +8,9 @@ import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle2, Clock, XCircle, Mail, MessageSquare, Phone, DollarSign, Calendar, User, FileText } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, XCircle, Mail, MessageSquare, Phone, DollarSign, Calendar, User, FileText, Sparkles, RefreshCw, TrendingUp } from 'lucide-react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface TimelineItem {
   type: 'CONTACT' | 'PROMISE' | 'PAYMENT';
@@ -23,6 +25,13 @@ interface TimelineItem {
   appliedAt?: string;
   settledAt?: string;
   ts: string;
+}
+
+interface InvoiceSummary {
+  summary: string;
+  keyPoints: string[];
+  nextSteps?: string[];
+  sentiment?: 'positive' | 'negative' | 'neutral';
 }
 
 interface InvoiceDetail {
@@ -162,6 +171,7 @@ function getTimelineIcon(type: string, channel?: string, status?: string) {
 export default function InvoiceDetailPage() {
   const params = useParams();
   const invoiceId = params.id as string;
+  const [isUpdatingSummary, setIsUpdatingSummary] = useState(false);
 
   const { data, isLoading } = useQuery<InvoiceDetail>({
     queryKey: ['invoice', invoiceId],
@@ -170,6 +180,31 @@ export default function InvoiceDetailPage() {
       return response.data;
     },
   });
+
+  const { data: summaryData, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<{
+    invoiceId: string;
+    summary: InvoiceSummary;
+    generatedAt: string;
+  }>({
+    queryKey: ['invoice-summary', invoiceId],
+    queryFn: async () => {
+      const response = await api.get(`/v1/invoices/${invoiceId}/summary`);
+      return response.data;
+    },
+    enabled: !!invoiceId,
+  });
+
+  const handleUpdateSummary = async () => {
+    setIsUpdatingSummary(true);
+    try {
+      await api.post(`/v1/invoices/${invoiceId}/summary/update`);
+      await refetchSummary();
+    } catch (error) {
+      console.error('Error actualizando resumen:', error);
+    } finally {
+      setIsUpdatingSummary(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -294,6 +329,117 @@ export default function InvoiceDetailPage() {
                     </Badge>
                   ))}
                 </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Resumen Inteligente */}
+        <Card className="mb-6 border-0 shadow-lg bg-white overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-white flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Resumen Inteligente
+              </CardTitle>
+              <Button
+                onClick={handleUpdateSummary}
+                disabled={isUpdatingSummary}
+                variant="outline"
+                size="sm"
+                className="bg-white/10 hover:bg-white/20 border-white/20 text-white"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isUpdatingSummary ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            {summaryLoading ? (
+              <div className="text-center py-8">
+                <Sparkles className="h-8 w-8 text-indigo-300 mx-auto mb-2 animate-pulse" />
+                <p className="text-gray-500">Generando resumen...</p>
+              </div>
+            ) : summaryData?.summary ? (
+              <div className="space-y-6">
+                {/* Resumen principal */}
+                <div className="p-4 bg-indigo-50 rounded-lg border-l-4 border-indigo-500">
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {summaryData.summary.summary}
+                  </p>
+                </div>
+
+                {/* Puntos clave */}
+                {summaryData.summary.keyPoints && summaryData.summary.keyPoints.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-indigo-600" />
+                      Puntos Clave
+                    </h3>
+                    <ul className="space-y-2">
+                      {summaryData.summary.keyPoints.map((point, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
+                          <span className="text-indigo-600 font-bold mt-0.5">•</span>
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Próximos pasos */}
+                {summaryData.summary.nextSteps && summaryData.summary.nextSteps.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-orange-600" />
+                      Próximos Pasos Sugeridos
+                    </h3>
+                    <ul className="space-y-2">
+                      {summaryData.summary.nextSteps.map((step, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
+                          <span className="text-orange-600 font-bold mt-0.5">→</span>
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Sentiment badge */}
+                {summaryData.summary.sentiment && (
+                  <div className="pt-4 border-t">
+                    <Badge
+                      variant={
+                        summaryData.summary.sentiment === 'positive'
+                          ? 'default'
+                          : summaryData.summary.sentiment === 'negative'
+                          ? 'destructive'
+                          : 'secondary'
+                      }
+                      className="text-xs"
+                    >
+                      Sentimiento: {
+                        summaryData.summary.sentiment === 'positive'
+                          ? 'Positivo'
+                          : summaryData.summary.sentiment === 'negative'
+                          ? 'Negativo'
+                          : 'Neutral'
+                      }
+                    </Badge>
+                  </div>
+                )}
+
+                {summaryData.generatedAt && (
+                  <p className="text-xs text-gray-400 mt-4">
+                    Generado: {format(new Date(summaryData.generatedAt), 'dd/MM/yyyy HH:mm')}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Sparkles className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500 font-medium">No hay resumen disponible</p>
+                <p className="text-sm text-gray-400 mt-1">Haz clic en "Actualizar" para generar uno</p>
               </div>
             )}
           </CardContent>
