@@ -275,13 +275,13 @@ export default function DashboardPage() {
                       <div className="p-2 bg-blue-50 rounded">
                         <p className="text-xs text-blue-600 mb-1">Enviadas (Outbound)</p>
                         <p className="text-sm font-semibold text-blue-900">
-                          {Object.values(interactionMetrics.volume?.outbound || {}).reduce((a: number, b: number) => a + b, 0)}
+                          {(Object.values(interactionMetrics.volume?.outbound || {}) as number[]).reduce((a, b) => a + b, 0)}
                         </p>
                       </div>
                       <div className="p-2 bg-green-50 rounded">
                         <p className="text-xs text-green-600 mb-1">Recibidas (Inbound)</p>
                         <p className="text-sm font-semibold text-green-900">
-                          {Object.values(interactionMetrics.volume?.inbound || {}).reduce((a: number, b: number) => a + b, 0)}
+                          {(Object.values(interactionMetrics.volume?.inbound || {}) as number[]).reduce((a, b) => a + b, 0)}
                         </p>
                       </div>
                     </div>
