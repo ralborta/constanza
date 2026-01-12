@@ -39,6 +39,7 @@ const navigation = [
   { name: 'Clientes', href: '/customers', icon: Users, color: 'indigo' },
   { name: 'Cheques', href: '#', icon: CreditCard, color: 'yellow' },
   { name: 'Eventos', href: '#', icon: Bell, color: 'orange' },
+  { name: 'Jobs', href: '/jobs', icon: BarChart3, color: 'green' },
 ];
 
 const notifySubmenu = [

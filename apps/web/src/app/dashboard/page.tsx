@@ -37,6 +37,7 @@ import {
   ChevronRight,
   ArrowUp,
   ArrowDown,
+  BarChart3,
 } from 'lucide-react';
 
 interface KPISummary {
@@ -113,6 +114,14 @@ export default function DashboardPage() {
     queryKey: ['invoices'],
     queryFn: async () => {
       const response = await api.get('/v1/invoices?state=ABIERTA');
+      return response.data;
+    },
+  });
+
+  const { data: interactionMetrics, isLoading: metricsLoading } = useQuery({
+    queryKey: ['interaction-metrics'],
+    queryFn: async () => {
+      const response = await api.get('/v1/kpi/interaction-metrics');
       return response.data;
     },
   });
@@ -208,6 +217,101 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Métricas Operativas de Interacciones */}
+        {interactionMetrics && (
+          <Card className="mb-6 border-0 shadow-lg bg-white">
+            <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+              <CardTitle className="text-white flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Métricas Operativas de Interacciones (Últimos 30 días)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              {metricsLoading ? (
+                <p className="text-gray-500">Cargando métricas...</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {/* Tasa de Respuesta por Canal */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Tasa de Respuesta</h3>
+                    <div className="space-y-2">
+                      {Object.entries(interactionMetrics.responseRate || {}).map(([channel, data]: [string, any]) => (
+                        <div key={channel} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <span className="text-sm text-gray-700">{channel}</span>
+                          <div className="text-right">
+                            <span className="text-sm font-semibold text-gray-900">{data.rate}%</span>
+                            <p className="text-xs text-gray-500">{data.responded}/{data.sent}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Efectividad por Canal */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Efectividad de Entrega</h3>
+                    <div className="space-y-2">
+                      {Object.entries(interactionMetrics.effectiveness || {}).map(([channel, data]: [string, any]) => (
+                        <div key={channel} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <span className="text-sm text-gray-700">{channel}</span>
+                          <div className="text-right">
+                            <span className="text-sm font-semibold text-gray-900">{data.rate}%</span>
+                            <p className="text-xs text-gray-500">{data.delivered}/{data.sent}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Volumen */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Volumen de Interacciones</h3>
+                    <div className="space-y-2">
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs text-gray-500 mb-1">Total</p>
+                        <p className="text-lg font-bold text-gray-900">{interactionMetrics.volume?.total || 0}</p>
+                      </div>
+                      <div className="p-2 bg-blue-50 rounded">
+                        <p className="text-xs text-blue-600 mb-1">Enviadas (Outbound)</p>
+                        <p className="text-sm font-semibold text-blue-900">
+                          {Object.values(interactionMetrics.volume?.outbound || {}).reduce((a: number, b: number) => a + b, 0)}
+                        </p>
+                      </div>
+                      <div className="p-2 bg-green-50 rounded">
+                        <p className="text-xs text-green-600 mb-1">Recibidas (Inbound)</p>
+                        <p className="text-sm font-semibold text-green-900">
+                          {Object.values(interactionMetrics.volume?.inbound || {}).reduce((a: number, b: number) => a + b, 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Indicadores Clave */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Indicadores Clave</h3>
+                    <div className="space-y-2">
+                      <div className="p-2 bg-orange-50 rounded">
+                        <p className="text-xs text-orange-600 mb-1">Conversaciones Estancadas</p>
+                        <p className="text-lg font-bold text-orange-900">{interactionMetrics.staleConversations || 0}</p>
+                      </div>
+                      <div className="p-2 bg-purple-50 rounded">
+                        <p className="text-xs text-purple-600 mb-1">Casos en Seguimiento</p>
+                        <p className="text-lg font-bold text-purple-900">{interactionMetrics.casesInFollowUp || 0}</p>
+                      </div>
+                      <div className="p-2 bg-indigo-50 rounded">
+                        <p className="text-xs text-indigo-600 mb-1">Tiempo Promedio Respuesta</p>
+                        <p className="text-sm font-semibold text-indigo-900">
+                          {interactionMetrics.avgResponseTimeHours ? `${interactionMetrics.avgResponseTimeHours.toFixed(1)}h` : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Tabla de Cobranzas Pendientes - Ocupa 2 columnas */}
