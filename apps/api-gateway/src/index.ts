@@ -87,6 +87,15 @@ server.addHook('onReady', async () => {
   logger.info('🚀 API-GATEWAY vCORS-FIX DESPLEGADO');
   logger.info('✅ CORS configurado con origin: true');
   logger.info('✅ @fastify/cors maneja OPTIONS automáticamente');
+  
+  // Listar todas las rutas registradas para debugging
+  const routes: string[] = [];
+  server.printRoutes().split('\n').forEach((line) => {
+    if (line.trim() && line.includes('/invoices')) {
+      routes.push(line.trim());
+    }
+  });
+  logger.info({ routes }, 'Rutas de invoices registradas');
 });
 
 // Hook para loggear errores de requests
