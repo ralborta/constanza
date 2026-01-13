@@ -161,6 +161,69 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // POST /invoices/:id/chat - Chat con IA sobre la factura (debe estar antes de /invoices/:id)
+  fastify.post(
+    '/invoices/:id/chat',
+    {
+      preHandler: [authenticate],
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const tenantId = request.user.tenant_id;
+      const { message, conversationHistory = [] } = (request.body as any) || {};
+
+      if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        return reply.status(400).send({
+          error: 'El mensaje es requerido y no puede estar vacío',
+        });
+      }
+
+      try {
+        // Importar dinámicamente para evitar dependencias circulares
+        const { processChatMessage } = await import('../services/chat.js');
+
+        // Verificar que la factura existe y pertenece al tenant
+        const invoice = await prisma.invoice.findFirst({
+          where: { id, tenantId },
+        });
+
+        if (!invoice) {
+          return reply.status(404).send({
+            error: 'Factura no encontrada',
+          });
+        }
+
+        // Procesar el mensaje con IA
+        const response = await processChatMessage(
+          id,
+          tenantId,
+          message.trim(),
+          conversationHistory
+        );
+
+        fastify.log.info(
+          { invoiceId: id, tenantId, messageLength: message.length },
+          'Chat message processed successfully'
+        );
+
+        return reply.status(200).send({
+          invoiceId: id,
+          message: response,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error: any) {
+        fastify.log.error(
+          { error: error.message, stack: error.stack, invoiceId: id, tenantId },
+          'Error processing chat message'
+        );
+        return reply.status(500).send({
+          error: 'Error procesando mensaje del chat',
+          message: error.message,
+        });
+      }
+    }
+  );
+
   // GET /invoices/:id - Detalle de factura con timeline
   fastify.get(
     '/invoices/:id',

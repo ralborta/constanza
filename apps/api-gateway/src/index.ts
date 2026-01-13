@@ -72,7 +72,7 @@ await server.register(callRoutes, { prefix: '/v1' });
 await server.register(paymentRoutes, { prefix: '/v1' });
 await server.register(summaryRoutes, { prefix: '/v1' });
 await server.register(jobRoutes, { prefix: '/v1/jobs' });
-await server.register(chatRoutes, { prefix: '/v1' });
+// chatRoutes ahora está integrado en invoiceRoutes para evitar conflictos de rutas
 await server.register(seedRoutes, { prefix: '/seed' });
 
 // Error handler
