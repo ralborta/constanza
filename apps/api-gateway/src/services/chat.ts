@@ -53,7 +53,12 @@ export async function buildInvoiceContext(
     include: {
       customer: {
         include: {
-          cuits: true,
+          customerCuits: true,
+        },
+      },
+      paymentApplications: {
+        include: {
+          payment: true,
         },
       },
       contactEvents: {
@@ -67,8 +72,11 @@ export async function buildInvoiceContext(
     throw new Error('Factura no encontrada');
   }
 
+  // Calcular monto aplicado
+  const montoAplicado = invoice.paymentApplications.reduce((sum, app) => sum + app.amount, 0);
+
   // Construir timeline desde contactEvents
-  const timeline = invoice.contactEvents.map((event) => ({
+  const timeline = invoice.contactEvents.map((event: any) => ({
     type: 'CONTACT',
     channel: event.channel,
     direction: event.direction,
@@ -96,14 +104,14 @@ export async function buildInvoiceContext(
       id: invoice.id,
       numero: invoice.numero,
       monto: invoice.monto,
-      montoAplicado: invoice.montoAplicado,
+      montoAplicado,
       fechaVto: invoice.fechaVto.toISOString(),
       estado: invoice.estado,
     },
     customer: {
       id: invoice.customer.id,
       razonSocial: invoice.customer.razonSocial,
-      cuits: invoice.customer.cuits.map((c) => ({
+      cuits: invoice.customer.customerCuits.map((c: any) => ({
         cuit: c.cuit,
         isPrimary: c.isPrimary,
       })),
