@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, CheckCircle2, Clock, XCircle, Mail, MessageSquare, Phone, DollarSign, Calendar, User, FileText, Sparkles, RefreshCw, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { InvoiceChat } from '@/components/invoices/invoice-chat';
 
 interface TimelineItem {
   type: 'CONTACT' | 'PROMISE' | 'PAYMENT';
@@ -461,124 +462,132 @@ export default function InvoiceDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Timeline */}
-        <Card className="border-0 shadow-lg bg-white overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-            <CardTitle className="text-white flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Timeline de Eventos
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            {invoice.timeline.length === 0 ? (
-              <div className="text-center py-12">
-                <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">No hay eventos en el timeline</p>
-                <p className="text-sm text-gray-400 mt-1">Los eventos aparecerán aquí cuando se envíen mensajes</p>
-              </div>
-            ) : (
-              <div className="relative">
-                {/* Línea vertical del timeline */}
-                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-200"></div>
-                
-                <div className="space-y-6">
-                  {invoice.timeline.map((item, index) => (
-                    <div key={index} className="relative flex items-start gap-4 pl-2">
-                      {/* Icono del timeline */}
-                      <div className="relative z-10 flex-shrink-0">
-                        {getTimelineIcon(item.type, item.channel, item.status)}
-                      </div>
-                      
-                      {/* Contenido del evento */}
-                      <div className="flex-1 min-w-0 bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between gap-4 mb-2">
-                          <div className="flex-1">
-                            {item.type === 'CONTACT' && (
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="text-sm font-semibold text-gray-900">
-                                  {item.channel} - {item.direction}
-                                </p>
-                                {item.status && (
-                                  <Badge
-                                    variant={
-                                      item.status === 'SENT' || item.status === 'DELIVERED'
-                                        ? 'default'
-                                        : item.status === 'FAILED'
-                                        ? 'destructive'
-                                        : 'secondary'
-                                    }
-                                    className="text-xs"
-                                  >
-                                    {item.status === 'SENT' ? 'Enviado' : 
-                                     item.status === 'DELIVERED' ? 'Entregado' :
-                                     item.status === 'FAILED' ? 'Fallido' : item.status}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                            {item.type === 'PROMISE' && (
-                              <p className="text-sm font-semibold text-gray-900">
-                                Promesa de pago
-                                {item.dueDate && (
-                                  <span className="ml-2 text-xs text-gray-500 font-normal">
-                                    (Vence: {format(new Date(item.dueDate), 'dd/MM/yyyy')})
-                                  </span>
-                                )}
-                              </p>
-                            )}
-                            {item.type === 'PAYMENT' && (
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold text-gray-900">Pago aplicado</p>
-                                {item.isAuthoritative && (
-                                  <Badge variant="default" className="text-xs">
-                                    Autoritativo ({item.sourceSystem})
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 whitespace-nowrap font-medium">
-                            {format(new Date(item.ts), 'dd/MM/yyyy HH:mm')}
-                          </p>
+        {/* Timeline y Chat en grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Timeline */}
+          <Card className="border-0 shadow-lg bg-white overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+              <CardTitle className="text-white flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Timeline de Eventos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 max-h-[600px] overflow-y-auto">
+              {invoice.timeline.length === 0 ? (
+                <div className="text-center py-12">
+                  <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">No hay eventos en el timeline</p>
+                  <p className="text-sm text-gray-400 mt-1">Los eventos aparecerán aquí cuando se envíen mensajes</p>
+                </div>
+              ) : (
+                <div className="relative">
+                  {/* Línea vertical del timeline */}
+                  <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                  
+                  <div className="space-y-6">
+                    {invoice.timeline.map((item, index) => (
+                      <div key={index} className="relative flex items-start gap-4 pl-2">
+                        {/* Icono del timeline */}
+                        <div className="relative z-10 flex-shrink-0">
+                          {getTimelineIcon(item.type, item.channel, item.status)}
                         </div>
                         
-                        {item.message && (
-                          <div className="mt-3 p-3 bg-gray-50 rounded-md border-l-4 border-blue-500">
-                            <p className="text-sm text-gray-700 leading-relaxed">{item.message}</p>
-                          </div>
-                        )}
-                        
-                        {item.amount && (
-                          <div className="mt-3 flex items-center gap-2">
-                            <DollarSign className="h-4 w-4 text-green-600" />
-                            <p className="text-sm font-semibold text-gray-900">
-                              Monto: ${(item.amount / 100).toLocaleString('es-AR')}
+                        {/* Contenido del evento */}
+                        <div className="flex-1 min-w-0 bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <div className="flex-1">
+                              {item.type === 'CONTACT' && (
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {item.channel} - {item.direction}
+                                  </p>
+                                  {item.status && (
+                                    <Badge
+                                      variant={
+                                        item.status === 'SENT' || item.status === 'DELIVERED'
+                                          ? 'default'
+                                          : item.status === 'FAILED'
+                                          ? 'destructive'
+                                          : 'secondary'
+                                      }
+                                      className="text-xs"
+                                    >
+                                      {item.status === 'SENT' ? 'Enviado' : 
+                                       item.status === 'DELIVERED' ? 'Entregado' :
+                                       item.status === 'FAILED' ? 'Fallido' : item.status}
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                              {item.type === 'PROMISE' && (
+                                <p className="text-sm font-semibold text-gray-900">
+                                  Promesa de pago
+                                  {item.dueDate && (
+                                    <span className="ml-2 text-xs text-gray-500 font-normal">
+                                      (Vence: {format(new Date(item.dueDate), 'dd/MM/yyyy')})
+                                    </span>
+                                  )}
+                                </p>
+                              )}
+                              {item.type === 'PAYMENT' && (
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-gray-900">Pago aplicado</p>
+                                  {item.isAuthoritative && (
+                                    <Badge variant="default" className="text-xs">
+                                      Autoritativo ({item.sourceSystem})
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 whitespace-nowrap font-medium">
+                              {format(new Date(item.ts), 'dd/MM/yyyy HH:mm')}
                             </p>
                           </div>
-                        )}
-                        
-                        {(item.appliedAt || item.settledAt) && (
-                          <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
-                            {item.appliedAt && (
-                              <p className="text-xs text-gray-500">
-                                <span className="font-medium">Aplicado:</span> {format(new Date(item.appliedAt), 'dd/MM/yyyy HH:mm')}
+                          
+                          {item.message && (
+                            <div className="mt-3 p-3 bg-gray-50 rounded-md border-l-4 border-blue-500">
+                              <p className="text-sm text-gray-700 leading-relaxed">{item.message}</p>
+                            </div>
+                          )}
+                          
+                          {item.amount && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <DollarSign className="h-4 w-4 text-green-600" />
+                              <p className="text-sm font-semibold text-gray-900">
+                                Monto: ${(item.amount / 100).toLocaleString('es-AR')}
                               </p>
-                            )}
-                            {item.settledAt && (
-                              <p className="text-xs text-gray-500">
-                                <span className="font-medium">Liquidado:</span> {format(new Date(item.settledAt), 'dd/MM/yyyy HH:mm')}
-                              </p>
-                            )}
-                          </div>
-                        )}
+                            </div>
+                          )}
+                          
+                          {(item.appliedAt || item.settledAt) && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
+                              {item.appliedAt && (
+                                <p className="text-xs text-gray-500">
+                                  <span className="font-medium">Aplicado:</span> {format(new Date(item.appliedAt), 'dd/MM/yyyy HH:mm')}
+                                </p>
+                              )}
+                              {item.settledAt && (
+                                <p className="text-xs text-gray-500">
+                                  <span className="font-medium">Liquidado:</span> {format(new Date(item.settledAt), 'dd/MM/yyyy HH:mm')}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Chat con Constanza */}
+          <div className="h-[600px]">
+            <InvoiceChat invoiceId={invoiceId} />
+          </div>
+        </div>
       </div>
     </MainLayout>
   );
