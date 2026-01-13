@@ -41,12 +41,10 @@ export function InvoiceChat({ invoiceId }: InvoiceChatProps) {
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
-      const conversationHistory = messages
-        .filter((m) => m.role !== 'system')
-        .map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+      const conversationHistory = messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
       const response = await api.post(`/v1/invoices/${invoiceId}/chat`, {
         message,
