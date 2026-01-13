@@ -15,7 +15,6 @@ import { callRoutes } from './routes/calls.js';
 import { paymentRoutes } from './routes/payments.js';
 import { summaryRoutes } from './routes/summaries.js';
 import { jobRoutes } from './routes/jobs.js';
-import { chatRoutes } from './routes/chat.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const server: FastifyInstance = Fastify({

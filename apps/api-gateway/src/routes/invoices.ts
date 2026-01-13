@@ -78,6 +78,8 @@ function normalizeInvoiceRow(row: any): any {
 }
 
 export async function invoiceRoutes(fastify: FastifyInstance) {
+  // Log para verificar que las rutas se registran
+  fastify.log.info('Registering invoice routes including /invoices/:id/chat');
   // GET /invoices - Lista facturas con filtros
   fastify.get(
     '/invoices',
@@ -168,6 +170,7 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
       preHandler: [authenticate],
     },
     async (request, reply) => {
+      fastify.log.info({ url: request.url, method: request.method }, 'Chat endpoint called');
       const { id } = request.params as { id: string };
       const tenantId = request.user.tenant_id;
       const { message, conversationHistory = [] } = (request.body as any) || {};
