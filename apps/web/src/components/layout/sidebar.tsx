@@ -23,6 +23,7 @@ import {
   ArrowLeftRight,
   CheckCircle,
   BarChart3,
+  CalendarClock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -51,6 +52,7 @@ const callsSubmenu = [
   { name: 'Cargar Batch', href: '/calls/upload', icon: Upload },
   { name: 'Ejecutar Batches', href: '/calls/batches', icon: Play },
   { name: 'Listado de Llamadas', href: '/calls', icon: List },
+  { name: 'Cronograma de callbacks', href: '/calls/cronograma', icon: CalendarClock },
 ];
 
 const paymentsSubmenu = [
