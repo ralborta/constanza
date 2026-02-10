@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import { processMessageForCallbacks } from '../services/callbacks-from-message.js';
 // SimpleLogger está disponible globalmente desde types.d.ts
 
 const prisma = new PrismaClient();
@@ -410,10 +411,32 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         'WhatsApp message registered'
       );
 
-      // TODO: Procesar con NLP service si hay texto
-      // Si el mensaje contiene intents como "pago mañana", crear promesa
-      // Si contiene entidades como monto/fecha, extraerlas
-      // Esto se puede hacer de forma asíncrona con una cola
+      // Extraer promesas y callbacks del mensaje (IA) y crear en BD
+      if (messageText && messageText.length >= 10) {
+        try {
+          const result = await processMessageForCallbacks(
+            messageText,
+            {
+              tenantId: customer.tenantId,
+              customerId: customer.id,
+              invoiceId: invoiceId ?? null,
+              sourceContactEventId: contactEvent.id,
+            },
+            'WHATSAPP'
+          );
+          if (result.promisesCreated > 0 || result.callbacksCreated > 0) {
+            fastify.log.info(
+              { eventId: contactEvent.id, ...result },
+              'Promesas/callbacks creados desde mensaje WhatsApp'
+            );
+          }
+        } catch (err: any) {
+          fastify.log.warn(
+            { eventId: contactEvent.id, error: err?.message },
+            'Error extrayendo callbacks/promesas del mensaje (no bloqueante)'
+          );
+        }
+      }
 
       return reply.status(200).send({
         status: 'ok',
@@ -538,6 +561,34 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         { eventId: contactEvent.id, customerId: customer.id, invoiceId: invoiceId },
         'Email message registered from OpenAI Agent Builder'
       );
+
+      // Extraer promesas y callbacks del mensaje (IA) y crear en BD
+      const emailBody = data.messageText || (data.summary as string) || '';
+      if (emailBody && emailBody.length >= 10) {
+        try {
+          const result = await processMessageForCallbacks(
+            emailBody,
+            {
+              tenantId: customer.tenantId,
+              customerId: customer.id,
+              invoiceId: invoiceId ?? null,
+              sourceContactEventId: contactEvent.id,
+            },
+            'EMAIL'
+          );
+          if (result.promisesCreated > 0 || result.callbacksCreated > 0) {
+            fastify.log.info(
+              { eventId: contactEvent.id, ...result },
+              'Promesas/callbacks creados desde mensaje Email'
+            );
+          }
+        } catch (err: any) {
+          fastify.log.warn(
+            { eventId: contactEvent.id, error: err?.message },
+            'Error extrayendo callbacks/promesas del email (no bloqueante)'
+          );
+        }
+      }
 
       return reply.status(200).send({
         status: 'ok',

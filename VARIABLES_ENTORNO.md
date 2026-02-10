@@ -208,6 +208,21 @@ TTS_URL=https://api.elevenlabs.io/v1/text-to-speech
 
 ## 🔗 Variables de Integración
 
+### `AGENT_API_KEY` (api-gateway, para agentes Email/WhatsApp)
+
+**Descripción:** API key para que los agentes (OpenAI Agent Builder para email, BuilderBot para WhatsApp) consulten contexto de cliente y facturas antes de responder.
+
+**Uso:** Los agentes llaman a `GET /v1/agent/context?email=...` o `?phone=...` con header `X-API-Key: <AGENT_API_KEY>` o `Authorization: Bearer <AGENT_API_KEY>`.
+
+**Ejemplo:**
+```
+AGENT_API_KEY=tu_clave_secreta_para_agentes
+```
+
+**Generar:** Mismo criterio que JWT_SECRET (ej. `openssl rand -base64 32`).
+
+---
+
 ### `CUCURU_WEBHOOK_SECRET` (apps/rail-cucuru)
 
 **Descripción:** Secreto para validar webhooks de Cucuru.
