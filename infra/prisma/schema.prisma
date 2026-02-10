@@ -16,10 +16,11 @@ model Tenant {
   createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   echeqs        Echeq[]
-  batchJobs     BatchJob[]
-  contactEvents ContactEvent[]
-  contactRuns   ContactRun[]
-  sequences     Sequence[]
+  batchJobs           BatchJob[]
+  contactEvents       ContactEvent[]
+  contactRuns         ContactRun[]
+  scheduledCallbacks  ScheduledCallback[]
+  sequences           Sequence[]
   asociados     Asociado[]
   customerCuits CustomerCuit[]
   customers     Customer[]
@@ -70,11 +71,12 @@ model Customer {
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   echeqs           Echeq[]
-  contactEvents    ContactEvent[]
-  contactRuns      ContactRun[]
-  customerCuits    CustomerCuit[]
-  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  invoices         Invoice[]
+  contactEvents      ContactEvent[]
+  contactRuns        ContactRun[]
+  customerCuits     CustomerCuit[]
+  scheduledCallbacks ScheduledCallback[]
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices           Invoice[]
 
   @@unique([tenantId, codigoUnico])
   @@unique([tenantId, email])
@@ -112,6 +114,7 @@ model Invoice {
   contactEvents       ContactEvent[]
   contactRuns         ContactRun[]
   customer            Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  scheduledCallbacks  ScheduledCallback[]
   tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   promises            Promise[]
   paymentApplications PaymentApplication[]
@@ -301,11 +304,12 @@ model ContactEvent {
   externalMessageId String?     @map("external_message_id")
   errorReason       String?     @map("error_reason")
   ts                DateTime    @default(now()) @db.Timestamptz(6)
-  batch             BatchJob?   @relation(fields: [batchId], references: [id])
-  customer          Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  invoice           Invoice?    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  run               ContactRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
-  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  batch                  BatchJob?          @relation(fields: [batchId], references: [id])
+  customer               Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoice                Invoice?           @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  run                    ContactRun?        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  scheduledCallbacksFrom  ScheduledCallback[] @relation("ScheduledCallbackSource")
+  tenant                 Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, runId])
   @@index([ts])
@@ -338,6 +342,30 @@ model BatchJob {
   @@index([tenantId, status])
   @@index([createdBy])
   @@map("batch_jobs")
+  @@schema("contact")
+}
+
+model ScheduledCallback {
+  id                   String        @id @default(uuid()) @db.Uuid
+  tenantId             String        @map("tenant_id") @db.Uuid
+  customerId           String        @map("customer_id") @db.Uuid
+  invoiceId            String?       @map("invoice_id") @db.Uuid
+  sourceContactEventId String?       @map("source_contact_event_id") @db.Uuid
+  scheduledAt          DateTime      @map("scheduled_at") @db.Timestamptz(6)
+  type                 String        // CALLBACK | FOLLOW_UP
+  reason               String?       // Motivo extraído del resumen
+  status               String        @default("PENDING") // PENDING | DONE | CANCELLED
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  customer             Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoice              Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  sourceContactEvent   ContactEvent? @relation("ScheduledCallbackSource", fields: [sourceContactEventId], references: [id], onDelete: SetNull)
+  tenant               Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([scheduledAt])
+  @@index([customerId])
+  @@map("scheduled_callbacks")
   @@schema("contact")
 }
 

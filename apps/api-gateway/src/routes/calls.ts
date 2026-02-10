@@ -5,6 +5,7 @@ import { authenticate, requirePerfil } from '../middleware/auth.js';
 import * as XLSX from 'xlsx';
 import axios from 'axios';
 import { getNotifierBaseUrl } from '../lib/config.js';
+import { processCallSummaryForCallbacks } from '../services/callbacks-from-summary.js';
 
 // Configuración de ElevenLabs
 const ELEVENLABS_API_URL = process.env.ELEVENLABS_API_URL || 'https://api.elevenlabs.io';
@@ -603,6 +604,68 @@ export async function callRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // GET /calls/cronograma - Cronograma de callbacks generados desde resúmenes de llamadas
+  fastify.get(
+    '/calls/cronograma',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1', 'OPERADOR_2'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const { status = 'PENDING', from: fromStr, to: toStr, limit = '50', offset = '0' } = request.query as {
+        status?: string;
+        from?: string;
+        to?: string;
+        limit?: string;
+        offset?: string;
+      };
+
+      const where: any = {
+        tenantId: user.tenant_id,
+      };
+      if (status) {
+        where.status = status;
+      }
+      if (fromStr || toStr) {
+        where.scheduledAt = {};
+        if (fromStr) where.scheduledAt.gte = new Date(fromStr);
+        if (toStr) where.scheduledAt.lte = new Date(toStr);
+      }
+
+      const callbacks = await prisma.scheduledCallback.findMany({
+        where,
+        orderBy: { scheduledAt: 'asc' },
+        take: parseInt(limit),
+        skip: parseInt(offset),
+        include: {
+          customer: { select: { id: true, razonSocial: true, codigoUnico: true, telefono: true } },
+          invoice: { select: { id: true, numero: true, monto: true } },
+        },
+      });
+
+      const total = await prisma.scheduledCallback.count({ where });
+
+      return {
+        callbacks: callbacks.map((c: (typeof callbacks)[number]) => ({
+          id: c.id,
+          customerId: c.customerId,
+          customer: c.customer,
+          invoiceId: c.invoiceId,
+          invoice: c.invoice,
+          sourceContactEventId: c.sourceContactEventId,
+          scheduledAt: c.scheduledAt,
+          type: c.type,
+          reason: c.reason,
+          status: c.status,
+          createdAt: c.createdAt,
+        })),
+        total,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+      };
+    }
+  );
+
   // POST /calls/webhooks/elevenlabs - Webhook de ElevenLabs para recibir datos de llamadas completadas
   fastify.post(
     '/calls/webhooks/elevenlabs',
@@ -656,6 +719,9 @@ export async function callRoutes(fastify: FastifyInstance) {
           },
         });
 
+        let callbacksCreated = 0;
+        let promisesCreated = 0;
+
         if (contactEvent) {
           // Actualizar el evento existente
           await prisma.contactEvent.update({
@@ -674,6 +740,31 @@ export async function callRoutes(fastify: FastifyInstance) {
             { contactEventId: contactEvent.id, conversationId: conversation_id },
             'ContactEvent actualizado desde webhook'
           );
+
+          // A partir del resumen de la IA: crear callbacks y promesas de pago (cronograma)
+          if (finalSummary && status === 'completed') {
+            try {
+              const result = await processCallSummaryForCallbacks(finalSummary, {
+                tenantId: contactEvent.tenantId,
+                customerId: contactEvent.customerId,
+                invoiceId: contactEvent.invoiceId ?? null,
+                sourceContactEventId: contactEvent.id,
+              });
+              promisesCreated = result.promisesCreated;
+              callbacksCreated = result.callbacksCreated;
+              if (promisesCreated > 0 || callbacksCreated > 0) {
+                fastify.log.info(
+                  { contactEventId: contactEvent.id, promisesCreated, callbacksCreated },
+                  'Callbacks y promesas creados desde resumen de llamada'
+                );
+              }
+            } catch (err: any) {
+              fastify.log.warn(
+                { contactEventId: contactEvent.id, error: err?.message },
+                'Error creando callbacks/promesas desde resumen (no bloqueante)'
+              );
+            }
+          }
         } else {
           // Si no encontramos el evento, podría ser una llamada que no se registró previamente
           // En este caso, solo logueamos el webhook
@@ -688,6 +779,8 @@ export async function callRoutes(fastify: FastifyInstance) {
           conversation_id,
           transcript_saved: !!finalTranscript,
           summary_saved: !!finalSummary,
+          promises_created: promisesCreated,
+          callbacks_created: callbacksCreated,
         });
       } catch (error: any) {
         fastify.log.error({ error: error.message }, 'Error procesando webhook de ElevenLabs');
