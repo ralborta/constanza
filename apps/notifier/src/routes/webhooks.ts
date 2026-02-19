@@ -459,13 +459,40 @@ export async function webhookRoutes(fastify: FastifyInstance) {
             },
           });
           await sendWhatsAppMessage({ number: data.from, message: respuesta });
+          // Registrar la respuesta del agente en el timeline (OUTBOUND) para que aparezca en la factura
+          await prisma.contactEvent.create({
+            data: {
+              tenantId: customer.tenantId,
+              customerId: customer.id,
+              invoiceId: contactEvent.invoiceId,
+              channel: 'WHATSAPP',
+              direction: 'OUTBOUND',
+              isManual: false,
+              messageText: respuesta,
+              status: 'DELIVERED',
+              payload: { origen: 'cobranza_ia', tokens_usados: tokens_usados, modelo_ia: modelo },
+              ts: new Date(),
+            },
+          });
           fastify.log.info({ eventId: contactEvent.id, tokens_usados, modelo }, 'Cobranza IA: respuesta enviada por BuilderBot');
         } catch (err: any) {
           fastify.log.warn({ eventId: contactEvent.id, error: err?.message }, 'Error flujo cobranza IA (no bloqueante)');
+          const fallbackMsg = 'Disculpa, tuve un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.';
           try {
-            await sendWhatsAppMessage({
-              number: data.from,
-              message: 'Disculpa, tuve un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.',
+            await sendWhatsAppMessage({ number: data.from, message: fallbackMsg });
+            await prisma.contactEvent.create({
+              data: {
+                tenantId: customer.tenantId,
+                customerId: customer.id,
+                invoiceId: contactEvent.invoiceId,
+                channel: 'WHATSAPP',
+                direction: 'OUTBOUND',
+                isManual: false,
+                messageText: fallbackMsg,
+                status: 'DELIVERED',
+                payload: { origen: 'cobranza_ia_fallback' },
+                ts: new Date(),
+              },
             });
           } catch (e: any) {
             fastify.log.warn({ error: e?.message }, 'Error enviando mensaje de fallback');
