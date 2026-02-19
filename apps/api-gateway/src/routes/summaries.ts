@@ -32,31 +32,9 @@ export async function summaryRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Factura no encontrada' });
       }
 
-      // Verificar que hay eventos antes de generar resumen
-      const eventCount = await prisma.contactEvent.count({
-        where: {
-          invoiceId: id,
-          tenantId,
-        },
-      });
+      fastify.log.info({ invoiceId: id, tenantId }, 'Generando resumen de factura (historia)');
 
-      fastify.log.info(
-        { invoiceId: id, tenantId, eventCount },
-        'Generando resumen de factura'
-      );
-
-      if (eventCount === 0) {
-        return reply.status(200).send({
-          invoiceId: id,
-          summary: {
-            summary: 'No hay interacciones registradas para esta factura.',
-            keyPoints: [],
-          },
-          generatedAt: new Date().toISOString(),
-        });
-      }
-
-      // Generar resumen
+      // Generar resumen (con o sin eventos: con eventos usa IA + interacciones; sin eventos usa solo datos de factura)
       const summary = await generateInvoiceSummary(id, tenantId);
 
       fastify.log.info(

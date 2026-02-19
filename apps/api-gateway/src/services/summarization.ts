@@ -56,19 +56,38 @@ export async function generateInvoiceSummary(
 
   console.log(`[Summarization] Encontrados ${events.length} eventos para factura ${invoiceId}`);
 
-  if (events.length === 0) {
-    return {
-      summary: 'No hay interacciones registradas para esta factura.',
-      keyPoints: [],
-    };
-  }
+  // Datos de la factura para la "historia" (vencimiento, estado, pagos, promesas)
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: invoiceId, tenantId },
+    include: {
+      paymentApplications: true,
+      promises: { orderBy: { dueDate: 'desc' }, take: 10 },
+    },
+  });
 
-  // Construir contexto de la conversación
-  const conversationContext = buildConversationContext(events);
+  const invoiceFacts = invoice
+    ? [
+        `Factura ${invoice.numero}. Estado: ${invoice.estado}.`,
+        `Vencimiento: ${invoice.fechaVto.toLocaleDateString('es-AR')}.`,
+        `Monto total: ${(invoice.monto / 100).toLocaleString('es-AR')}.`,
+        `Monto aplicado: ${(invoice.paymentApplications.reduce((s, a) => s + a.amount, 0) / 100).toLocaleString('es-AR')}.`,
+        `Promesas registradas: ${invoice.promises.length}.`,
+        invoice.promises.length > 0
+          ? `Última promesa: vence ${invoice.promises[0].dueDate.toLocaleDateString('es-AR')}, estado ${invoice.promises[0].status}.`
+          : '',
+      ]
+          .filter(Boolean)
+          .join(' ')
+    : '';
+
+  const conversationContext = events.length > 0 ? buildConversationContext(events) : '';
   console.log(`[Summarization] Contexto construido: ${conversationContext.length} caracteres`);
 
-  // Generar resumen con OpenAI
-  const summary = await generateSummaryWithOpenAI(conversationContext, 'invoice');
+  const summary = await generateInvoiceSummaryWithOpenAI(
+    conversationContext,
+    invoiceFacts,
+    events.length === 0
+  );
   console.log(`[Summarization] Resumen generado: ${summary.summary.length} caracteres`);
 
   return summary;
@@ -157,6 +176,95 @@ function buildConversationContext(events: TimelineEvent[]): string {
 
   // Retornar contexto completo ordenado cronológicamente
   return lines.join('\n\n');
+}
+
+/**
+ * Genera la "historia" de la factura con OpenAI: relato narrativo y profesional
+ * usando datos de la factura (vencimiento, estado, pagos, promesas) + interacciones.
+ */
+async function generateInvoiceSummaryWithOpenAI(
+  conversationContext: string,
+  invoiceFacts: string,
+  noEvents: boolean
+): Promise<SummaryResult> {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY no está configurada');
+  }
+
+  const systemPrompt = `Eres un experto en cobranzas. Redactas la "historia" de una factura en formato narrativo y profesional.
+El relato debe ser breve (párrafos claros, tono formal) e incluir:
+- Cuándo venció la factura y el estado actual (abierta, vencida, parcial, pagada).
+- Si hay pagos aplicados o no; si no hay pagos, indicarlo de forma explícita.
+- Cuántas veces se contactó al cliente y por qué canales; si el cliente respondió o no.
+- Promesas de pago: si existen, fechas y cumplimiento; si están vencidas sin pago, indicarlo.
+- Si se evidencia riesgo de incobrabilidad (sin respuesta, promesas incumplidas, antigüedad), mencionarlo de forma directa pero profesional.
+- Próximos pasos sugeridos (contacto, gestión judicial, etc.) cuando aplique.
+Usa solo los datos proporcionados. Sé conciso y claro.`;
+
+  const userPrompt = noEvents
+    ? `Datos de la factura (no hay interacciones registradas aún):
+
+${invoiceFacts}
+
+Genera un resumen narrativo breve en español que describa el estado de la factura y, si aplica, el riesgo de incobrabilidad. Si no hay pagos ni respuesta del cliente, indícalo.
+
+Responde en JSON:
+- summary: texto del resumen (máximo 300 palabras)
+- keyPoints: array de puntos clave (máximo 5)
+- nextSteps: array de próximos pasos sugeridos (opcional, máximo 3)
+- sentiment: "positive", "negative" o "neutral"`
+    : `Datos de la factura:
+${invoiceFacts}
+
+Historial de interacciones:
+${conversationContext}
+
+Genera la "historia" de esta factura: un resumen narrativo que integre los datos de la factura y las interacciones. Incluye vencimiento, pagos (o ausencia de ellos), contactos, promesas y, si aplica, indicación de riesgo de incobrabilidad.
+
+Responde en JSON:
+- summary: texto del resumen (máximo 400 palabras)
+- keyPoints: array de puntos clave (máximo 5)
+- nextSteps: array de próximos pasos sugeridos (opcional, máximo 3)
+- sentiment: "positive", "negative" o "neutral"`;
+
+  try {
+    const response = await axios.post(
+      `${OPENAI_API_URL}/chat/completions`,
+      {
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
+      }
+    );
+
+    const content = response.data.choices[0]?.message?.content;
+    if (!content) throw new Error('No se recibió respuesta de OpenAI');
+    const parsed = JSON.parse(content);
+    return {
+      summary: parsed.summary || 'No se pudo generar el resumen.',
+      keyPoints: parsed.keyPoints || [],
+      nextSteps: parsed.nextSteps || [],
+      sentiment: parsed.sentiment || 'neutral',
+    };
+  } catch (error: any) {
+    if (error.response) {
+      throw new Error(
+        `OpenAI API Error: ${error.response.status} - ${error.response.data?.error?.message || 'Unknown error'}`
+      );
+    }
+    throw error;
+  }
 }
 
 /**
