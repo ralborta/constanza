@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { format } from 'date-fns';
@@ -24,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Eye, MoreVertical } from 'lucide-react';
+import { Search, Eye, History, MoreVertical } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { UploadInvoiceButton } from '@/components/invoices/upload-invoice-button';
+import { InvoiceHistorialDrawer } from '@/components/invoices/invoice-historial-drawer';
 
 interface Invoice {
   id: string;
@@ -63,6 +65,9 @@ function getStatusBadge(estado: string) {
 }
 
 export default function InvoicesPage() {
+  const [historialInvoiceId, setHistorialInvoiceId] = useState<string | null>(null);
+  const [historialOpen, setHistorialOpen] = useState(false);
+
   const { data, isLoading } = useQuery<{ invoices: Invoice[] }>({
     queryKey: ['invoices'],
     queryFn: async () => {
@@ -179,6 +184,15 @@ export default function InvoicesPage() {
                                   Ver Detalle
                                 </Link>
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setHistorialInvoiceId(invoice.id);
+                                  setHistorialOpen(true);
+                                }}
+                              >
+                                <History className="mr-2 h-4 w-4" />
+                                Ver historial
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -190,6 +204,15 @@ export default function InvoicesPage() {
             </div>
           </CardContent>
         </Card>
+
+        <InvoiceHistorialDrawer
+          invoiceId={historialInvoiceId}
+          open={historialOpen}
+          onOpenChange={(open) => {
+            setHistorialOpen(open);
+            if (!open) setHistorialInvoiceId(null);
+          }}
+        />
       </div>
     </MainLayout>
   );

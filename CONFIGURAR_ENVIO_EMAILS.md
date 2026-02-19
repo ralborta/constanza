@@ -21,15 +21,26 @@ Ve a **Railway Dashboard** → Tu proyecto → `notifier` → **Variables** → 
 
 ### Variables Obligatorias
 
+**Ejemplo con Gmail:**
 ```env
-# Configuración SMTP (REQUERIDAS)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=tu_email@gmail.com
-SMTP_PASS=abcdefghijklmnop  # ⚠️ App Password de 16 caracteres SIN espacios
+SMTP_PASS=abcdefghijklmnop  # App Password de 16 caracteres SIN espacios
+```
 
-# Remitente (Opcionales - si no las pones, usa SMTP_USER)
-SMTP_FROM_EMAIL=noreply@constanza.com
+**Ejemplo con Resend (recomendado para producción):**
+```env
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=465
+SMTP_USER=resend
+SMTP_PASS=re_xxxxxxxx       # API Key de Resend (dashboard → API Keys)
+SMTP_SECURE=true            # Opcional; con puerto 465 ya se usa SSL
+```
+
+**Remitente (opcionales; si no las ponés, se usa SMTP_USER):**
+```env
+SMTP_FROM_EMAIL=noreply@tudominio.com   # En Resend: debe ser un dominio verificado
 SMTP_FROM_NAME=Constanza
 
 # Base de datos (Railway la crea automáticamente)
@@ -96,6 +107,13 @@ Value: production
 ```
 
 **Nota**: `DATABASE_URL` y `REDIS_URL` se agregan automáticamente por Railway cuando conectas esos servicios.
+
+### 📬 Usar Resend
+
+1. Creá cuenta en [resend.com](https://resend.com) y verificá tu dominio (Settings → Domains).
+2. Creá una API Key (API Keys → Create).
+3. En Railway (notifier) configurá: `SMTP_HOST=smtp.resend.com`, `SMTP_PORT=465`, `SMTP_USER=resend`, `SMTP_PASS=re_xxx...`, y `SMTP_FROM_EMAIL` con un email del dominio verificado (ej. `noreply@tudominio.com`).
+4. Opcional: `SMTP_SECURE=true` para puerto 465. Sin cambios en el código.
 
 ---
 

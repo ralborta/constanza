@@ -8,10 +8,11 @@ import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle2, Clock, XCircle, Mail, MessageSquare, Phone, DollarSign, Calendar, User, FileText, Sparkles, RefreshCw, TrendingUp } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, XCircle, Mail, MessageSquare, Phone, DollarSign, Calendar, User, FileText, Sparkles, RefreshCw, TrendingUp, History } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InvoiceChat } from '@/components/invoices/invoice-chat';
+import { InvoiceHistorialDrawer } from '@/components/invoices/invoice-historial-drawer';
 
 interface TimelineItem {
   type: 'CONTACT' | 'PROMISE' | 'PAYMENT';
@@ -173,6 +174,7 @@ export default function InvoiceDetailPage() {
   const params = useParams();
   const invoiceId = params.id as string;
   const [isUpdatingSummary, setIsUpdatingSummary] = useState(false);
+  const [historialOpen, setHistorialOpen] = useState(false);
 
   const { data, isLoading } = useQuery<InvoiceDetail>({
     queryKey: ['invoice', invoiceId],
@@ -243,9 +245,20 @@ export default function InvoiceDetailPage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver al Dashboard
           </Link>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            Factura {invoice.numero}
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              Factura {invoice.numero}
+            </h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setHistorialOpen(true)}
+              className="gap-2"
+            >
+              <History className="h-4 w-4" />
+              Historial de la factura
+            </Button>
+          </div>
         </div>
 
         {/* Información de la factura */}
@@ -588,6 +601,12 @@ export default function InvoiceDetailPage() {
             <InvoiceChat invoiceId={invoiceId} />
           </div>
         </div>
+
+        <InvoiceHistorialDrawer
+          invoiceId={invoiceId}
+          open={historialOpen}
+          onOpenChange={setHistorialOpen}
+        />
       </div>
     </MainLayout>
   );
