@@ -91,7 +91,7 @@ async function correlateInvoice(
     }
   }
 
-  // 5. Fallback: factura más reciente del cliente (solo si hay facturas activas)
+  // 5. Fallback: factura más reciente activa del cliente (para que inbounds aparezcan en el timeline)
   const recentInvoice = await prisma.invoice.findFirst({
     where: {
       customerId,
@@ -105,14 +105,8 @@ async function correlateInvoice(
     },
   });
 
-  // Solo usar fallback si la factura es reciente (últimos 90 días)
   if (recentInvoice) {
-    const daysSinceDue = Math.floor(
-      (Date.now() - recentInvoice.fechaVto.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    if (daysSinceDue <= 90) {
-      return recentInvoice.id;
-    }
+    return recentInvoice.id;
   }
 
   return null;
