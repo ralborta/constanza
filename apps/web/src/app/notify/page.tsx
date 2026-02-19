@@ -138,9 +138,29 @@ export default function NotifyPage() {
       'Confirmación de pago': 'Estimado/a {nombre_cliente},\n\nHemos recibido su pago correctamente. Muchas gracias.\n\nSaludos cordiales.',
     },
     WHATSAPP: {
-      'Recordatorio corto': 'Hola {nombre_cliente}, te recordamos que tienes una factura pendiente. Por favor, realiza el pago a la brevedad. Gracias!',
-      'Factura vencida': 'Hola {nombre_cliente}, tu factura está vencida. Por favor contáctanos para regularizar. Gracias!',
-      'Confirmación': 'Hola {nombre_cliente}, hemos recibido tu pago. ¡Gracias!',
+      'Recordatorio corto': `🧾 Recordatorio de pago
+
+Hola {nombre_cliente}, tenés una factura pendiente.
+
+📋 Monto: {monto}
+⏰ Vence: {fecha_vencimiento}
+
+Por favor, realizá el pago a la brevedad.
+Gracias.`,
+      'Factura vencida': `🧾 Factura vencida
+
+Hola {nombre_cliente}, tu factura está vencida.
+
+📋 Monto: {monto}
+⏰ Vencimiento: {fecha_vencimiento}
+
+Contáctanos para regularizar.
+Gracias.`,
+      'Confirmación': `✅ Pago recibido
+
+Hola {nombre_cliente}, hemos recibido tu pago correctamente.
+
+Gracias.`,
     },
     VOICE: {
       'Recordatorio': 'Hola {nombre_cliente}, te recordamos que tienes una factura pendiente de pago. Por favor, realiza el pago a la brevedad. Gracias.',
