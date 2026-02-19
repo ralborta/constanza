@@ -129,7 +129,10 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
   getTransporter(); // valida config
   const { email: fromEmail, name: fromName } = getFromAddress();
 
-  if (!validateEmail(to)) {
+  // Normalizar destinatario: sin espacios y minúsculas (evita 550 por formato en algunos servidores)
+  const toNormalized = (to || '').trim().toLowerCase();
+
+  if (!validateEmail(toNormalized)) {
     throw new EmailError(
       EmailErrorCode.INVALID_RECIPIENT,
       `Email inválido: ${to}`
@@ -141,7 +144,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
   try {
     const info = await transport.sendMail({
       from: `"${fromName.replace(/"/g, '\\"')}" <${fromEmail}>`,
-      to,
+      to: toNormalized,
       subject,
       html,
       text: text || html.replace(/<[^>]*>/g, ''),
@@ -150,13 +153,27 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
     const accepted = (info.accepted as string[] || []).filter(Boolean);
     const rejected = (info.rejected as string[] || []).filter(Boolean);
 
+    // Si el servidor rechazó al destinatario (ej. 550), tratarlo como error para que el batch no quede como enviado
+    if (rejected.length > 0) {
+      throw new EmailError(
+        EmailErrorCode.SMTP_SEND_FAILED,
+        `Destinatario rechazado por el servidor (550): ${rejected.join(', ')}. Revisá que la dirección sea correcta y que el buzón exista.`,
+        new Error(`Rejected: ${rejected.join(', ')}`)
+      );
+    }
+
     return {
       messageId: info.messageId || '',
       accepted,
-      rejected,
+      rejected: [],
     };
   } catch (error: any) {
-    const msg = error?.message || String(error);
+    // Incluir respuesta completa del servidor (ej. 550) para diagnosticar rechazos por destinatario
+    const responseMsg = error?.response ? String(error.response).trim() : '';
+    const code = error?.responseCode ?? '';
+    const msg = [error?.message, code && responseMsg ? `[${code}] ${responseMsg}` : responseMsg]
+      .filter(Boolean)
+      .join(' — ') || String(error);
 
     // Nodemailer / SMTP: códigos típicos
     if (error?.code === 'EAUTH' || msg.toLowerCase().includes('authentication') || msg.toLowerCase().includes('invalid login')) {
