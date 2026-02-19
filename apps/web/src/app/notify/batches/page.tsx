@@ -248,13 +248,13 @@ function NotifyBatchesContent() {
                           ? `${batch.createdBy.nombre} ${batch.createdBy.apellido}`
                           : 'N/A'}
                       </TableCell>
-                      <TableCell className="text-xs text-red-600 max-w-xs">
+                      <TableCell className="text-xs text-red-600 max-w-[280px]">
                         {batch.failed > 0 && batch.errorSummary ? (
                           <div className="truncate" title={typeof batch.errorSummary === 'string' ? batch.errorSummary : JSON.stringify(batch.errorSummary, null, 2)}>
                             {Array.isArray(batch.errorSummary) 
                               ? batch.errorSummary.map((err: any, idx: number) => (
                                   <div key={idx} className="truncate">
-                                    {err.code || err.message || 'Error desconocido'}
+                                    {err.message || err.code || 'Error desconocido'}
                                   </div>
                                 )).slice(0, 1) // Mostrar solo el primer error
                               : typeof batch.errorSummary === 'string'

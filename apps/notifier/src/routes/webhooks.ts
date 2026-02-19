@@ -5,14 +5,11 @@ import { processMessageForCallbacks } from '../services/callbacks-from-message.j
 import { obtenerContextoCliente } from '../services/cobranza-context.js';
 import { construirPromptDinamico } from '../services/prompt-builder.js';
 import { llamarOpenAICobranza } from '../services/openai-cobranza.js';
+import { getPoliticasCobranza } from '../services/cobranza-politicas.js';
 import { sendWhatsAppMessage } from '../lib/builderbot.js';
-import axios from 'axios';
 // SimpleLogger está disponible globalmente desde types.d.ts
 
 const prisma = new PrismaClient();
-
-const API_GATEWAY_URL = process.env.API_GATEWAY_URL || process.env.NOTIFIER_API_GATEWAY_URL || '';
-const AGENT_API_KEY = process.env.AGENT_API_KEY || process.env.NOTIFIER_AGENT_API_KEY || '';
 
 /**
  * Correlation Engine: Asocia mensajes inbound a facturas
@@ -446,16 +443,12 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         }
       }
 
-      // Flujo contexto dinámico cobranza: obtener contexto → políticas → prompt → OpenAI → guardar → enviar por BuilderBot
+      // Flujo contexto dinámico cobranza: obtener contexto → políticas (desde BD) → prompt → OpenAI → guardar → enviar por BuilderBot
       const textoUtilParaIA = messageText && messageText.length >= 3 && !['[Imagen]', '[Documento]', '[Mensaje de voz]'].includes(messageText.trim());
-      if (textoUtilParaIA && API_GATEWAY_URL && AGENT_API_KEY) {
+      if (textoUtilParaIA) {
         try {
           const contexto = await obtenerContextoCliente(data.from);
-          const politicasRes = await axios.get<Record<string, unknown>>(`${API_GATEWAY_URL.replace(/\/$/, '')}/v1/cobranza/politicas`, {
-            headers: { 'X-API-Key': AGENT_API_KEY, 'X-Tenant-Id': customer.tenantId },
-            timeout: 10000,
-          }).catch(() => ({ data: {} }));
-          const politicas = politicasRes.data || {};
+          const politicas = await getPoliticasCobranza(customer.tenantId);
           const prompt = construirPromptDinamico(contexto, messageText, politicas as any);
           const { respuesta, tokens_usados, modelo } = await llamarOpenAICobranza(prompt);
           const payloadActual = (contactEvent.payload as Record<string, unknown>) || {};

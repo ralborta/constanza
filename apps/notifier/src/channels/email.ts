@@ -1,4 +1,5 @@
-import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 
 // Errores semánticos para mejor debugging
 export enum EmailErrorCode {
@@ -43,24 +44,40 @@ function validateEmail(email: string): boolean {
   return emailRegex.test(email);
 }
 
-let sendgridInitialized = false;
+let transporter: Transporter | null = null;
 
-function ensureSendgridInitialized(): void {
-  if (sendgridInitialized) {
-    return;
+/**
+ * Crea el transporter SMTP con la config de env (una sola vez).
+ */
+function getTransporter(): Transporter {
+  if (transporter) {
+    return transporter;
   }
 
-  const apiKey = process.env.SENDGRID_API_KEY || process.env.SMTP_PASS;
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT) || 587;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const secure = process.env.SMTP_SECURE === 'true' || port === 465;
 
-  if (!apiKey) {
+  if (!host || !user || !pass) {
     throw new EmailError(
       EmailErrorCode.SMTP_CONFIG_MISSING,
-      'SENDGRID_API_KEY (o SMTP_PASS) no está configurado'
+      'SMTP_HOST, SMTP_USER y SMTP_PASS deben estar configurados'
     );
   }
 
-  sgMail.setApiKey(apiKey);
-  sendgridInitialized = true;
+  transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: {
+      user,
+      pass,
+    },
+  });
+
+  return transporter;
 }
 
 /**
@@ -100,14 +117,17 @@ function getFromAddress(): { email: string; name: string } {
 }
 
 /**
- * Envía un email usando nodemailer
- * 
+ * Envía un email por SMTP directo (Nodemailer).
+ * Variables de entorno: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
+ * SMTP_FROM_EMAIL (opcional), SMTP_FROM_NAME (opcional), SMTP_SECURE (opcional, true para 465).
+ *
  * @param params - Parámetros del email
  * @returns Resultado del envío con messageId
  * @throws EmailError con código semántico si falla
  */
 export async function sendEmail({ to, subject, html, text }: SendEmailParams): Promise<SendEmailResult> {
-  ensureSendgridInitialized();
+  getTransporter(); // valida config
+  const { email: fromEmail, name: fromName } = getFromAddress();
 
   if (!validateEmail(to)) {
     throw new EmailError(
@@ -116,64 +136,50 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
     );
   }
 
-  const { email: fromEmail, name: fromName } = getFromAddress();
-
-  const mailOptions = {
-    to,
-    from: {
-      email: fromEmail,
-      name: fromName,
-    },
-    subject,
-    html,
-    text: text || html.replace(/<[^>]*>/g, ''),
-  };
+  const transport = getTransporter();
 
   try {
-    const [response] = await sgMail.send(mailOptions);
+    const info = await transport.sendMail({
+      from: `"${fromName.replace(/"/g, '\\"')}" <${fromEmail}>`,
+      to,
+      subject,
+      html,
+      text: text || html.replace(/<[^>]*>/g, ''),
+    });
 
-    if (response.statusCode >= 400) {
-      throw new EmailError(
-        EmailErrorCode.SMTP_SEND_FAILED,
-        `SendGrid respondió con status ${response.statusCode}`
-      );
-    }
+    const accepted = (info.accepted as string[] || []).filter(Boolean);
+    const rejected = (info.rejected as string[] || []).filter(Boolean);
 
     return {
-      messageId:
-        response.headers['x-message-id'] ||
-        response.headers['x-message-id'.toLowerCase()] ||
-        '',
-      accepted: [to],
-      rejected: [],
+      messageId: info.messageId || '',
+      accepted,
+      rejected,
     };
   } catch (error: any) {
-    const statusCode = error?.response?.statusCode;
-    const responseErrors = error?.response?.body?.errors;
-    const detailedMessage = Array.isArray(responseErrors) && responseErrors.length > 0
-      ? responseErrors.map((err: any) => err.message).join('; ')
-      : error.message;
+    const msg = error?.message || String(error);
 
-    if (statusCode === 401 || statusCode === 403) {
+    // Nodemailer / SMTP: códigos típicos
+    if (error?.code === 'EAUTH' || msg.toLowerCase().includes('authentication') || msg.toLowerCase().includes('invalid login')) {
       throw new EmailError(
         EmailErrorCode.SMTP_AUTH_FAILED,
-        `Error de autenticación con SendGrid: ${detailedMessage}`,
+        `Error de autenticación SMTP: ${msg}`,
         error
       );
     }
 
-    if (statusCode === 429) {
-      throw new EmailError(
-        EmailErrorCode.RATE_LIMIT,
-        `Límite de envío alcanzado: ${detailedMessage}`,
-        error
-      );
-    }
-
-    if (!statusCode && (error?.code === 'ETIMEDOUT' || error?.code === 'ENOTFOUND')) {
+    if (error?.code === 'ECONNECTION' || error?.code === 'ETIMEDOUT' || error?.code === 'ENOTFOUND' || error?.code === 'ESOCKET') {
       throw new EmailError(
         EmailErrorCode.SMTP_CONNECTION_FAILED,
-        `Error de conexión SMTP: ${detailedMessage}`,
+        `Error de conexión SMTP: ${msg}`,
+        error
+      );
+    }
+
+    // Rate limit (algunos servidores cierran por demasiados envíos)
+    if (error?.code === 'EENVELOPE' && msg.toLowerCase().includes('rate')) {
+      throw new EmailError(
+        EmailErrorCode.RATE_LIMIT,
+        `Límite de envío: ${msg}`,
         error
       );
     }
@@ -184,9 +190,8 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams): P
 
     throw new EmailError(
       EmailErrorCode.SMTP_SEND_FAILED,
-      `Error al enviar email: ${detailedMessage}`,
+      `Error al enviar email: ${msg}`,
       error
     );
   }
 }
-

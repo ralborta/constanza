@@ -2,14 +2,14 @@
 
 ## ✅ Implementación Completada
 
-Se ha implementado la funcionalidad completa de envío de emails con:
+Se ha implementado la funcionalidad completa de envío de emails con **SMTP directo** (Nodemailer):
 
+- ✅ Envío por SMTP directo (Gmail, Outlook, cualquier servidor SMTP)
 - ✅ Separación de responsabilidades (`renderTemplate()` vs `sendEmail()`)
 - ✅ Template HTML profesional y responsive
 - ✅ Resolución automática de variables desde la DB
 - ✅ Manejo de errores semántico con códigos específicos
-- ✅ Validaciones de configuración SMTP
-- ✅ Soporte para Gmail y otros proveedores SMTP
+- ✅ Validaciones de configuración SMTP (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)
 
 ---
 
@@ -173,8 +173,8 @@ Notifier Service (apps/notifier)
     ↓ BullMQ Queue (Redis)
 Worker (procesa uno por uno)
     ↓ renderEmailTemplate() → resuelve variables desde DB
-    ↓ sendEmail() → envía por SMTP
-SMTP Server (Gmail/SendGrid/etc)
+    ↓ sendEmail() → Nodemailer → SMTP directo
+SMTP Server (Gmail, Outlook, etc.)
     ↓ Email enviado
 ```
 
@@ -269,13 +269,21 @@ Para llevar esto a nivel "plataforma seria", se pueden agregar:
 
 ## 🐛 Troubleshooting
 
+### Error: "ERROR_SMTP_SEND_FAILED"
+El envío es por **SMTP directo** (Nodemailer). Revisá:
+
+- **SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS** correctos para tu servidor (ej. Gmail: `smtp.gmail.com`, 587, tu email, App Password).
+- **Gmail:** `SMTP_PASS` debe ser una **App Password** de 16 caracteres (sin espacios), no tu contraseña normal; verificación en 2 pasos activada.
+- **Puerto/seguridad:** 587 sin TLS explícito, 465 con `SMTP_SECURE=true` si tu servidor lo exige.
+- **Ver el detalle:** En "Progreso de Mensajes" se muestra el mensaje completo del error. También en **Railway → notifier → Logs** ("Failed to send EMAIL notification").
+
 ### Error: "ERROR_SMTP_AUTH_FAILED"
-- Verifica que `SMTP_PASS` sea una App Password (no tu contraseña normal)
-- Asegúrate de que la autenticación de 2 factores esté habilitada
+- Verificá que `SMTP_USER` y `SMTP_PASS` sean correctos para tu servidor SMTP.
+- Gmail: usá una **App Password** (no la contraseña normal) y tené la verificación en 2 pasos activada.
 
 ### Error: "ERROR_RATE_LIMIT"
-- Gmail limita el número de emails por día
-- Considera usar un proveedor profesional para producción
+- SendGrid/Gmail limita el número de emails por día.
+- Revisá el plan de SendGrid o usa un proveedor con mayor cuota.
 
 ### Emails no llegan
 - Revisa la carpeta de spam
