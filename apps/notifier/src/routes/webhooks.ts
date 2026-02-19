@@ -2,9 +2,17 @@ import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { processMessageForCallbacks } from '../services/callbacks-from-message.js';
+import { obtenerContextoCliente } from '../services/cobranza-context.js';
+import { construirPromptDinamico } from '../services/prompt-builder.js';
+import { llamarOpenAICobranza } from '../services/openai-cobranza.js';
+import { sendWhatsAppMessage } from '../lib/builderbot.js';
+import axios from 'axios';
 // SimpleLogger está disponible globalmente desde types.d.ts
 
 const prisma = new PrismaClient();
+
+const API_GATEWAY_URL = process.env.API_GATEWAY_URL || process.env.NOTIFIER_API_GATEWAY_URL || '';
+const AGENT_API_KEY = process.env.AGENT_API_KEY || process.env.NOTIFIER_AGENT_API_KEY || '';
 
 /**
  * Correlation Engine: Asocia mensajes inbound a facturas
@@ -435,6 +443,46 @@ export async function webhookRoutes(fastify: FastifyInstance) {
             { eventId: contactEvent.id, error: err?.message },
             'Error extrayendo callbacks/promesas del mensaje (no bloqueante)'
           );
+        }
+      }
+
+      // Flujo contexto dinámico cobranza: obtener contexto → políticas → prompt → OpenAI → guardar → enviar por BuilderBot
+      const textoUtilParaIA = messageText && messageText.length >= 3 && !['[Imagen]', '[Documento]', '[Mensaje de voz]'].includes(messageText.trim());
+      if (textoUtilParaIA && API_GATEWAY_URL && AGENT_API_KEY) {
+        try {
+          const contexto = await obtenerContextoCliente(data.from);
+          const politicasRes = await axios.get<Record<string, unknown>>(`${API_GATEWAY_URL.replace(/\/$/, '')}/v1/cobranza/politicas`, {
+            headers: { 'X-API-Key': AGENT_API_KEY, 'X-Tenant-Id': customer.tenantId },
+            timeout: 10000,
+          }).catch(() => ({ data: {} }));
+          const politicas = politicasRes.data || {};
+          const prompt = construirPromptDinamico(contexto, messageText, politicas as any);
+          const { respuesta, tokens_usados, modelo } = await llamarOpenAICobranza(prompt);
+          const payloadActual = (contactEvent.payload as Record<string, unknown>) || {};
+          await prisma.contactEvent.update({
+            where: { id: contactEvent.id },
+            data: {
+              payload: {
+                ...payloadActual,
+                respuesta_agente: respuesta,
+                tokens_usados: tokens_usados,
+                modelo_ia: modelo,
+                contexto_cobranza_used: true,
+              },
+            },
+          });
+          await sendWhatsAppMessage({ number: data.from, message: respuesta });
+          fastify.log.info({ eventId: contactEvent.id, tokens_usados, modelo }, 'Cobranza IA: respuesta enviada por BuilderBot');
+        } catch (err: any) {
+          fastify.log.warn({ eventId: contactEvent.id, error: err?.message }, 'Error flujo cobranza IA (no bloqueante)');
+          try {
+            await sendWhatsAppMessage({
+              number: data.from,
+              message: 'Disculpa, tuve un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.',
+            });
+          } catch (e: any) {
+            fastify.log.warn({ error: e?.message }, 'Error enviando mensaje de fallback');
+          }
         }
       }
 

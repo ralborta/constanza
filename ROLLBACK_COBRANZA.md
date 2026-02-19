@@ -95,3 +95,10 @@ Mejor: usar **revert** (Opción 3) en lugar de `reset --force` si ya hay otros t
 | Solo querés apagar la IA en WhatsApp | Desactivar webhook en BuilderBot o variable `COBRANZA_IA_RESPONDER=false`. |
 
 **Para la presentación de mañana:** lo más seguro es **deployar solo `main`** y dejar la feature en una rama hasta que la pruebes bien.
+
+---
+
+## Variables usadas por la feature (solo si deployás la rama)
+
+- **api-gateway:** ninguna nueva (usa `AGENT_API_KEY` si ya la tenés para agent/context).
+- **notifier:** `API_GATEWAY_URL` (URL del api-gateway), `AGENT_API_KEY` (misma que api-gateway, para GET /v1/cobranza/politicas), `OPENAI_API_KEY`, `BUILDERBOT_API_KEY`, `BUILDERBOT_BOT_ID`. Si faltan `API_GATEWAY_URL` o `AGENT_API_KEY`, el notifier **no** ejecuta el flujo de respuesta con IA (solo registra el mensaje como hasta ahora).
