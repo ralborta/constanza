@@ -391,7 +391,7 @@ export default function InvoiceDetailPage() {
                   </div>
                 )}
 
-                {summaryData.summary.nextSteps?.length > 0 && (
+                {(summaryData.summary.nextSteps?.length ?? 0) > 0 && (
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
                       <Clock className="h-3.5 w-3.5 text-amber-600" />
