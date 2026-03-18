@@ -50,18 +50,15 @@ interface Invoice {
 }
 
 function getStatusBadge(estado: string) {
-  const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-    ABIERTA: { label: 'Por vencer', variant: 'secondary' },
-    VENCIDA: { label: 'Vencido', variant: 'destructive' },
-    PARCIAL: { label: 'Parcial', variant: 'outline' },
-    PAGADA: { label: 'Pagada', variant: 'default' },
-    PROGRAMADA: { label: 'Programado', variant: 'default' },
+  const map: Record<string, { label: string; className: string }> = {
+    ABIERTA:    { label: 'Por vencer', className: 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-50' },
+    VENCIDA:    { label: 'Vencido',    className: 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-50' },
+    PARCIAL:    { label: 'Parcial',    className: 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-50' },
+    PAGADA:     { label: 'Pagada',     className: 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50' },
+    PROGRAMADA: { label: 'Programado', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50' },
   };
-
-  const status = statusMap[estado] || { label: estado, variant: 'outline' };
-  return (
-    <Badge variant={status.variant}>{status.label}</Badge>
-  );
+  const s = map[estado] || { label: estado, className: '' };
+  return <Badge className={`font-medium text-xs ${s.className}`}>{s.label}</Badge>;
 }
 
 export default function InvoicesPage() {
@@ -81,29 +78,27 @@ export default function InvoicesPage() {
       <div className="p-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Facturas
-            </h1>
-            <p className="mt-1 text-sm text-gray-600">Gestiona todas tus facturas y carga datos desde Excel</p>
+            <h1 className="text-2xl font-bold text-foreground">Facturas</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Gestión y seguimiento de todas las facturas</p>
           </div>
           <UploadInvoiceButton />
         </div>
 
-        <Card className="border-0 shadow-lg bg-white">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-gray-800">Todas las Facturas</CardTitle>
+        <Card className="border border-border shadow-sm">
+          <CardHeader className="border-b border-border pb-4">
+            <div className="flex items-center justify-between mb-4">
+              <CardTitle className="text-base font-semibold text-foreground">Todas las Facturas</CardTitle>
             </div>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por cliente, número de factura..."
-                  className="pl-10"
+                  className="pl-9 h-9 text-sm"
                 />
               </div>
               <Select defaultValue="all">
-                <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px] h-9 text-sm">
                   <SelectValue placeholder="Todos los estados" />
                 </SelectTrigger>
                 <SelectContent>
@@ -116,64 +111,60 @@ export default function InvoicesPage() {
               </Select>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gradient-to-r from-purple-50 to-pink-50">
-                    <TableHead className="font-semibold text-gray-800">ID FACTURA</TableHead>
-                    <TableHead className="font-semibold text-gray-800">CLIENTE</TableHead>
-                    <TableHead className="font-semibold text-gray-800">MONTO</TableHead>
-                    <TableHead className="font-semibold text-gray-800">APLICADO</TableHead>
-                    <TableHead className="font-semibold text-gray-800">FECHA VENC.</TableHead>
-                    <TableHead className="font-semibold text-gray-800">ESTADO</TableHead>
-                    <TableHead className="font-semibold text-gray-800">ACCIONES</TableHead>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Factura</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cliente</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Monto</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aplicado</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vencimiento</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estado</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-gray-500">
-                        Cargando...
-                      </TableCell>
+                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">Cargando...</TableCell>
                     </TableRow>
                   ) : data?.invoices.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-gray-500">
-                        No hay facturas
-                      </TableCell>
+                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No hay facturas</TableCell>
                     </TableRow>
                   ) : (
                     data?.invoices.map((invoice) => (
-                      <TableRow key={invoice.id}>
-                        <TableCell className="font-medium">
+                      <TableRow key={invoice.id} className="hover:bg-muted/30">
+                        <TableCell>
                           <Link
                             href={`/invoices/${invoice.id}`}
-                            className="text-purple-600 hover:text-purple-800 hover:underline font-semibold"
+                            className="font-mono text-sm font-semibold text-primary hover:underline"
                           >
                             {invoice.numero}
                           </Link>
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{invoice.customer.razonSocial}</div>
+                            <div className="text-sm font-medium text-foreground">{invoice.customer.razonSocial}</div>
                             {invoice.customer.cuit && (
-                              <div className="text-xs text-gray-500">CUIT: {invoice.customer.cuit}</div>
+                              <div className="text-xs text-muted-foreground">CUIT: {invoice.customer.cuit}</div>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-semibold text-gray-900">
+                        <TableCell className="font-mono text-sm font-semibold text-foreground">
                           ${(invoice.monto / 100).toLocaleString('es-AR')}
                         </TableCell>
-                        <TableCell className="font-medium text-green-600">
+                        <TableCell className="font-mono text-sm font-medium text-emerald-600">
                           ${(invoice.montoAplicado / 100).toLocaleString('es-AR')}
                         </TableCell>
-                        <TableCell>{format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell className="text-sm text-foreground">{format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}</TableCell>
                         <TableCell>{getStatusBadge(invoice.estado)}</TableCell>
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>

@@ -28,16 +28,18 @@ import {
   Download,
   Plus,
   Search,
-  Eye,
-  Bell,
-  Phone,
-  Edit,
   Filter,
   ChevronLeft,
   ChevronRight,
   ArrowUp,
   ArrowDown,
   BarChart3,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  AlertCircle,
+  CheckCircle2,
+  FileCheck,
 } from 'lucide-react';
 
 interface KPISummary {
@@ -87,18 +89,52 @@ function getDaysSinceDue(date: string): number {
 
 function getStatusBadge(estado: string) {
   if (estado === 'ABIERTA' || estado === 'POR_VENCER') {
-    return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Por vencer</Badge>;
+    return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-50 font-medium">Por vencer</Badge>;
   }
   if (estado === 'VENCIDA' || estado === 'VENCIDO') {
-    return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Vencido</Badge>;
+    return <Badge className="bg-red-50 text-red-700 border border-red-200 hover:bg-red-50 font-medium">Vencido</Badge>;
   }
   if (estado === 'PROGRAMADA' || estado === 'PROGRAMADO') {
-    return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Programado</Badge>;
+    return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 font-medium">Programado</Badge>;
   }
   if (estado === 'PARCIAL') {
-    return <Badge variant="outline">Parcial</Badge>;
+    return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-50 font-medium">Parcial</Badge>;
   }
-  return <Badge variant="outline">{estado}</Badge>;
+  return <Badge variant="outline" className="font-medium">{estado}</Badge>;
+}
+
+interface KpiCardProps {
+  title: string;
+  value: string;
+  variation?: number;
+  icon: React.ReactNode;
+  accentColor: string;
+}
+
+function KpiCard({ title, value, variation, icon, accentColor }: KpiCardProps) {
+  const isPositive = variation !== undefined && variation >= 0;
+  return (
+    <Card className="border border-border shadow-sm hover:shadow-md transition-shadow">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{title}</p>
+            <p className="text-2xl font-bold text-foreground font-mono">{value}</p>
+            {variation !== undefined && (
+              <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+                {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                <span>{isPositive ? '+' : ''}{variation.toFixed(1)}% vs. mes anterior</span>
+              </div>
+            )}
+          </div>
+          <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${accentColor}`}>
+            {icon}
+          </div>
+        </div>
+        <div className={`mt-4 h-0.5 w-full rounded-full ${accentColor}`} />
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function DashboardPage() {
@@ -126,7 +162,6 @@ export default function DashboardPage() {
     },
   });
 
-  // Mock data para E-Checks (hasta que esté implementado en el backend)
   const eChecks: ECheck[] = [
     { id: 'E-78910', emisor: 'Innova Corp', monto: 250000, estado: 'PENDIENTE' },
     { id: 'E-78911', emisor: 'Global Exports', monto: 55075, estado: 'PENDIENTE' },
@@ -138,170 +173,136 @@ export default function DashboardPage() {
       <div className="p-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard de Cobranzas</h1>
-          <div className="flex gap-3">
-            <Button variant="outline" size="sm">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Dashboard de Cobranzas</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Resumen operativo en tiempo real</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="text-sm">
               <Download className="mr-2 h-4 w-4" />
-              Exportar Reporte
+              Exportar
             </Button>
-            <Button size="sm" className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg">
+            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm">
               <Plus className="mr-2 h-4 w-4" />
-              Generar Nuevo Cobro
+              Nuevo Cobro
             </Button>
           </div>
         </div>
 
         {/* KPI Cards */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/90">Monto Total Cobrado</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">
-                {kpisLoading ? '...' : `$${((kpis?.totalCollected || kpis?.cashIn30d || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              </div>
-              {kpis?.totalCollectedVariation !== undefined && (
-                <p className="text-xs mt-1 font-medium text-white/80">
-                  {kpis.totalCollectedVariation >= 0 ? '+' : ''}{kpis.totalCollectedVariation.toFixed(1)}%
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-red-500 to-rose-600 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/90">Deuda Pendiente</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">
-                {kpisLoading ? '...' : `$${((kpis?.totalPending || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              </div>
-              {kpis?.totalPendingVariation !== undefined && (
-                <p className="text-xs mt-1 font-medium text-white/80">
-                  {kpis.totalPendingVariation >= 0 ? '+' : ''}{kpis.totalPendingVariation.toFixed(1)}%
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/90">Eficiencia de Cobro</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">
-                {kpisLoading ? '...' : `${(kpis?.efficiency || kpis?.autoAppliedPct || 0).toFixed(0)}%`}
-              </div>
-              {kpis?.efficiencyVariation !== undefined && (
-                <p className="text-xs mt-1 font-medium text-white/80">
-                  {kpis.efficiencyVariation >= 0 ? '+' : ''}{kpis.efficiencyVariation.toFixed(1)}%
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-500 to-pink-600 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/90">E-Checks Pendientes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">
-                {kpisLoading ? '...' : kpis?.echeqsPending || 0}
-              </div>
-              {kpis?.echeqsVariation !== undefined && (
-                <p className="text-xs mt-1 font-medium text-white/80">
-                  {kpis.echeqsVariation >= 0 ? '+' : ''}{kpis.echeqsVariation.toFixed(1)}%
-                </p>
-              )}
-            </CardContent>
-          </Card>
+        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            title="Monto Total Cobrado"
+            value={kpisLoading ? '—' : `$${((kpis?.totalCollected || kpis?.cashIn30d || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`}
+            variation={kpis?.totalCollectedVariation}
+            icon={<DollarSign className="h-5 w-5 text-emerald-600" />}
+            accentColor="bg-emerald-100"
+          />
+          <KpiCard
+            title="Deuda Pendiente"
+            value={kpisLoading ? '—' : `$${((kpis?.totalPending || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`}
+            variation={kpis?.totalPendingVariation}
+            icon={<AlertCircle className="h-5 w-5 text-red-600" />}
+            accentColor="bg-red-100"
+          />
+          <KpiCard
+            title="Eficiencia de Cobro"
+            value={kpisLoading ? '—' : `${(kpis?.efficiency || kpis?.autoAppliedPct || 0).toFixed(0)}%`}
+            variation={kpis?.efficiencyVariation}
+            icon={<CheckCircle2 className="h-5 w-5 text-blue-600" />}
+            accentColor="bg-blue-100"
+          />
+          <KpiCard
+            title="E-Checks Pendientes"
+            value={kpisLoading ? '—' : String(kpis?.echeqsPending || 0)}
+            variation={kpis?.echeqsVariation}
+            icon={<FileCheck className="h-5 w-5 text-amber-600" />}
+            accentColor="bg-amber-100"
+          />
         </div>
 
-        {/* Métricas Operativas de Interacciones */}
+        {/* Métricas Operativas */}
         {interactionMetrics && (
-          <Card className="mb-6 border-0 shadow-lg bg-white">
-            <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-              <CardTitle className="text-white flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Métricas Operativas de Interacciones (Últimos 30 días)
-              </CardTitle>
+          <Card className="mb-6 border border-border shadow-sm">
+            <CardHeader className="border-b border-border pb-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-semibold text-foreground">Métricas Operativas de Interacciones</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">Últimos 30 días</p>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-6">
               {metricsLoading ? (
-                <p className="text-gray-500">Cargando métricas...</p>
+                <p className="text-sm text-muted-foreground">Cargando métricas...</p>
               ) : (
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                  {/* Tasa de Respuesta por Canal */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Tasa de Respuesta</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Tasa de Respuesta</h3>
                     <div className="space-y-2">
                       {Object.entries(interactionMetrics.responseRate || {}).map(([channel, data]: [string, any]) => (
-                        <div key={channel} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <span className="text-sm text-gray-700">{channel}</span>
+                        <div key={channel} className="flex items-center justify-between p-2.5 bg-muted/50 rounded-md">
+                          <span className="text-sm text-foreground">{channel}</span>
                           <div className="text-right">
-                            <span className="text-sm font-semibold text-gray-900">{data.rate}%</span>
-                            <p className="text-xs text-gray-500">{data.responded}/{data.sent}</p>
+                            <span className="text-sm font-semibold text-foreground">{data.rate}%</span>
+                            <p className="text-xs text-muted-foreground">{data.responded}/{data.sent}</p>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
-
-                  {/* Efectividad por Canal */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Efectividad de Entrega</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Efectividad de Entrega</h3>
                     <div className="space-y-2">
                       {Object.entries(interactionMetrics.effectiveness || {}).map(([channel, data]: [string, any]) => (
-                        <div key={channel} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <span className="text-sm text-gray-700">{channel}</span>
+                        <div key={channel} className="flex items-center justify-between p-2.5 bg-muted/50 rounded-md">
+                          <span className="text-sm text-foreground">{channel}</span>
                           <div className="text-right">
-                            <span className="text-sm font-semibold text-gray-900">{data.rate}%</span>
-                            <p className="text-xs text-gray-500">{data.delivered}/{data.sent}</p>
+                            <span className="text-sm font-semibold text-foreground">{data.rate}%</span>
+                            <p className="text-xs text-muted-foreground">{data.delivered}/{data.sent}</p>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
-
-                  {/* Volumen */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Volumen de Interacciones</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Volumen de Interacciones</h3>
                     <div className="space-y-2">
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs text-gray-500 mb-1">Total</p>
-                        <p className="text-lg font-bold text-gray-900">{interactionMetrics.volume?.total || 0}</p>
+                      <div className="p-2.5 bg-muted/50 rounded-md">
+                        <p className="text-xs text-muted-foreground mb-1">Total</p>
+                        <p className="text-lg font-bold text-foreground font-mono">{interactionMetrics.volume?.total || 0}</p>
                       </div>
-                      <div className="p-2 bg-blue-50 rounded">
+                      <div className="p-2.5 bg-blue-50 rounded-md border border-blue-100">
                         <p className="text-xs text-blue-600 mb-1">Enviadas (Outbound)</p>
-                        <p className="text-sm font-semibold text-blue-900">
+                        <p className="text-sm font-semibold text-blue-900 font-mono">
                           {(Object.values(interactionMetrics.volume?.outbound || {}) as number[]).reduce((a, b) => a + b, 0)}
                         </p>
                       </div>
-                      <div className="p-2 bg-green-50 rounded">
-                        <p className="text-xs text-green-600 mb-1">Recibidas (Inbound)</p>
-                        <p className="text-sm font-semibold text-green-900">
+                      <div className="p-2.5 bg-emerald-50 rounded-md border border-emerald-100">
+                        <p className="text-xs text-emerald-600 mb-1">Recibidas (Inbound)</p>
+                        <p className="text-sm font-semibold text-emerald-900 font-mono">
                           {(Object.values(interactionMetrics.volume?.inbound || {}) as number[]).reduce((a, b) => a + b, 0)}
                         </p>
                       </div>
                     </div>
                   </div>
-
-                  {/* Indicadores Clave */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Indicadores Clave</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Indicadores Clave</h3>
                     <div className="space-y-2">
-                      <div className="p-2 bg-orange-50 rounded">
-                        <p className="text-xs text-orange-600 mb-1">Conversaciones Estancadas</p>
-                        <p className="text-lg font-bold text-orange-900">{interactionMetrics.staleConversations || 0}</p>
+                      <div className="p-2.5 bg-amber-50 rounded-md border border-amber-100">
+                        <p className="text-xs text-amber-600 mb-1">Conversaciones Estancadas</p>
+                        <p className="text-lg font-bold text-amber-900 font-mono">{interactionMetrics.staleConversations || 0}</p>
                       </div>
-                      <div className="p-2 bg-purple-50 rounded">
-                        <p className="text-xs text-purple-600 mb-1">Casos en Seguimiento</p>
-                        <p className="text-lg font-bold text-purple-900">{interactionMetrics.casesInFollowUp || 0}</p>
+                      <div className="p-2.5 bg-primary/5 rounded-md border border-primary/10">
+                        <p className="text-xs text-primary mb-1">Casos en Seguimiento</p>
+                        <p className="text-lg font-bold text-primary font-mono">{interactionMetrics.casesInFollowUp || 0}</p>
                       </div>
-                      <div className="p-2 bg-indigo-50 rounded">
-                        <p className="text-xs text-indigo-600 mb-1">Tiempo Promedio Respuesta</p>
-                        <p className="text-sm font-semibold text-indigo-900">
+                      <div className="p-2.5 bg-muted/50 rounded-md">
+                        <p className="text-xs text-muted-foreground mb-1">Tiempo Promedio Respuesta</p>
+                        <p className="text-sm font-semibold text-foreground">
                           {interactionMetrics.avgResponseTimeHours ? `${interactionMetrics.avgResponseTimeHours.toFixed(1)}h` : 'N/A'}
                         </p>
                       </div>
@@ -314,23 +315,24 @@ export default function DashboardPage() {
         )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Tabla de Cobranzas Pendientes - Ocupa 2 columnas */}
+          {/* Tabla Cobranzas Pendientes */}
           <div className="lg:col-span-2">
-            <Card className="border-0 shadow-lg bg-white">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-                <CardTitle className="text-gray-800">Cobranzas Pendientes</CardTitle>
-                {/* Barra de búsqueda y filtros */}
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <Card className="border border-border shadow-sm">
+              <CardHeader className="border-b border-border pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <CardTitle className="text-base font-semibold text-foreground">Cobranzas Pendientes</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">Facturas abiertas y por vencer</p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <Input
-                      placeholder="Buscar..."
-                      className="pl-10"
-                    />
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input placeholder="Buscar..." className="pl-9 h-9 text-sm" />
                   </div>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-full sm:w-[160px]">
-                      <SelectValue placeholder="Todos los estados" />
+                    <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm">
+                      <SelectValue placeholder="Estado" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los estados</SelectItem>
@@ -340,8 +342,8 @@ export default function DashboardPage() {
                     </SelectContent>
                   </Select>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-full sm:w-[160px]">
-                      <SelectValue placeholder="Todas las fechas" />
+                    <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm">
+                      <SelectValue placeholder="Período" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas las fechas</SelectItem>
@@ -350,100 +352,71 @@ export default function DashboardPage() {
                       <SelectItem value="90d">Últimos 90 días</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" size="sm">
-                    <Filter className="mr-2 h-4 w-4" />
-                    Más filtros
+                  <Button variant="outline" size="sm" className="h-9 text-sm">
+                    <Filter className="mr-2 h-3.5 w-3.5" />
+                    Filtros
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead className="cursor-pointer hover:bg-gray-50">
-                          <div className="flex items-center gap-1">
-                            ID FACTURA
-                            <ArrowDown className="h-3 w-3 text-gray-400" />
-                          </div>
+                      <TableRow className="bg-muted/40 hover:bg-muted/40">
+                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground cursor-pointer">
+                          <div className="flex items-center gap-1">Factura <ArrowDown className="h-3 w-3" /></div>
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-gray-50">
-                          <div className="flex items-center gap-1">
-                            CLIENTE
-                            <ArrowUp className="h-3 w-3 text-gray-400" />
-                          </div>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground cursor-pointer">
+                          <div className="flex items-center gap-1">Cliente <ArrowUp className="h-3 w-3" /></div>
                         </TableHead>
-                        <TableHead>MONTO</TableHead>
-                        <TableHead>FECHA VENCIMIENTO</TableHead>
-                        <TableHead>ANTIGÜEDAD</TableHead>
-                        <TableHead>ESTADO</TableHead>
-                        <TableHead>ACCIONES</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Monto</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vencimiento</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Antigüedad</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estado</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {invoicesLoading ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-gray-500">
-                            Cargando...
-                          </TableCell>
+                          <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">Cargando...</TableCell>
                         </TableRow>
                       ) : invoices?.invoices.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-gray-500">
-                            No hay facturas pendientes
-                          </TableCell>
+                          <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No hay facturas pendientes</TableCell>
                         </TableRow>
                       ) : (
                         invoices?.invoices.map((invoice) => {
                           const daysSinceDue = getDaysSinceDue(invoice.fechaVto);
                           return (
-                            <TableRow key={invoice.id}>
-                              <TableCell className="font-medium">
-                                {invoice.numero}
-                              </TableCell>
+                            <TableRow key={invoice.id} className="hover:bg-muted/30">
+                              <TableCell className="font-mono text-sm font-medium text-foreground">{invoice.numero}</TableCell>
                               <TableCell>
                                 <div>
-                                  <div className="font-medium">{invoice.customer.razonSocial}</div>
+                                  <div className="text-sm font-medium text-foreground">{invoice.customer.razonSocial}</div>
                                   {invoice.customer.cuit && (
-                                    <div className="text-xs text-gray-500">CUIT: {invoice.customer.cuit}</div>
+                                    <div className="text-xs text-muted-foreground">CUIT: {invoice.customer.cuit}</div>
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                ${(invoice.monto / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              <TableCell className="font-mono text-sm font-semibold text-foreground">
+                                ${(invoice.monto / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                               </TableCell>
-                              <TableCell>{format(new Date(invoice.fechaVto), 'dd MMM yyyy')}</TableCell>
+                              <TableCell className="text-sm text-foreground">{format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}</TableCell>
                               <TableCell>
-                                <span className={daysSinceDue > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
-                                  {daysSinceDue > 0 ? `${daysSinceDue} días` : 'Al día'}
+                                <span className={`text-sm font-medium ${daysSinceDue > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                  {daysSinceDue > 0 ? `${daysSinceDue}d` : 'Al día'}
                                 </span>
                               </TableCell>
                               <TableCell>{getStatusBadge(invoice.estado)}</TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Button variant="ghost" size="sm" asChild>
-                                    <Link href={`/invoices/${invoice.id}`}>
-                                      Ver
-                                    </Link>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="sm" className="h-8 text-xs text-primary hover:text-primary hover:bg-primary/10" asChild>
+                                    <Link href={`/invoices/${invoice.id}`}>Ver</Link>
                                   </Button>
-                                  {invoice.estado === 'ABIERTA' && (
-                                    <Button variant="ghost" size="sm">
-                                      Recordar
-                                    </Button>
-                                  )}
-                                  {invoice.estado === 'VENCIDA' && (
-                                    <Button variant="ghost" size="sm">
-                                      Llamar
-                                    </Button>
-                                  )}
-                                  {invoice.estado === 'PROGRAMADA' && (
-                                    <Button variant="ghost" size="sm">
-                                      Editar
-                                    </Button>
-                                  )}
-                                  {invoice.estado === 'VENCIDA' && (
-                                    <Button variant="ghost" size="sm">
-                                      Notificar
+                                  {(invoice.estado === 'ABIERTA' || invoice.estado === 'VENCIDA') && (
+                                    <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground">
+                                      {invoice.estado === 'ABIERTA' ? 'Recordar' : 'Llamar'}
                                     </Button>
                                   )}
                                 </div>
@@ -455,26 +428,19 @@ export default function DashboardPage() {
                     </TableBody>
                   </Table>
                 </div>
-                {/* Paginación */}
                 {invoices && invoices.invoices.length > 0 && (
-                  <div className="mt-4 flex items-center justify-between">
-                    <p className="text-sm text-gray-500">
-                      Mostrando 1-{invoices.invoices.length} de {invoices.invoices.length} resultados
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+                    <p className="text-xs text-muted-foreground">
+                      Mostrando {invoices.invoices.length} resultados
                     </p>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" disabled>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled>
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" className="bg-gray-100">
-                        1
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        2
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        3
-                      </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90">1</Button>
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0">2</Button>
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0">3</Button>
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0">
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
@@ -484,80 +450,73 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Columna derecha: E-Checks arriba y Gráfico abajo */}
+          {/* Columna derecha */}
           <div className="space-y-6">
-            {/* Tabla de E-Checks */}
-            <Card className="border-0 shadow-lg bg-white">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
+            {/* E-Checks */}
+            <Card className="border border-border shadow-sm">
+              <CardHeader className="border-b border-border pb-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-gray-800">E-Checks Pendientes de Aprobación</CardTitle>
-                  <Link href="#" className="text-sm text-blue-600 hover:text-blue-800">
-                    Ver todos
-                  </Link>
+                  <div>
+                    <CardTitle className="text-base font-semibold text-foreground">E-Checks Pendientes</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">Pendientes de aprobación</p>
+                  </div>
+                  <Link href="#" className="text-xs text-primary hover:underline font-medium">Ver todos</Link>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ID</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Emisor</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Monto</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {eChecks.length === 0 ? (
                       <TableRow>
-                        <TableHead>ID CHEQUE</TableHead>
-                        <TableHead>EMISOR</TableHead>
-                        <TableHead className="cursor-pointer hover:bg-gray-50">
-                          <div className="flex items-center gap-1">
-                            MONTO
-                            <ArrowUp className="h-3 w-3 text-gray-400" />
-                          </div>
-                        </TableHead>
-                        <TableHead>ACCIONES</TableHead>
+                        <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">No hay e-cheques pendientes</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {eChecks.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center text-sm text-gray-500 py-4">
-                            No hay e-cheques pendientes
+                    ) : (
+                      eChecks.map((check) => (
+                        <TableRow key={check.id} className="hover:bg-muted/30">
+                          <TableCell className="font-mono text-xs font-medium text-foreground">{check.id}</TableCell>
+                          <TableCell className="text-sm text-foreground">{check.emisor}</TableCell>
+                          <TableCell className="font-mono text-xs font-semibold text-foreground">
+                            ${(check.monto / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell>
+                            <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white">
+                              Aprobar
+                            </Button>
                           </TableCell>
                         </TableRow>
-                      ) : (
-                        eChecks.map((check) => (
-                          <TableRow key={check.id}>
-                            <TableCell className="font-medium">{check.id}</TableCell>
-                            <TableCell>{check.emisor}</TableCell>
-                            <TableCell>
-                              ${(check.monto / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </TableCell>
-                            <TableCell>
-                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
-                                Aprobar
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
 
-            {/* Gráfico de Rendimiento Mensual */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Rendimiento de Cobranzas Mensuales</CardTitle>
+            {/* Gráfico de barras */}
+            <Card className="border border-border shadow-sm">
+              <CardHeader className="border-b border-border pb-4">
+                <CardTitle className="text-base font-semibold text-foreground">Rendimiento Mensual</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Cobranzas de los últimos 6 meses</p>
               </CardHeader>
-              <CardContent>
-                <div className="h-64 flex items-end justify-between gap-2">
-                  {/* Mock bars - en producción usar una librería de gráficos como recharts */}
+              <CardContent className="p-6">
+                <div className="h-48 flex items-end justify-between gap-2">
                   {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'].map((month, index) => {
-                    const heights = [45, 52, 48, 60, 55, 70]; // Valores mock
+                    const heights = [45, 52, 48, 60, 55, 70];
                     return (
-                      <div key={month} className="flex-1 flex flex-col items-center">
+                      <div key={month} className="flex-1 flex flex-col items-center gap-2">
                         <div
-                          className="w-full bg-green-400 rounded-t"
+                          className="w-full bg-primary/80 hover:bg-primary rounded-sm transition-colors cursor-default"
                           style={{ height: `${heights[index]}%` }}
+                          title={`${month}: ${heights[index]}%`}
                         />
-                        <span className="mt-2 text-xs text-gray-500">{month}</span>
+                        <span className="text-xs text-muted-foreground">{month}</span>
                       </div>
                     );
                   })}
