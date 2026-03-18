@@ -381,7 +381,7 @@ export default function InvoiceDetailPage() {
                       Puntos Clave
                     </h3>
                     <ul className="space-y-2">
-                      {summaryData.summary.keyPoints.map((point, index) => (
+                      {summaryData.summary.keyPoints?.map((point, index) => (
                         <li key={index} className="flex items-start gap-2 text-sm text-foreground">
                           <span className="text-primary font-bold mt-0.5 flex-shrink-0">•</span>
                           <span>{point}</span>
@@ -398,7 +398,7 @@ export default function InvoiceDetailPage() {
                       Próximos Pasos Sugeridos
                     </h3>
                     <ul className="space-y-2">
-                      {summaryData.summary.nextSteps.map((step, index) => (
+                      {summaryData.summary.nextSteps?.map((step, index) => (
                         <li key={index} className="flex items-start gap-2 text-sm text-foreground">
                           <span className="text-amber-600 font-bold mt-0.5 flex-shrink-0">→</span>
                           <span>{step}</span>
