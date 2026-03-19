@@ -39,7 +39,7 @@ import {
   CurrencyDollar,
   Warning,
   CheckCircle,
-  FileCheck,
+  Checks,
 } from '@phosphor-icons/react';
 
 interface KPISummary {
@@ -216,7 +216,7 @@ export default function DashboardPage() {
             title="E-Checks Pendientes"
             value={kpisLoading ? '—' : String(kpis?.echeqsPending || 0)}
             variation={kpis?.echeqsVariation}
-            icon={<FileCheck size={20} weight="duotone" className="text-amber-600" />}
+            icon={<Checks size={20} weight="duotone" className="text-amber-600" />}
             accentColor="bg-amber-100"
           />
         </div>
