@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle, Clock, XCircle, Envelope, ChatTeardrop, Phone, CurrencyDollar, Calendar, User, FileText, Sparkle, ArrowClockwise, TrendUp, ClockCounterClockwise, Robot, Warning, Bot } from '@phosphor-icons/react';
+import { ArrowLeft, CheckCircle, Clock, XCircle, Envelope, ChatTeardrop, Phone, CurrencyDollar, Calendar, User, FileText, Sparkle, ArrowClockwise, TrendUp, ClockCounterClockwise, Robot, Warning } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InvoiceChat } from '@/components/invoices/invoice-chat';
