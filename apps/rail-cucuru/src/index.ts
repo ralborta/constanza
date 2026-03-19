@@ -1,7 +1,7 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
-import { webhookRoutes } from './routes/webhooks.js';
+import { cresiumWebhookTestRoutes, webhookRoutes } from './routes/webhooks.js';
 import { healthRoutes } from './routes/health.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
@@ -70,6 +70,8 @@ server.decorate('redis', redis);
 // Routes
 await server.register(healthRoutes);
 await server.register(webhookRoutes, { prefix: '/wh/cucuru' });
+// Endpoint temporal de test para capturar el payload de Cresium
+await server.register(cresiumWebhookTestRoutes, { prefix: '/wh/cresium' });
 
 // Error handler
 server.setErrorHandler((error, request, reply) => {

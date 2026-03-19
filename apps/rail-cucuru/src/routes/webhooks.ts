@@ -209,3 +209,48 @@ export async function webhookRoutes(fastify: FastifyInstance) {
   });
 }
 
+/**
+ * Endpoint temporal de test para Cresium.
+ * Objetivo: capturar headers + body del webhook "Depósito" para definir el mapeo a nuestro modelo (pay.payments / payment_applications).
+ *
+ * Importante: redaccion de valores potencialmente sensibles en logs.
+ */
+export async function cresiumWebhookTestRoutes(fastify: FastifyInstance) {
+  const redact = (headers: Record<string, unknown>) => {
+    const redacted: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(headers)) {
+      const key = k.toLowerCase();
+      const shouldRedact =
+        key.includes('signature') ||
+        key.includes('secret') ||
+        key.includes('token') ||
+        key.includes('authorization') ||
+        key === 'x-signature' ||
+        key === 'x-webhook-signature';
+      redacted[k] = shouldRedact ? '[redacted]' : v;
+    }
+    return redacted;
+  };
+
+  fastify.post('/deposito', async (request, reply) => {
+    try {
+      const headers = request.headers as any;
+      // request.body puede venir como string/obj; lo logueamos lo que venga
+      const body = request.body as any;
+
+      fastify.log.info(
+        {
+          headers: redact(headers),
+          body,
+        },
+        'Cresium webhook test: recibido deposito (payload y headers)'
+      );
+
+      return reply.status(200).send({ status: 'ok' });
+    } catch (error: any) {
+      fastify.log.error({ error: error?.message }, 'Error manejando webhook test Cresium');
+      return reply.status(500).send({ error: 'Internal error' });
+    }
+  });
+}
+
