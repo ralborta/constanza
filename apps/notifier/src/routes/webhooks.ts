@@ -464,7 +464,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
             data: {
               tenantId: customer.tenantId,
               customerId: customer.id,
-              invoiceId: contactEvent.invoiceId,
+              invoiceId: contactEvent.invoiceId ?? invoiceId,
               channel: 'WHATSAPP',
               direction: 'OUTBOUND',
               isManual: false,
@@ -484,7 +484,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
               data: {
                 tenantId: customer.tenantId,
                 customerId: customer.id,
-                invoiceId: contactEvent.invoiceId,
+                invoiceId: contactEvent.invoiceId ?? invoiceId,
                 channel: 'WHATSAPP',
                 direction: 'OUTBOUND',
                 isManual: false,
