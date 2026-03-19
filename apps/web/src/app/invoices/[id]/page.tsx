@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle2, Clock, XCircle, Mail, MessageSquare, Phone, DollarSign, Calendar, User, FileText, Sparkles, RefreshCw, TrendingUp, History, Bot } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, XCircle, Envelope, ChatTeardrop, Phone, CurrencyDollar, Calendar, User, FileText, Sparkle, ArrowClockwise, TrendUp, ClockCounterClockwise, Robot, Warning, Bot } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InvoiceChat } from '@/components/invoices/invoice-chat';
@@ -85,7 +85,7 @@ function getTimelineIcon(type: string, channel?: string, status?: string) {
   if (type === 'PAYMENT') {
     return (
       <div className="flex items-center justify-center w-9 h-9 rounded-full bg-emerald-50 border-2 border-emerald-400 flex-shrink-0">
-        <DollarSign className="h-4 w-4 text-emerald-600" />
+        <CurrencyDollar size={16} weight="duotone" className="text-emerald-600" />
       </div>
     );
   }
@@ -93,13 +93,13 @@ function getTimelineIcon(type: string, channel?: string, status?: string) {
     if (status === 'BROKEN') {
       return (
         <div className="flex items-center justify-center w-9 h-9 rounded-full bg-red-50 border-2 border-red-400 flex-shrink-0">
-          <XCircle className="h-4 w-4 text-red-600" />
+          <XCircle size={16} weight="duotone" className="text-red-600" />
         </div>
       );
     }
     return (
       <div className="flex items-center justify-center w-9 h-9 rounded-full bg-amber-50 border-2 border-amber-400 flex-shrink-0">
-        <Clock className="h-4 w-4 text-amber-600" />
+        <Clock size={16} weight="duotone" className="text-amber-600" />
       </div>
     );
   }
@@ -107,35 +107,35 @@ function getTimelineIcon(type: string, channel?: string, status?: string) {
   if (channelUpper === 'EMAIL') {
     return (
       <div className={`flex items-center justify-center w-9 h-9 rounded-full border-2 flex-shrink-0 ${isFailed ? 'bg-red-50 border-red-400' : isOk ? 'bg-blue-50 border-blue-400' : 'bg-muted border-border'}`}>
-        <Mail className={`h-4 w-4 ${isFailed ? 'text-red-600' : isOk ? 'text-blue-600' : 'text-muted-foreground'}`} />
+        <Envelope size={16} weight="duotone" className={`${isFailed ? 'text-red-600' : isOk ? 'text-blue-600' : 'text-muted-foreground'}`} />
       </div>
     );
   }
   if (channelUpper === 'WHATSAPP') {
     return (
       <div className={`flex items-center justify-center w-9 h-9 rounded-full border-2 flex-shrink-0 ${isFailed ? 'bg-red-50 border-red-400' : isOk ? 'bg-emerald-50 border-emerald-400' : 'bg-muted border-border'}`}>
-        <MessageSquare className={`h-4 w-4 ${isFailed ? 'text-red-600' : isOk ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+        <ChatTeardrop size={16} weight="duotone" className={`${isFailed ? 'text-red-600' : isOk ? 'text-emerald-600' : 'text-muted-foreground'}`} />
       </div>
     );
   }
   if (channelUpper === 'VOICE') {
     return (
       <div className={`flex items-center justify-center w-9 h-9 rounded-full border-2 flex-shrink-0 ${isFailed ? 'bg-red-50 border-red-400' : isOk ? 'bg-violet-50 border-violet-400' : 'bg-muted border-border'}`}>
-        <Phone className={`h-4 w-4 ${isFailed ? 'text-red-600' : isOk ? 'text-violet-600' : 'text-muted-foreground'}`} />
+        <Phone size={16} weight="duotone" className={`${isFailed ? 'text-red-600' : isOk ? 'text-violet-600' : 'text-muted-foreground'}`} />
       </div>
     );
   }
   if (channelUpper === 'AI' || channelUpper === 'AGENT') {
     return (
       <div className="flex items-center justify-center w-9 h-9 rounded-full bg-primary/10 border-2 border-primary/40 flex-shrink-0">
-        <Bot className="h-4 w-4 text-primary" />
+        <Robot size={16} weight="duotone" className="text-primary" />
       </div>
     );
   }
 
   return (
     <div className="flex items-center justify-center w-9 h-9 rounded-full bg-muted border-2 border-border flex-shrink-0">
-      <FileText className="h-4 w-4 text-muted-foreground" />
+      <FileText size={16} weight="duotone" className="text-muted-foreground" />
     </div>
   );
 }
@@ -231,7 +231,7 @@ export default function InvoiceDetailPage() {
             href="/dashboard"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
           >
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            <ArrowLeft size={16} weight="regular" className="mr-1.5" />
             Volver al Dashboard
           </Link>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -245,7 +245,7 @@ export default function InvoiceDetailPage() {
               onClick={() => setHistorialOpen(true)}
               className="gap-2 text-sm"
             >
-              <History className="h-4 w-4" />
+              <ClockCounterClockwise size={16} weight="duotone" className="mr-2" />
               Historial completo
             </Button>
           </div>
@@ -256,7 +256,7 @@ export default function InvoiceDetailPage() {
           <CardHeader className="border-b border-border pb-4">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <FileText className="h-4 w-4 text-primary" />
+                <FileText size={16} weight="duotone" className="text-primary" />
               </div>
               <CardTitle className="text-base font-semibold text-foreground">Información de la Factura</CardTitle>
             </div>
@@ -266,7 +266,7 @@ export default function InvoiceDetailPage() {
               {/* Cliente */}
               <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/40 border border-border">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 flex-shrink-0">
-                  <User className="h-4 w-4 text-blue-600" />
+                  <User size={16} weight="duotone" className="text-blue-600" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Cliente</p>
@@ -280,7 +280,7 @@ export default function InvoiceDetailPage() {
               {/* Monto */}
               <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/40 border border-border">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 flex-shrink-0">
-                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                  <CurrencyDollar size={16} weight="duotone" className="text-emerald-600" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Monto Total</p>
@@ -294,7 +294,7 @@ export default function InvoiceDetailPage() {
               {/* Vencimiento */}
               <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/40 border border-border">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 flex-shrink-0">
-                  <Calendar className="h-4 w-4 text-amber-600" />
+                  <Calendar size={16} weight="duotone" className="text-amber-600" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Vencimiento</p>
@@ -305,7 +305,7 @@ export default function InvoiceDetailPage() {
               {/* Estado */}
               <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/40 border border-border">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle size={16} weight="duotone" className="text-primary" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Estado</p>
@@ -339,7 +339,7 @@ export default function InvoiceDetailPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100">
-                  <Sparkles className="h-4 w-4 text-violet-600" />
+                  <Sparkle size={16} weight="duotone" className="text-violet-600" />
                 </div>
                 <div>
                   <CardTitle className="text-base font-semibold text-foreground">Resumen Inteligente</CardTitle>
@@ -357,7 +357,7 @@ export default function InvoiceDetailPage() {
                 size="sm"
                 className="text-sm gap-2"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${isUpdatingSummary ? 'animate-spin' : ''}`} />
+                <ArrowClockwise size={14} weight="regular" className={`${isUpdatingSummary ? 'animate-spin' : ''}`} />
                 Actualizar
               </Button>
             </div>
@@ -365,7 +365,7 @@ export default function InvoiceDetailPage() {
           <CardContent className="p-6">
             {summaryLoading ? (
               <div className="text-center py-8">
-                <Sparkles className="h-8 w-8 text-violet-300 mx-auto mb-2 animate-pulse" />
+              <Sparkle size={32} weight="duotone" className="text-violet-300 mx-auto mb-2 animate-pulse" />
                 <p className="text-sm text-muted-foreground">Generando resumen...</p>
               </div>
             ) : summaryData?.summary ? (
@@ -377,7 +377,7 @@ export default function InvoiceDetailPage() {
                 {summaryData.summary.keyPoints?.length > 0 && (
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
-                      <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                      <TrendUp size={14} weight="duotone" className="text-primary" />
                       Puntos Clave
                     </h3>
                     <ul className="space-y-2">
@@ -394,7 +394,7 @@ export default function InvoiceDetailPage() {
                 {(summaryData.summary.nextSteps?.length ?? 0) > 0 && (
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
-                      <Clock className="h-3.5 w-3.5 text-amber-600" />
+                      <Clock size={14} weight="duotone" className="text-amber-600" />
                       Próximos Pasos Sugeridos
                     </h3>
                     <ul className="space-y-2">
@@ -424,7 +424,7 @@ export default function InvoiceDetailPage() {
               </div>
             ) : summaryError ? (
               <div className="text-center py-8">
-                <Sparkles className="h-8 w-8 text-amber-300 mx-auto mb-2" />
+              <Sparkle size={32} weight="duotone" className="text-amber-300 mx-auto mb-2" />
                 <p className="text-sm font-medium text-amber-700">Error al generar resumen</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {(summaryError as any)?.response?.data?.message || (summaryError as any)?.message || 'Error desconocido'}
@@ -432,7 +432,7 @@ export default function InvoiceDetailPage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <Sparkles className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+              <Sparkle size={32} weight="duotone" className="text-muted-foreground/30 mx-auto mb-2" />
                 <p className="text-sm font-medium text-muted-foreground">No hay resumen disponible</p>
                 <p className="text-xs text-muted-foreground/70 mt-1">Haz clic en &quot;Actualizar&quot; para generar uno</p>
               </div>
@@ -447,7 +447,7 @@ export default function InvoiceDetailPage() {
             <CardHeader className="border-b border-border pb-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                  <Clock className="h-4 w-4 text-primary" />
+                  <Clock size={16} weight="duotone" className="text-primary" />
                 </div>
                 <CardTitle className="text-base font-semibold text-foreground">Timeline de Eventos</CardTitle>
               </div>
@@ -455,7 +455,7 @@ export default function InvoiceDetailPage() {
             <CardContent className="p-6 max-h-[600px] overflow-y-auto">
               {invoice.timeline.length === 0 ? (
                 <div className="text-center py-12">
-                  <Clock className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <Clock size={40} weight="duotone" className="text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-sm font-medium text-muted-foreground">No hay eventos en el timeline</p>
                   <p className="text-xs text-muted-foreground/70 mt-1">Los eventos aparecerán cuando se envíen mensajes</p>
                 </div>
@@ -511,7 +511,7 @@ export default function InvoiceDetailPage() {
 
                           {item.amount && (
                             <div className="mt-3 flex items-center gap-1.5">
-                              <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                              <CurrencyDollar size={14} weight="duotone" className="text-emerald-600" />
                               <p className="text-sm font-semibold text-foreground font-mono">
                                 ${(item.amount / 100).toLocaleString('es-AR')}
                               </p>

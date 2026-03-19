@@ -25,22 +25,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Download,
+  DownloadSimple,
   Plus,
-  Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
+  MagnifyingGlass,
+  Funnel,
+  CaretLeft,
+  CaretRight,
   ArrowUp,
   ArrowDown,
-  BarChart3,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  AlertCircle,
-  CheckCircle2,
+  ChartBar,
+  TrendUp,
+  TrendDown,
+  CurrencyDollar,
+  Warning,
+  CheckCircle,
   FileCheck,
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 
 interface KPISummary {
   dso: number;
@@ -122,7 +122,7 @@ function KpiCard({ title, value, variation, icon, accentColor }: KpiCardProps) {
             <p className="text-2xl font-bold text-foreground font-mono">{value}</p>
             {variation !== undefined && (
               <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-                {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {isPositive ? <TrendUp size={12} weight="bold" /> : <TrendDown size={12} weight="bold" />}
                 <span>{isPositive ? '+' : ''}{variation.toFixed(1)}% vs. mes anterior</span>
               </div>
             )}
@@ -179,11 +179,11 @@ export default function DashboardPage() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="text-sm">
-              <Download className="mr-2 h-4 w-4" />
+              <DownloadSimple size={16} weight="regular" className="mr-2" />
               Exportar
             </Button>
             <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus size={16} weight="bold" className="mr-2" />
               Nuevo Cobro
             </Button>
           </div>
@@ -195,28 +195,28 @@ export default function DashboardPage() {
             title="Monto Total Cobrado"
             value={kpisLoading ? '—' : `$${((kpis?.totalCollected || kpis?.cashIn30d || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`}
             variation={kpis?.totalCollectedVariation}
-            icon={<DollarSign className="h-5 w-5 text-emerald-600" />}
+            icon={<CurrencyDollar size={20} weight="duotone" className="text-emerald-600" />}
             accentColor="bg-emerald-100"
           />
           <KpiCard
             title="Deuda Pendiente"
             value={kpisLoading ? '—' : `$${((kpis?.totalPending || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`}
             variation={kpis?.totalPendingVariation}
-            icon={<AlertCircle className="h-5 w-5 text-red-600" />}
+            icon={<Warning size={20} weight="duotone" className="text-red-600" />}
             accentColor="bg-red-100"
           />
           <KpiCard
             title="Eficiencia de Cobro"
             value={kpisLoading ? '—' : `${(kpis?.efficiency || kpis?.autoAppliedPct || 0).toFixed(0)}%`}
             variation={kpis?.efficiencyVariation}
-            icon={<CheckCircle2 className="h-5 w-5 text-blue-600" />}
+            icon={<CheckCircle size={20} weight="duotone" className="text-blue-600" />}
             accentColor="bg-blue-100"
           />
           <KpiCard
             title="E-Checks Pendientes"
             value={kpisLoading ? '—' : String(kpis?.echeqsPending || 0)}
             variation={kpis?.echeqsVariation}
-            icon={<FileCheck className="h-5 w-5 text-amber-600" />}
+            icon={<FileCheck size={20} weight="duotone" className="text-amber-600" />}
             accentColor="bg-amber-100"
           />
         </div>
@@ -227,7 +227,7 @@ export default function DashboardPage() {
             <CardHeader className="border-b border-border pb-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                  <BarChart3 className="h-4 w-4 text-primary" />
+                  <ChartBar size={16} weight="duotone" className="text-primary" />
                 </div>
                 <div>
                   <CardTitle className="text-base font-semibold text-foreground">Métricas Operativas de Interacciones</CardTitle>
@@ -327,7 +327,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <MagnifyingGlass size={16} weight="regular" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input placeholder="Buscar..." className="pl-9 h-9 text-sm" />
                   </div>
                   <Select defaultValue="all">
@@ -353,7 +353,7 @@ export default function DashboardPage() {
                     </SelectContent>
                   </Select>
                   <Button variant="outline" size="sm" className="h-9 text-sm">
-                    <Filter className="mr-2 h-3.5 w-3.5" />
+                    <Funnel size={14} weight="regular" className="mr-2" />
                     Filtros
                   </Button>
                 </div>
@@ -364,10 +364,10 @@ export default function DashboardPage() {
                     <TableHeader>
                       <TableRow className="bg-muted/40 hover:bg-muted/40">
                         <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground cursor-pointer">
-                          <div className="flex items-center gap-1">Factura <ArrowDown className="h-3 w-3" /></div>
+                          <div className="flex items-center gap-1">Factura <ArrowDown size={11} /></div>
                         </TableHead>
                         <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground cursor-pointer">
-                          <div className="flex items-center gap-1">Cliente <ArrowUp className="h-3 w-3" /></div>
+                          <div className="flex items-center gap-1">Cliente <ArrowUp size={11} /></div>
                         </TableHead>
                         <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Monto</TableHead>
                         <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vencimiento</TableHead>
@@ -435,13 +435,13 @@ export default function DashboardPage() {
                     </p>
                     <div className="flex items-center gap-1">
                       <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled>
-                        <ChevronLeft className="h-4 w-4" />
+                        <CaretLeft size={14} />
                       </Button>
                       <Button variant="outline" size="sm" className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90">1</Button>
                       <Button variant="outline" size="sm" className="h-8 w-8 p-0">2</Button>
                       <Button variant="outline" size="sm" className="h-8 w-8 p-0">3</Button>
                       <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                        <ChevronRight className="h-4 w-4" />
+                        <CaretRight size={14} />
                       </Button>
                     </div>
                   </div>

@@ -5,7 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Bot, User, Send, Loader2 } from 'lucide-react';
+import { Robot, User, PaperPlaneTilt, CircleNotch } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
 interface ChatMessage {
@@ -99,7 +99,7 @@ export function InvoiceChat({ invoiceId }: InvoiceChatProps) {
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-          <Bot className="h-4 w-4 text-primary-foreground" />
+          <Robot size={16} weight="duotone" className="text-primary-foreground" />
         </div>
         <div>
           <p className="text-sm font-semibold text-foreground leading-none">Constanza IA</p>
@@ -123,7 +123,7 @@ export function InvoiceChat({ invoiceId }: InvoiceChatProps) {
           >
             {message.role === 'assistant' && (
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <Bot className="h-4 w-4 text-primary-foreground" />
+                <Robot size={16} weight="duotone" className="text-primary-foreground" />
               </div>
             )}
             <div
@@ -144,7 +144,7 @@ export function InvoiceChat({ invoiceId }: InvoiceChatProps) {
             </div>
             {message.role === 'user' && (
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center">
-                <User className="h-4 w-4 text-muted-foreground" />
+                <User size={16} weight="duotone" className="text-muted-foreground" />
               </div>
             )}
           </div>
@@ -153,11 +153,11 @@ export function InvoiceChat({ invoiceId }: InvoiceChatProps) {
         {isThinking && (
           <div className="flex gap-3 justify-start">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-              <Bot className="h-4 w-4 text-primary-foreground" />
+              <Robot size={16} weight="duotone" className="text-primary-foreground" />
             </div>
             <div className="bg-muted/60 rounded-xl rounded-tl-sm px-4 py-3 border border-border">
               <div className="flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              <CircleNotch size={14} weight="regular" className="animate-spin text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Analizando...</span>
               </div>
             </div>
@@ -187,9 +187,9 @@ export function InvoiceChat({ invoiceId }: InvoiceChatProps) {
             size="icon"
           >
             {isThinking || chatMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <CircleNotch size={16} weight="regular" className="animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <PaperPlaneTilt size={16} weight="duotone" />
             )}
           </Button>
         </div>

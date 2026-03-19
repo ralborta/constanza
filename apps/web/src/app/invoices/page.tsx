@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Eye, History, MoreVertical } from 'lucide-react';
+import { MagnifyingGlass, Eye, ClockCounterClockwise, DotsThreeVertical } from '@phosphor-icons/react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -91,7 +91,7 @@ export default function InvoicesPage() {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <MagnifyingGlass size={16} weight="regular" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por cliente, número de factura..."
                   className="pl-9 h-9 text-sm"
@@ -165,13 +165,13 @@ export default function InvoicesPage() {
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <MoreVertical className="h-4 w-4" />
+                                <DotsThreeVertical size={16} weight="bold" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem asChild>
                                 <Link href={`/invoices/${invoice.id}`}>
-                                  <Eye className="mr-2 h-4 w-4" />
+                                  <Eye size={15} weight="duotone" className="mr-2" />
                                   Ver Detalle
                                 </Link>
                               </DropdownMenuItem>
@@ -181,7 +181,7 @@ export default function InvoicesPage() {
                                   setHistorialOpen(true);
                                 }}
                               >
-                                <History className="mr-2 h-4 w-4" />
+                                <ClockCounterClockwise size={15} weight="duotone" className="mr-2" />
                                 Ver historial
                               </DropdownMenuItem>
                             </DropdownMenuContent>

@@ -5,27 +5,27 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard,
+  SquaresFour,
   FileText,
   CreditCard,
   Bell,
-  LogOut,
+  SignOut,
   User,
   Users,
-  Send,
+  PaperPlaneTilt,
   Phone,
-  Upload,
+  UploadSimple,
   Play,
   List,
-  ChevronDown,
-  ChevronRight,
+  CaretDown,
+  CaretRight,
   Wallet,
-  ArrowLeftRight,
+  ArrowsLeftRight,
   CheckCircle,
-  BarChart3,
-  CalendarClock,
-  Building2,
-} from 'lucide-react';
+  ChartBar,
+  Timer,
+  Buildings,
+} from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -35,28 +35,28 @@ import {
 } from '@/components/ui/collapsible';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Dashboard', href: '/dashboard', icon: SquaresFour },
   { name: 'Facturas', href: '/invoices', icon: FileText },
   { name: 'Clientes', href: '/customers', icon: Users },
   { name: 'Cheques', href: '#', icon: CreditCard },
   { name: 'Eventos', href: '#', icon: Bell },
-  { name: 'Jobs', href: '/jobs', icon: BarChart3 },
+  { name: 'Jobs', href: '/jobs', icon: ChartBar },
 ];
 
 const notifySubmenu = [
-  { name: 'Enviar Mensaje', href: '/notify', icon: Send },
-  { name: 'Progreso de Mensajes', href: '/notify/batches', icon: BarChart3 },
+  { name: 'Enviar Mensaje', href: '/notify', icon: PaperPlaneTilt },
+  { name: 'Progreso de Mensajes', href: '/notify/batches', icon: ChartBar },
 ];
 
 const callsSubmenu = [
-  { name: 'Cargar Batch', href: '/calls/upload', icon: Upload },
+  { name: 'Cargar Batch', href: '/calls/upload', icon: UploadSimple },
   { name: 'Ejecutar Batches', href: '/calls/batches', icon: Play },
   { name: 'Listado de Llamadas', href: '/calls', icon: List },
-  { name: 'Cronograma de callbacks', href: '/calls/cronograma', icon: CalendarClock },
+  { name: 'Cronograma de callbacks', href: '/calls/cronograma', icon: Timer },
 ];
 
 const paymentsSubmenu = [
-  { name: 'Transferencias Bancarias', href: '/payments/transfers', icon: ArrowLeftRight },
+  { name: 'Transferencias Bancarias', href: '/payments/transfers', icon: ArrowsLeftRight },
   { name: 'Conciliación de Pagos', href: '/payments/reconciliation', icon: CheckCircle },
 ];
 
@@ -71,7 +71,11 @@ function NavItem({ href, icon: Icon, name, active }: { href: string; icon: any; 
           : 'text-sidebar-fg/70 hover:bg-white/10 hover:text-sidebar-fg'
       )}
     >
-      <Icon className="h-4 w-4 flex-shrink-0" />
+      <Icon
+        size={18}
+        weight={active ? 'duotone' : 'regular'}
+        className="flex-shrink-0"
+      />
       {name}
     </Link>
   );
@@ -88,7 +92,7 @@ function SubNavItem({ href, icon: Icon, name, active }: { href: string; icon: an
           : 'text-sidebar-fg/60 hover:bg-white/10 hover:text-sidebar-fg'
       )}
     >
-      <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+      <Icon size={15} weight={active ? 'duotone' : 'regular'} className="flex-shrink-0" />
       {name}
     </Link>
   );
@@ -122,7 +126,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex h-14 items-center gap-3 px-4 border-b border-sidebar-border">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-active">
-          <Building2 className="h-4 w-4 text-white" />
+          <Buildings size={18} weight="duotone" className="text-white" />
         </div>
         <div>
           <p className="text-sm font-bold text-sidebar-fg leading-none">Constanza</p>
@@ -133,34 +137,28 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         <SectionLabel>Operaciones</SectionLabel>
-
         {navigation.map((item) => (
           <NavItem
             key={item.name}
             href={item.href}
             icon={item.icon}
             name={item.name}
-            active={pathname === item.href || (item.href !== '#' && pathname?.startsWith(item.href + '/') || false)}
+            active={pathname === item.href || (item.href !== '#' && (pathname?.startsWith(item.href + '/') || false))}
           />
         ))}
 
         <SectionLabel>Comunicaciones</SectionLabel>
 
-        {/* Enviar Mensajes */}
         <Collapsible open={notifyOpen} onOpenChange={setNotifyOpen}>
-          <CollapsibleTrigger
-            className={cn(
-              'w-full flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150',
-              isNotifyActive
-                ? 'bg-sidebar-active text-white'
-                : 'text-sidebar-fg/70 hover:bg-white/10 hover:text-sidebar-fg'
-            )}
-          >
+          <CollapsibleTrigger className={cn(
+            'w-full flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150',
+            isNotifyActive ? 'bg-sidebar-active text-white' : 'text-sidebar-fg/70 hover:bg-white/10 hover:text-sidebar-fg'
+          )}>
             <div className="flex items-center gap-3">
-              <Send className="h-4 w-4 flex-shrink-0" />
+              <PaperPlaneTilt size={18} weight={isNotifyActive ? 'duotone' : 'regular'} className="flex-shrink-0" />
               <span>Enviar Mensajes</span>
             </div>
-            {notifyOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {notifyOpen ? <CaretDown size={13} /> : <CaretRight size={13} />}
           </CollapsibleTrigger>
           <CollapsibleContent className="pl-3 mt-0.5 space-y-0.5">
             {notifySubmenu.map((item) => (
@@ -169,21 +167,16 @@ export function Sidebar() {
           </CollapsibleContent>
         </Collapsible>
 
-        {/* Llamadas */}
         <Collapsible open={callsOpen} onOpenChange={setCallsOpen}>
-          <CollapsibleTrigger
-            className={cn(
-              'w-full flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150',
-              isCallsActive
-                ? 'bg-sidebar-active text-white'
-                : 'text-sidebar-fg/70 hover:bg-white/10 hover:text-sidebar-fg'
-            )}
-          >
+          <CollapsibleTrigger className={cn(
+            'w-full flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150',
+            isCallsActive ? 'bg-sidebar-active text-white' : 'text-sidebar-fg/70 hover:bg-white/10 hover:text-sidebar-fg'
+          )}>
             <div className="flex items-center gap-3">
-              <Phone className="h-4 w-4 flex-shrink-0" />
+              <Phone size={18} weight={isCallsActive ? 'duotone' : 'regular'} className="flex-shrink-0" />
               <span>Llamadas</span>
             </div>
-            {callsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {callsOpen ? <CaretDown size={13} /> : <CaretRight size={13} />}
           </CollapsibleTrigger>
           <CollapsibleContent className="pl-3 mt-0.5 space-y-0.5">
             {callsSubmenu.map((item) => (
@@ -194,21 +187,16 @@ export function Sidebar() {
 
         <SectionLabel>Finanzas</SectionLabel>
 
-        {/* Pagos */}
         <Collapsible open={paymentsOpen} onOpenChange={setPaymentsOpen}>
-          <CollapsibleTrigger
-            className={cn(
-              'w-full flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150',
-              isPaymentsActive
-                ? 'bg-sidebar-active text-white'
-                : 'text-sidebar-fg/70 hover:bg-white/10 hover:text-sidebar-fg'
-            )}
-          >
+          <CollapsibleTrigger className={cn(
+            'w-full flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150',
+            isPaymentsActive ? 'bg-sidebar-active text-white' : 'text-sidebar-fg/70 hover:bg-white/10 hover:text-sidebar-fg'
+          )}>
             <div className="flex items-center gap-3">
-              <Wallet className="h-4 w-4 flex-shrink-0" />
+              <Wallet size={18} weight={isPaymentsActive ? 'duotone' : 'regular'} className="flex-shrink-0" />
               <span>Pagos</span>
             </div>
-            {paymentsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {paymentsOpen ? <CaretDown size={13} /> : <CaretRight size={13} />}
           </CollapsibleTrigger>
           <CollapsibleContent className="pl-3 mt-0.5 space-y-0.5">
             {paymentsSubmenu.map((item) => (
@@ -218,12 +206,12 @@ export function Sidebar() {
         </Collapsible>
       </nav>
 
-      {/* User profile */}
+      {/* User */}
       <div className="border-t border-sidebar-border p-3">
         <div className="flex items-center gap-3 rounded-md px-2 py-2">
           <Avatar className="h-8 w-8 flex-shrink-0">
             <AvatarFallback className="bg-sidebar-active text-white text-xs font-semibold">
-              <User className="h-4 w-4" />
+              <User size={16} weight="duotone" />
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
@@ -235,7 +223,7 @@ export function Sidebar() {
             className="flex-shrink-0 p-1.5 rounded-md text-sidebar-fg/40 hover:text-sidebar-fg hover:bg-white/10 transition-colors"
             title="Cerrar sesión"
           >
-            <LogOut className="h-4 w-4" />
+            <SignOut size={16} weight="regular" />
           </button>
         </div>
       </div>
