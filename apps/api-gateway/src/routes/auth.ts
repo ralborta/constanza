@@ -18,87 +18,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/login', async (request, reply) => {
     const body = loginSchema.parse(request.body);
 
-    // 🔥 TEMPORAL: Usuario fake para desarrollo sin DB
-    // TODO: Remover cuando la DB esté lista
-    if (body.email === 'admin@constanza.com' && body.password === 'admin123') {
-      // Intentar obtener un tenant y usuario real de la DB primero
-      let tenantId: string;
-      let userId: string;
-      
-      try {
-        const tenant = await prisma.tenant.findFirst({
-          orderBy: { createdAt: 'asc' },
-        });
-        
-        if (tenant) {
-          tenantId = tenant.id;
-          fastify.log.info({ tenantId }, 'Using real tenant from DB for fake user');
-          
-          // Intentar obtener un usuario admin real de la DB
-          const adminUser = await prisma.user.findFirst({
-            where: {
-              tenantId: tenant.id,
-              perfil: 'ADM',
-              activo: true,
-            },
-            orderBy: { createdAt: 'asc' },
-          });
-          
-          if (adminUser) {
-            userId = adminUser.id;
-            fastify.log.info({ userId }, 'Using real admin user from DB');
-          } else {
-            // Si no hay usuario admin, usar el primer usuario disponible
-            const anyUser = await prisma.user.findFirst({
-              where: {
-                tenantId: tenant.id,
-                activo: true,
-              },
-              orderBy: { createdAt: 'asc' },
-            });
-            
-            if (anyUser) {
-              userId = anyUser.id;
-              fastify.log.warn({ userId }, 'Using first available user from DB (not admin)');
-            } else {
-              // Si no hay usuarios, usar UUID temporal (fallará al crear batchJob, pero al menos el login funciona)
-              userId = '00000000-0000-0000-0000-000000000002';
-              fastify.log.warn('No users found in DB, using temporary UUID (batchJob creation will fail)');
-            }
-          }
-        } else {
-          fastify.log.error('No hay ningún tenant en la DB: ejecutá seed o migración 007_default_tenant_id.sql');
-          return reply.status(503).send({
-            error:
-              'Servidor sin datos de empresa (tenant). Ejecutá el seed de Prisma o la migración SQL 007 en la base.',
-          });
-        }
-      } catch (error) {
-        fastify.log.error({ error }, 'Error leyendo tenants para login de desarrollo');
-        return reply.status(503).send({
-          error: 'No se pudo verificar la base de datos. Revisá DATABASE_URL y migraciones.',
-        });
-      }
-      
-      const token = fastify.jwt.sign({
-        tenant_id: tenantId,
-        user_id: userId,
-        perfil: 'ADM' as const,
-      });
-
-      return {
-        token,
-        user: {
-          id: userId,
-          nombre: 'Admin',
-          apellido: 'Sistema',
-          email: 'admin@constanza.com',
-          perfil: 'ADM',
-        },
-      };
-    }
-
-    // Intenta login real con DB (puede fallar si DB no está disponible)
+    // 1) Siempre intentar login real primero (evita 503 por el bypass "fake" cuando la DB sí tiene usuario admin).
     try {
       const user = await prisma.user.findFirst({
         where: {
@@ -110,40 +30,90 @@ export async function authRoutes(fastify: FastifyInstance) {
         },
       });
 
-      if (!user) {
-        return reply.status(401).send({ error: 'Credenciales inválidas' });
-      }
+      if (user) {
+        if (!user.passwordHash) {
+          return reply.status(401).send({ error: 'Usuario sin contraseña configurada' });
+        }
+        const isValid = await bcrypt.compare(body.password, user.passwordHash);
+        if (!isValid) {
+          return reply.status(401).send({ error: 'Credenciales inválidas' });
+        }
 
-      if (!user.passwordHash) {
-        return reply.status(401).send({ error: 'Usuario sin contraseña configurada' });
-      }
+        const token = fastify.jwt.sign({
+          tenant_id: user.tenantId,
+          user_id: user.id,
+          perfil: user.perfil as 'ADM' | 'OPERADOR_1' | 'OPERADOR_2',
+        });
 
-      const isValid = await bcrypt.compare(body.password, user.passwordHash);
-      if (!isValid) {
-        return reply.status(401).send({ error: 'Credenciales inválidas' });
+        return {
+          token,
+          user: {
+            id: user.id,
+            nombre: user.nombre,
+            apellido: user.apellido,
+            email: user.email,
+            perfil: user.perfil,
+          },
+        };
       }
-
-      const token = fastify.jwt.sign({
-        tenant_id: user.tenantId,
-        user_id: user.id,
-        perfil: user.perfil as 'ADM' | 'OPERADOR_1' | 'OPERADOR_2',
+    } catch (error: unknown) {
+      fastify.log.error({ error }, 'login: error consultando usuario');
+      return reply.status(503).send({
+        error: 'Base de datos no disponible. Revisá DATABASE_URL en Railway y que Postgres esté activo.',
       });
-
-      return {
-        token,
-        user: {
-          id: user.id,
-          nombre: user.nombre,
-          apellido: user.apellido,
-          email: user.email,
-          perfil: user.perfil,
-        },
-      };
-    } catch (error: any) {
-      // Si falla la DB, devuelve error pero permite el usuario fake
-      fastify.log.warn({ error: error.message }, 'Error consultando DB, usando usuario fake si aplica');
-      return reply.status(401).send({ error: 'Credenciales inválidas' });
     }
+
+    // 2) Solo desarrollo: admin demo sin fila en users (o entorno vacío tras migraciones)
+    if (body.email === 'admin@constanza.com' && body.password === 'admin123') {
+      try {
+        const tenant = await prisma.tenant.findFirst({
+          orderBy: { createdAt: 'asc' },
+        });
+
+        if (!tenant) {
+          return reply.status(503).send({
+            error:
+              'No hay tenant en la base. Ejecutá la migración 007 o `pnpm seed` en infra/prisma.',
+          });
+        }
+
+        const adminUser = await prisma.user.findFirst({
+          where: { tenantId: tenant.id, perfil: 'ADM', activo: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        const anyUser = await prisma.user.findFirst({
+          where: { tenantId: tenant.id, activo: true },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        const userId =
+          adminUser?.id ?? anyUser?.id ?? '00000000-0000-0000-0000-000000000002';
+
+        const token = fastify.jwt.sign({
+          tenant_id: tenant.id,
+          user_id: userId,
+          perfil: 'ADM' as const,
+        });
+
+        return {
+          token,
+          user: {
+            id: userId,
+            nombre: adminUser?.nombre ?? 'Admin',
+            apellido: adminUser?.apellido ?? 'Sistema',
+            email: 'admin@constanza.com',
+            perfil: 'ADM',
+          },
+        };
+      } catch (error: unknown) {
+        fastify.log.error({ error }, 'login dev bypass failed');
+        return reply.status(503).send({
+          error: 'No se pudo completar el login de desarrollo. Revisá la conexión a la base.',
+        });
+      }
+    }
+
+    return reply.status(401).send({ error: 'Credenciales inválidas' });
   });
 
   // Login clientes
