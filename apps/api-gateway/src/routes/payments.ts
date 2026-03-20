@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { withTenantRls } from '../lib/tenant-rls.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 import {
   buildCresiumConciliationCandidates,
@@ -59,63 +60,64 @@ export async function paymentRoutes(fastify: FastifyInstance) {
         }
       }
 
-      const payments = await prisma.payment.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take,
-        skip,
-        include: {
-          applications: {
-            include: {
-              invoice: {
-                include: {
-                  customer: {
-                    select: {
-                      razonSocial: true,
-                      codigoUnico: true,
+      return withTenantRls(user, async (tx) => {
+        const payments = await tx.payment.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          take,
+          skip,
+          include: {
+            applications: {
+              include: {
+                invoice: {
+                  include: {
+                    customer: {
+                      select: {
+                        razonSocial: true,
+                        codigoUnico: true,
+                      },
                     },
                   },
                 },
               },
             },
           },
-        },
-      });
+        });
 
-      const total = await prisma.payment.count({ where });
+        const total = await tx.payment.count({ where });
 
-      // Calcular totales
-      const totalAmount = payments.reduce((sum, payment) => sum + transferTotalCents(payment), 0);
+        const totalAmount = payments.reduce((sum, payment) => sum + transferTotalCents(payment), 0);
 
-      return {
-        transfers: payments.map((payment) => ({
-          id: payment.id,
-          sourceSystem: payment.sourceSystem,
-          status: payment.status,
-          externalRef: payment.externalRef,
-          createdAt: payment.createdAt,
-          settledAt: payment.settledAt,
-          totalAmount: transferTotalCents(payment),
-          applications: payment.applications.map((app) => ({
-            id: app.id,
-            invoice: {
-              id: app.invoice.id,
-              numero: app.invoice.numero,
-              customer: {
-                razonSocial: app.invoice.customer.razonSocial,
-                codigoUnico: app.invoice.customer.codigoUnico,
+        return {
+          transfers: payments.map((payment) => ({
+            id: payment.id,
+            sourceSystem: payment.sourceSystem,
+            status: payment.status,
+            externalRef: payment.externalRef,
+            createdAt: payment.createdAt,
+            settledAt: payment.settledAt,
+            totalAmount: transferTotalCents(payment),
+            applications: payment.applications.map((app) => ({
+              id: app.id,
+              invoice: {
+                id: app.invoice.id,
+                numero: app.invoice.numero,
+                customer: {
+                  razonSocial: app.invoice.customer.razonSocial,
+                  codigoUnico: app.invoice.customer.codigoUnico,
+                },
               },
-            },
-            amount: app.amount,
-            isAuthoritative: app.isAuthoritative,
-            appliedAt: app.appliedAt,
+              amount: app.amount,
+              isAuthoritative: app.isAuthoritative,
+              appliedAt: app.appliedAt,
+            })),
           })),
-        })),
-        total,
-        totalAmount,
-        limit: take,
-        offset: skip,
-      };
+          total,
+          totalAmount,
+          limit: take,
+          offset: skip,
+        };
+      });
     }
   );
 

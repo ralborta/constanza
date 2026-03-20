@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { withTenantRls } from '../lib/tenant-rls.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 import * as XLSX from 'xlsx';
 
@@ -99,32 +100,34 @@ export async function customerRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const user = request.user!;
 
-      const customers = await prisma.customer.findMany({
-        where: {
-          tenantId: user.tenant_id,
-        },
-        include: {
-          customerCuits: true,
-        },
-        orderBy: {
-          razonSocial: 'asc',
-        },
-      });
+      return withTenantRls(user, async (tx) => {
+        const customers = await tx.customer.findMany({
+          where: {
+            tenantId: user.tenant_id,
+          },
+          include: {
+            customerCuits: true,
+          },
+          orderBy: {
+            razonSocial: 'asc',
+          },
+        });
 
-      return {
-        customers: customers.map((c) => ({
-          id: c.id,
-          codigoUnico: c.codigoUnico,
-          codigoVenta: c.codigoVenta,
-          externalRef: c.externalRef,
-          razonSocial: c.razonSocial,
-          email: c.email,
-          telefono: c.telefono,
-          activo: c.activo,
-          accesoHabilitado: c.accesoHabilitado,
-          cuits: c.customerCuits,
-        })),
-      };
+        return {
+          customers: customers.map((c) => ({
+            id: c.id,
+            codigoUnico: c.codigoUnico,
+            codigoVenta: c.codigoVenta,
+            externalRef: c.externalRef,
+            razonSocial: c.razonSocial,
+            email: c.email,
+            telefono: c.telefono,
+            activo: c.activo,
+            accesoHabilitado: c.accesoHabilitado,
+            cuits: c.customerCuits,
+          })),
+        };
+      });
     }
   );
 
@@ -139,66 +142,68 @@ export async function customerRoutes(fastify: FastifyInstance) {
       const body = createCustomerSchema.parse(request.body);
       const codigoCliente = (body.codigoUnico ?? body.cvu)!.trim();
 
-      if (body.externalRef?.trim()) {
-        const clash = await prisma.customer.findFirst({
+      return withTenantRls(user, async (tx) => {
+        if (body.externalRef?.trim()) {
+          const clash = await tx.customer.findFirst({
+            where: {
+              tenantId: user.tenant_id,
+              externalRef: body.externalRef.trim(),
+            },
+          });
+          if (clash) {
+            return reply.status(409).send({ error: 'Ya existe un cliente con ese externalRef (ERP)' });
+          }
+        }
+
+        const existing = await tx.customer.findFirst({
           where: {
             tenantId: user.tenant_id,
-            externalRef: body.externalRef.trim(),
+            OR: [{ codigoUnico: codigoCliente }, { email: body.email.trim().toLowerCase() }],
           },
         });
-        if (clash) {
-          return reply.status(409).send({ error: 'Ya existe un cliente con ese externalRef (ERP)' });
+        if (existing) {
+          return reply.status(409).send({ error: 'Ya existe un cliente con ese CVU o email' });
         }
-      }
 
-      const existing = await prisma.customer.findFirst({
-        where: {
-          tenantId: user.tenant_id,
-          OR: [{ codigoUnico: codigoCliente }, { email: body.email.trim().toLowerCase() }],
-        },
+        const normalizeCuit = (raw: string) => raw.replace(/\D/g, '') || raw;
+
+        const customer = await tx.customer.create({
+          data: {
+            tenantId: user.tenant_id,
+            externalRef: body.externalRef?.trim() || null,
+            codigoUnico: codigoCliente,
+            codigoVenta: body.codigoVenta || '000',
+            razonSocial: body.razonSocial.trim(),
+            email: body.email.trim().toLowerCase(),
+            telefono: body.telefono?.trim(),
+            customerCuits:
+              body.cuits?.length ?
+                {
+                  create: body.cuits.map((cu) => ({
+                    tenantId: user.tenant_id,
+                    cuit: normalizeCuit(cu.cuit.trim()),
+                    razonSocial: cu.razonSocial?.trim(),
+                    isPrimary: cu.isPrimary,
+                  })),
+                }
+              : undefined,
+          },
+          include: { customerCuits: true },
+        });
+
+        return {
+          customer: {
+            id: customer.id,
+            externalRef: customer.externalRef,
+            codigoUnico: customer.codigoUnico,
+            codigoVenta: customer.codigoVenta,
+            razonSocial: customer.razonSocial,
+            email: customer.email,
+            telefono: customer.telefono,
+            cuits: customer.customerCuits,
+          },
+        };
       });
-      if (existing) {
-        return reply.status(409).send({ error: 'Ya existe un cliente con ese CVU o email' });
-      }
-
-      const normalizeCuit = (raw: string) => raw.replace(/\D/g, '') || raw;
-
-      const customer = await prisma.customer.create({
-        data: {
-          tenantId: user.tenant_id,
-          externalRef: body.externalRef?.trim() || null,
-          codigoUnico: codigoCliente,
-          codigoVenta: body.codigoVenta || '000',
-          razonSocial: body.razonSocial.trim(),
-          email: body.email.trim().toLowerCase(),
-          telefono: body.telefono?.trim(),
-          customerCuits:
-            body.cuits?.length ?
-              {
-                create: body.cuits.map((cu) => ({
-                  tenantId: user.tenant_id,
-                  cuit: normalizeCuit(cu.cuit.trim()),
-                  razonSocial: cu.razonSocial?.trim(),
-                  isPrimary: cu.isPrimary,
-                })),
-              }
-            : undefined,
-        },
-        include: { customerCuits: true },
-      });
-
-      return {
-        customer: {
-          id: customer.id,
-          externalRef: customer.externalRef,
-          codigoUnico: customer.codigoUnico,
-          codigoVenta: customer.codigoVenta,
-          razonSocial: customer.razonSocial,
-          email: customer.email,
-          telefono: customer.telefono,
-          cuits: customer.customerCuits,
-        },
-      };
     }
   );
 

@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { withTenantRls } from '../lib/tenant-rls.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 import * as XLSX from 'xlsx';
 
@@ -117,50 +118,52 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
         }
       }
 
-      const invoices = await prisma.invoice.findMany({
-        where,
-        include: {
-          customer: {
-            include: {
-              customerCuits: {
-                where: { isPrimary: true },
-                take: 1,
+      return withTenantRls(user, async (tx) => {
+        const invoices = await tx.invoice.findMany({
+          where,
+          include: {
+            customer: {
+              include: {
+                customerCuits: {
+                  where: { isPrimary: true },
+                  take: 1,
+                },
+              },
+            },
+            paymentApplications: {
+              include: {
+                payment: true,
               },
             },
           },
-          paymentApplications: {
-            include: {
-              payment: true,
-            },
+          orderBy: {
+            fechaVto: 'asc',
           },
-        },
-        orderBy: {
-          fechaVto: 'asc',
-        },
-      });
+        });
 
-      return {
-        invoices: invoices.map((inv) => ({
-          id: inv.id,
-          externalRef: inv.externalRef,
-          customer: {
-            id: inv.customer.id,
-            razonSocial: inv.customer.razonSocial,
-            cuit: inv.customer.customerCuits[0]?.cuit,
-          },
-          numero: inv.numero,
-          monto: inv.monto,
-          montoAplicado: inv.paymentApplications.reduce((sum, app) => sum + app.amount, 0),
-          fechaVto: inv.fechaVto,
-          estado: inv.estado,
-          applications: inv.paymentApplications.map((app) => ({
-            id: app.id,
-            amount: app.amount,
-            isAuthoritative: app.isAuthoritative,
-            appliedAt: app.appliedAt,
+        return {
+          invoices: invoices.map((inv) => ({
+            id: inv.id,
+            externalRef: inv.externalRef,
+            customer: {
+              id: inv.customer.id,
+              razonSocial: inv.customer.razonSocial,
+              cuit: inv.customer.customerCuits[0]?.cuit,
+            },
+            numero: inv.numero,
+            monto: inv.monto,
+            montoAplicado: inv.paymentApplications.reduce((sum, app) => sum + app.amount, 0),
+            fechaVto: inv.fechaVto,
+            estado: inv.estado,
+            applications: inv.paymentApplications.map((app) => ({
+              id: app.id,
+              amount: app.amount,
+              isAuthoritative: app.isAuthoritative,
+              appliedAt: app.appliedAt,
+            })),
           })),
-        })),
-      };
+        };
+      });
     }
   );
 
@@ -189,75 +192,77 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
       const user = request.user!;
       const body = createInvoiceBodySchema.parse(request.body);
 
-      if (body.externalRef?.trim()) {
-        const clash = await prisma.invoice.findFirst({
-          where: { tenantId: user.tenant_id, externalRef: body.externalRef.trim() },
-        });
-        if (clash) {
-          return reply.status(409).send({ error: 'Ya existe una factura con ese externalRef (ERP)' });
+      return withTenantRls(user, async (tx) => {
+        if (body.externalRef?.trim()) {
+          const clash = await tx.invoice.findFirst({
+            where: { tenantId: user.tenant_id, externalRef: body.externalRef.trim() },
+          });
+          if (clash) {
+            return reply.status(409).send({ error: 'Ya existe una factura con ese externalRef (ERP)' });
+          }
         }
-      }
 
-      let customer: { id: string } | null = null;
-      if (body.customerId) {
-        customer = await prisma.customer.findFirst({
-          where: { id: body.customerId, tenantId: user.tenant_id },
+        let customer: { id: string } | null = null;
+        if (body.customerId) {
+          customer = await tx.customer.findFirst({
+            where: { id: body.customerId, tenantId: user.tenant_id },
+          });
+        } else if ((body.codigoUnicoCliente ?? body.cvuCliente)?.trim()) {
+          const cod = (body.codigoUnicoCliente ?? body.cvuCliente)!.trim();
+          customer = await tx.customer.findFirst({
+            where: { tenantId: user.tenant_id, codigoUnico: cod },
+          });
+        }
+        if (!customer) {
+          return reply.status(400).send({ error: 'Cliente no encontrado para este tenant' });
+        }
+
+        const numero = body.numero.trim();
+        const dup = await tx.invoice.findFirst({
+          where: { tenantId: user.tenant_id, numero },
         });
-      } else if ((body.codigoUnicoCliente ?? body.cvuCliente)?.trim()) {
-        const cod = (body.codigoUnicoCliente ?? body.cvuCliente)!.trim();
-        customer = await prisma.customer.findFirst({
-          where: { tenantId: user.tenant_id, codigoUnico: cod },
+        if (dup) {
+          return reply.status(409).send({ error: `Ya existe la factura ${numero}` });
+        }
+
+        const monto = Math.round(body.montoPesos * 100);
+        let fechaVto: Date;
+        const fv = body.fechaVto.trim();
+        if (fv.includes('/')) {
+          const [d, m, y] = fv.split('/').map(Number);
+          fechaVto = new Date(y, m - 1, d);
+        } else {
+          fechaVto = new Date(fv);
+        }
+        if (isNaN(fechaVto.getTime())) {
+          return reply.status(400).send({ error: 'fechaVto inválida (usá YYYY-MM-DD o DD/MM/YYYY)' });
+        }
+
+        const invoice = await tx.invoice.create({
+          data: {
+            tenantId: user.tenant_id,
+            customerId: customer.id,
+            externalRef: body.externalRef?.trim() || null,
+            numero,
+            monto,
+            fechaVto,
+            estado: body.estado,
+          },
         });
-      }
-      if (!customer) {
-        return reply.status(400).send({ error: 'Cliente no encontrado para este tenant' });
-      }
 
-      const numero = body.numero.trim();
-      const dup = await prisma.invoice.findFirst({
-        where: { tenantId: user.tenant_id, numero },
+        fastify.log.info({ invoiceId: invoice.id, numero }, 'Invoice created manually');
+        return {
+          invoice: {
+            id: invoice.id,
+            externalRef: invoice.externalRef,
+            numero: invoice.numero,
+            monto: invoice.monto,
+            fechaVto: invoice.fechaVto,
+            estado: invoice.estado,
+            customerId: invoice.customerId,
+          },
+        };
       });
-      if (dup) {
-        return reply.status(409).send({ error: `Ya existe la factura ${numero}` });
-      }
-
-      const monto = Math.round(body.montoPesos * 100);
-      let fechaVto: Date;
-      const fv = body.fechaVto.trim();
-      if (fv.includes('/')) {
-        const [d, m, y] = fv.split('/').map(Number);
-        fechaVto = new Date(y, m - 1, d);
-      } else {
-        fechaVto = new Date(fv);
-      }
-      if (isNaN(fechaVto.getTime())) {
-        return reply.status(400).send({ error: 'fechaVto inválida (usá YYYY-MM-DD o DD/MM/YYYY)' });
-      }
-
-      const invoice = await prisma.invoice.create({
-        data: {
-          tenantId: user.tenant_id,
-          customerId: customer.id,
-          externalRef: body.externalRef?.trim() || null,
-          numero,
-          monto,
-          fechaVto,
-          estado: body.estado,
-        },
-      });
-
-      fastify.log.info({ invoiceId: invoice.id, numero }, 'Invoice created manually');
-      return {
-        invoice: {
-          id: invoice.id,
-          externalRef: invoice.externalRef,
-          numero: invoice.numero,
-          monto: invoice.monto,
-          fechaVto: invoice.fechaVto,
-          estado: invoice.estado,
-          customerId: invoice.customerId,
-        },
-      };
     }
   );
 
