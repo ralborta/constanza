@@ -1,5 +1,9 @@
 import { prisma } from '../lib/prisma.js';
-import { extractTaxIdsFromPayload } from './cresium-helpers.js';
+import {
+  extractCvuDigitsFromPayload,
+  extractTaxIdsFromPayload,
+  cvuNormalized,
+} from './cresium-helpers.js';
 
 export type ConciliationCandidate = {
   invoiceId: string;
@@ -38,6 +42,29 @@ export async function buildCresiumConciliationCandidates(
     if (tn.length !== 11) continue;
     for (const r of allCuits) {
       if (norm(r.cuit) === tn) customerIdSet.add(r.customerId);
+    }
+  }
+
+  const payload = meta.payload;
+  if (payload) {
+    const payloadCvus = extractCvuDigitsFromPayload(payload);
+    if (payloadCvus.length > 0) {
+      const customers = await prisma.customer.findMany({
+        where: { tenantId },
+        select: { id: true, codigoUnico: true },
+      });
+      for (const c of customers) {
+        const cu = cvuNormalized(c.codigoUnico);
+        if (cu.length < 8) continue;
+        for (const p of payloadCvus) {
+          const pn = cvuNormalized(p);
+          if (pn.length < 8) continue;
+          if (pn === cu || pn.endsWith(cu) || cu.endsWith(pn)) {
+            customerIdSet.add(c.id);
+            break;
+          }
+        }
+      }
     }
   }
 

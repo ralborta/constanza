@@ -98,7 +98,7 @@ export function CreateInvoiceManualButton() {
               <SelectContent>
                 {customersData?.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.codigoUnico} — {c.razonSocial}
+                    CVU {c.codigoUnico} — {c.razonSocial}
                   </SelectItem>
                 ))}
               </SelectContent>

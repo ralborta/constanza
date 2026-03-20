@@ -131,6 +131,30 @@ async function customerIdsForTaxIds(tenantId: string, taxIds: string[]): Promise
   return set;
 }
 
+/** Clientes cuyo CVU guardado en codigoUnico coincide con algún CVU detectado en el payload (payer / contraparte). */
+async function customerIdsForPayingCvu(tenantId: string, body: unknown): Promise<Set<string>> {
+  const payloadCvus = extractCvuDigitsFromPayload(body);
+  if (payloadCvus.length === 0) return new Set();
+  const customers = await prisma.customer.findMany({
+    where: { tenantId },
+    select: { id: true, codigoUnico: true },
+  });
+  const set = new Set<string>();
+  for (const c of customers) {
+    const cu = cvuNormalized(c.codigoUnico);
+    if (cu.length < 8) continue;
+    for (const p of payloadCvus) {
+      const pn = cvuNormalized(p);
+      if (pn.length < 8) continue;
+      if (pn === cu || pn.endsWith(cu) || cu.endsWith(pn)) {
+        set.add(c.id);
+        break;
+      }
+    }
+  }
+  return set;
+}
+
 async function findInvoiceMatch(
   tenantId: string,
   body: Record<string, unknown>
@@ -285,7 +309,11 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
     }
 
     const taxIds = extractTaxIdsFromPayload(body);
-    const custFilter = await customerIdsForTaxIds(tenantId, taxIds);
+    const custFilterCuit = await customerIdsForTaxIds(tenantId, taxIds);
+    const custFilterCvu = await customerIdsForPayingCvu(tenantId, body);
+    const custFilter = new Set<string>();
+    for (const id of custFilterCuit) custFilter.add(id);
+    for (const id of custFilterCvu) custFilter.add(id);
     const rows = await loadOpenInvoiceRows(tenantId);
 
     let matched: { id: string; numero: string; reason: string } | null = null;
@@ -296,13 +324,17 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
     }
 
     if (!matched && custFilter.size > 0) {
-      const byCuit = pickSingleExactPendingInvoice(
+      const byCuitOrCvu = pickSingleExactPendingInvoice(
         rows,
         amountCents,
         custFilter
       );
-      if (byCuit) {
-        matched = { id: byCuit.id, numero: byCuit.numero, reason: 'cuit_unique_exact_balance' };
+      if (byCuitOrCvu) {
+        matched = {
+          id: byCuitOrCvu.id,
+          numero: byCuitOrCvu.numero,
+          reason: 'cuit_or_cvu_exact_balance',
+        };
       }
     }
 

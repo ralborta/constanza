@@ -169,13 +169,14 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
       externalRef: z.string().max(200).optional(),
       customerId: z.string().uuid().optional(),
       codigoUnicoCliente: z.string().optional(),
+      cvuCliente: z.string().optional(),
       numero: z.string().min(1),
       montoPesos: z.number().positive(),
       fechaVto: z.string().min(8),
       estado: z.enum(['ABIERTA', 'VENCIDA', 'PARCIAL', 'SALDADA']).optional().default('ABIERTA'),
     })
-    .refine((d) => d.customerId || (d.codigoUnicoCliente && d.codigoUnicoCliente.length > 0), {
-      message: 'Indicá customerId o codigoUnicoCliente',
+    .refine((d) => d.customerId || (d.codigoUnicoCliente ?? d.cvuCliente)?.trim(), {
+      message: 'Indicá customerId o codigoUnicoCliente o cvuCliente',
     });
 
   // POST /invoices - Alta manual
@@ -202,9 +203,10 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
         customer = await prisma.customer.findFirst({
           where: { id: body.customerId, tenantId: user.tenant_id },
         });
-      } else if (body.codigoUnicoCliente) {
+      } else if ((body.codigoUnicoCliente ?? body.cvuCliente)?.trim()) {
+        const cod = (body.codigoUnicoCliente ?? body.cvuCliente)!.trim();
         customer = await prisma.customer.findFirst({
-          where: { tenantId: user.tenant_id, codigoUnico: body.codigoUnicoCliente.trim() },
+          where: { tenantId: user.tenant_id, codigoUnico: cod },
         });
       }
       if (!customer) {

@@ -4,23 +4,30 @@ import { prisma } from '../lib/prisma.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 import * as XLSX from 'xlsx';
 
-const createCustomerSchema = z.object({
-  externalRef: z.string().max(200).optional(),
-  codigoUnico: z.string(),
-  codigoVenta: z.string().default('000'),
-  razonSocial: z.string(),
-  email: z.string().email(),
-  telefono: z.string().optional(),
-  cuits: z
-    .array(
-      z.object({
-        cuit: z.string(),
-        razonSocial: z.string().optional(),
-        isPrimary: z.boolean().default(false),
-      })
-    )
-    .optional(),
-});
+const createCustomerSchema = z
+  .object({
+    externalRef: z.string().max(200).optional(),
+    /** CVU del cliente (alias semántico; se guarda en codigo_unico). */
+    codigoUnico: z.string().optional(),
+    cvu: z.string().optional(),
+    codigoVenta: z.string().default('000'),
+    razonSocial: z.string(),
+    email: z.string().email(),
+    telefono: z.string().optional(),
+    cuits: z
+      .array(
+        z.object({
+          cuit: z.string(),
+          razonSocial: z.string().optional(),
+          isPrimary: z.boolean().default(false),
+        })
+      )
+      .optional(),
+  })
+  .refine((d) => Boolean((d.codigoUnico ?? d.cvu)?.trim()), {
+    message: 'Indicá codigoUnico o cvu (CVU del cliente)',
+    path: ['codigoUnico'],
+  });
 
 interface ExcelRow {
   [key: string]: any;
@@ -29,6 +36,11 @@ interface ExcelRow {
 // Función para normalizar nombres de columnas
 function normalizeColumnName(key: string): string {
   const normalized = key.toLowerCase().trim();
+
+  // CVU del cliente (mismo campo que codigo_unico en DB; conciliación Cresium)
+  if (normalized === 'cvu' || normalized === 'cvu cliente') {
+    return 'Código Único';
+  }
   
   // Mapeo de variaciones comunes a nombres estándar
   // Primero verificar "Código Venta" antes de "Código Único" para evitar conflictos
@@ -125,6 +137,7 @@ export async function customerRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const user = request.user!;
       const body = createCustomerSchema.parse(request.body);
+      const codigoCliente = (body.codigoUnico ?? body.cvu)!.trim();
 
       if (body.externalRef?.trim()) {
         const clash = await prisma.customer.findFirst({
@@ -141,11 +154,11 @@ export async function customerRoutes(fastify: FastifyInstance) {
       const existing = await prisma.customer.findFirst({
         where: {
           tenantId: user.tenant_id,
-          OR: [{ codigoUnico: body.codigoUnico.trim() }, { email: body.email.trim().toLowerCase() }],
+          OR: [{ codigoUnico: codigoCliente }, { email: body.email.trim().toLowerCase() }],
         },
       });
       if (existing) {
-        return reply.status(409).send({ error: 'Ya existe un cliente con ese código único o email' });
+        return reply.status(409).send({ error: 'Ya existe un cliente con ese CVU o email' });
       }
 
       const normalizeCuit = (raw: string) => raw.replace(/\D/g, '') || raw;
@@ -154,7 +167,7 @@ export async function customerRoutes(fastify: FastifyInstance) {
         data: {
           tenantId: user.tenant_id,
           externalRef: body.externalRef?.trim() || null,
-          codigoUnico: body.codigoUnico.trim(),
+          codigoUnico: codigoCliente,
           codigoVenta: body.codigoVenta || '000',
           razonSocial: body.razonSocial.trim(),
           email: body.email.trim().toLowerCase(),

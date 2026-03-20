@@ -210,16 +210,18 @@ export default function CustomersPage() {
                 <DialogHeader>
                   <DialogTitle>Alta manual de cliente</DialogTitle>
                   <DialogDescription>
-                    Para sincronizar con un ERP podés usar el campo &quot;ID en ERP&quot;. También disponible:{' '}
+                    El <strong>CVU</strong> es la llave del cliente para conciliar transferencias Cresium (mismo valor que en
+                    el banco). Para un ERP podés usar &quot;ID en ERP&quot;. API:{' '}
                     <code className="text-xs bg-muted px-1 rounded">POST /v1/integrations/ingest</code>.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">Código único *</Label>
+                    <Label className="text-xs">CVU (clave cliente / Cresium) *</Label>
                     <Input
                       value={manualForm.codigoUnico}
                       onChange={(e) => setManualForm((f) => ({ ...f, codigoUnico: e.target.value }))}
+                      placeholder="22 dígitos o referencia acordada"
                     />
                   </div>
                   <div className="space-y-1">
@@ -380,7 +382,7 @@ export default function CustomersPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
-                  placeholder="Buscar por razón social, email, código o CUIT..."
+                  placeholder="Buscar por razón social, email, CVU o CUIT..."
                   className="pl-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -393,7 +395,7 @@ export default function CustomersPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gradient-to-r from-indigo-50 to-blue-50">
-                    <TableHead className="font-semibold text-gray-800">Código Único</TableHead>
+                    <TableHead className="font-semibold text-gray-800">CVU</TableHead>
                     <TableHead className="font-semibold text-gray-800">Razón Social</TableHead>
                     <TableHead className="font-semibold text-gray-800">Email</TableHead>
                     <TableHead className="font-semibold text-gray-800">Teléfono</TableHead>

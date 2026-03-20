@@ -3,20 +3,24 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 
+const customerIngestRow = z
+  .object({
+    externalRef: z.string().max(200).optional(),
+    /** Alias de `cvu` — CVU del cliente (mismo campo que codigoUnico en DB). */
+    codigoUnico: z.string().optional(),
+    cvu: z.string().optional(),
+    codigoVenta: z.string().optional(),
+    razonSocial: z.string(),
+    email: z.string().email(),
+    telefono: z.string().optional(),
+    cuit: z.string().optional(),
+  })
+  .refine((r) => Boolean((r.codigoUnico ?? r.cvu)?.trim()), {
+    message: 'Indicá codigoUnico o cvu',
+  });
+
 const ingestSchema = z.object({
-  customers: z
-    .array(
-      z.object({
-        externalRef: z.string().max(200).optional(),
-        codigoUnico: z.string(),
-        codigoVenta: z.string().optional(),
-        razonSocial: z.string(),
-        email: z.string().email(),
-        telefono: z.string().optional(),
-        cuit: z.string().optional(),
-      })
-    )
-    .optional(),
+  customers: z.array(customerIngestRow).optional(),
   invoices: z
     .array(
       z.object({
@@ -27,6 +31,8 @@ const ingestSchema = z.object({
         estado: z.enum(['ABIERTA', 'VENCIDA', 'PARCIAL', 'SALDADA']).optional(),
         customerExternalRef: z.string().optional(),
         codigoUnicoCliente: z.string().optional(),
+        /** Alias de codigoUnicoCliente (CVU del cliente). */
+        cvuCliente: z.string().optional(),
         customerId: z.string().uuid().optional(),
       })
     )
@@ -65,6 +71,7 @@ export async function integrationRoutes(fastify: FastifyInstance) {
       const resolveCustomerId = async (row: {
         customerExternalRef?: string;
         codigoUnicoCliente?: string;
+        cvuCliente?: string;
         customerId?: string;
       }): Promise<string | null> => {
         if (row.customerId) {
@@ -79,9 +86,10 @@ export async function integrationRoutes(fastify: FastifyInstance) {
           });
           return c?.id ?? null;
         }
-        if (row.codigoUnicoCliente?.trim()) {
+        const codigoCliente = (row.codigoUnicoCliente ?? row.cvuCliente)?.trim();
+        if (codigoCliente) {
           const c = await prisma.customer.findFirst({
-            where: { tenantId, codigoUnico: row.codigoUnicoCliente.trim() },
+            where: { tenantId, codigoUnico: codigoCliente },
           });
           return c?.id ?? null;
         }
@@ -91,6 +99,7 @@ export async function integrationRoutes(fastify: FastifyInstance) {
       if (body.customers) {
         for (let i = 0; i < body.customers.length; i++) {
           const c = body.customers[i]!;
+          const codigo = (c.codigoUnico ?? c.cvu)!.trim();
           try {
             let existing = c.externalRef?.trim()
               ? await prisma.customer.findFirst({
@@ -99,7 +108,7 @@ export async function integrationRoutes(fastify: FastifyInstance) {
               : null;
             if (!existing) {
               existing = await prisma.customer.findFirst({
-                where: { tenantId, codigoUnico: c.codigoUnico.trim() },
+                where: { tenantId, codigoUnico: codigo },
               });
             }
 
@@ -146,7 +155,7 @@ export async function integrationRoutes(fastify: FastifyInstance) {
                 data: {
                   tenantId,
                   externalRef: c.externalRef?.trim() || null,
-                  codigoUnico: c.codigoUnico.trim(),
+                  codigoUnico: codigo,
                   codigoVenta: c.codigoVenta?.trim() || '000',
                   razonSocial: c.razonSocial.trim(),
                   email,
@@ -177,7 +186,9 @@ export async function integrationRoutes(fastify: FastifyInstance) {
           try {
             const customerId = await resolveCustomerId(inv);
             if (!customerId) {
-              result.errors.push(`Factura ${i + 1}: no se encontró cliente (customerId / customerExternalRef / codigoUnicoCliente)`);
+              result.errors.push(
+                `Factura ${i + 1}: no se encontró cliente (customerId / customerExternalRef / codigoUnicoCliente / cvuCliente)`
+              );
               continue;
             }
 

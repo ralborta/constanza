@@ -64,6 +64,7 @@ model Customer {
   tenantId         String         @map("tenant_id") @db.Uuid
   /// Clave estable en el ERP / sistema de facturación (para sincronizar / upsert).
   externalRef      String?        @map("external_ref")
+  /// CVU del cliente (clave de negocio): mismo valor que debe figurar en transferencias/pagos Cresium para conciliar.
   codigoUnico      String         @map("codigo_unico")
   codigoVenta      String         @default("000") @map("codigo_venta")
   razonSocial      String         @map("razon_social")
