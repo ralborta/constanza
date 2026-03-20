@@ -1,0 +1,28 @@
+# Opcional: dispara un deploy en Vercel vía Deploy Hook (ver docs/VERCEL.md).
+# Requiere secret VERCEL_DEPLOY_HOOK en GitHub (URL del hook creado en Vercel).
+
+name: Trigger Vercel deploy (web)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+
+jobs:
+  hook:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST Deploy Hook
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK no configurado — omitiendo (configurá el hook en Vercel + secret en GitHub; ver docs/VERCEL.md)"
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK"
+          echo "Deploy hook invocado."
