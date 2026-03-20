@@ -235,6 +235,8 @@ Los registros existentes se actualizan si coinciden `externalRef` o, si no viene
 
 Requiere columnas `external_ref` en `core.customers` e `core.invoices` (migración `006_customer_invoice_external_ref.sql`).
 
+**Tenant por defecto:** si el JWT usa el UUID fijo `00000000-0000-0000-0000-000000000001`, debe existir en `core.tenants` o los INSERT fallan por FK. Aplicar migración `007_default_tenant_id.sql` y/o ejecutar `pnpm seed` desde `infra/prisma` (el seed crea el tenant con ese id).
+
 ---
 
 ### Cresium — `apps/rail-cucuru` (**único** webhook de pagos entrantes: `POST /wh/cresium/deposito`)
