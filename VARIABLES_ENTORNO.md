@@ -232,6 +232,8 @@ AGENT_API_KEY=tu_clave_secreta_para_agentes
 | `CRESIUM_COMPANY_ID` | No | Si se define, debe coincidir con header `x-company-id` del webhook (ej. `700`). |
 | `CRESIUM_SKIP_SIGNATURE_VERIFY` | No | `true` solo en pruebas locales si aún no tenés el secret (⚠️ nunca en producción). |
 | `CRESIUM_AMOUNT_UNIT` | No | Por defecto el monto del webhook se interpreta en **pesos** y se convierte a centavos. Si Cresium envía **centavos**, definir `CRESIUM_AMOUNT_UNIT=CENTS`. |
+| `CRESIUM_REJECT_CVU_MISMATCH` | No | `true`: rechaza el depósito si en el payload hay CVUs y ninguno coincide con `core.tenants.cresium_cvu_cobro`. |
+| `CRESIUM_AUTO_MATCH_AMOUNT_ONLY` | No | `true`: si no hay match por texto/CUIT, intenta imputar cuando **una sola** factura abierta tiene saldo pendiente **igual** al monto (riesgoso en producción). |
 
 **Ejemplo:**
 ```bash
@@ -242,7 +244,7 @@ CRESIUM_COMPANY_ID=700
 
 **Imputación manual** (depósito sin match de factura en el payload): desde API autenticada, `POST /v1/payments/:paymentId/impute` con body `{ "invoiceId": "<uuid-factura>" }`.
 
-**Base de datos:** aplicar migración `infra/supabase/migrations/004_payment_total_amount_cents.sql` (columna `pay.payments.total_amount_cents`).
+**Base de datos:** aplicar migraciones `004_payment_total_amount_cents.sql` y `005_tenant_cvu_payment_metadata.sql` (`core.tenants.cresium_cvu_cobro`, `pay.payments.metadata`).
 
 ---
 

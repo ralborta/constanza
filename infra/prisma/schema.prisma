@@ -13,6 +13,8 @@ model Tenant {
   id            String         @id @default(uuid()) @db.Uuid
   name          String
   slug          String         @unique
+  /// CVU de cobro de la empresa en Cresium (validación opcional del depósito).
+  cresiumCvuCobro String?      @map("cresium_cvu_cobro")
   createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   echeqs        Echeq[]
@@ -193,6 +195,8 @@ model Payment {
   externalRef        String?              @map("external_ref")
   /// Monto en centavos cuando el pago aún no tiene applications (ej. depósito Cresium sin match de factura).
   totalAmountCents   Int?                 @map("total_amount_cents")
+  /// Payload Cresium + IDs extraídos (CUIT, CVU) para auditoría y conciliación.
+  metadata           Json?                @map("metadata")
   createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
   applications       PaymentApplication[]

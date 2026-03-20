@@ -1,0 +1,78 @@
+/**
+ * Lógica de extracción / matching para Cresium.
+ * Mantener alineado con apps/rail-cucuru/src/lib/cresium-helpers.ts
+ */
+
+export function normalizeArgentineTaxId(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 11) return digits;
+  return null;
+}
+
+const TAX_ID_HINT_KEYS = [
+  'payertaxid',
+  'payercuit',
+  'cuit',
+  'taxid',
+  'payerdocument',
+  'origintaxid',
+  'sendertaxid',
+  'customertaxid',
+  'debtorcuit',
+  'orderingcuit',
+  'counterparty',
+];
+
+export function extractTaxIdsFromPayload(body: unknown): string[] {
+  const found = new Set<string>();
+
+  const scanString = (s: string) => {
+    for (const m of s.matchAll(/\b\d{2}[-.]?\d{8}[-.]?\d{1}\b/g)) {
+      const n = normalizeArgentineTaxId(m[0]);
+      if (n) found.add(n);
+    }
+    for (const m of s.matchAll(/\b\d{11}\b/g)) {
+      const n = normalizeArgentineTaxId(m[0]);
+      if (n) found.add(n);
+    }
+  };
+
+  const visit = (v: unknown, depth: number) => {
+    if (depth > 14) return;
+    if (typeof v === 'string') scanString(v);
+    else if (v && typeof v === 'object' && !Array.isArray(v)) {
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+        const kl = k.toLowerCase().replace(/[_-]/g, '');
+        if (TAX_ID_HINT_KEYS.some((h) => kl.includes(h)) && typeof val === 'string') {
+          const n = normalizeArgentineTaxId(val);
+          if (n) found.add(n);
+        }
+        visit(val, depth + 1);
+      }
+    } else if (Array.isArray(v)) {
+      for (const item of v) visit(item, depth + 1);
+    }
+  };
+
+  visit(body, 0);
+  return [...found];
+}
+
+export function extractCvuDigitsFromPayload(body: unknown): string[] {
+  const found = new Set<string>();
+  const visit = (v: unknown, depth: number) => {
+    if (depth > 14 || found.size > 30) return;
+    if (typeof v === 'string') {
+      const digits = v.replace(/\D/g, '');
+      if (digits.length >= 20 && digits.length <= 22) found.add(digits);
+    } else if (v && typeof v === 'object') {
+      for (const val of Object.values(v as object)) visit(val, depth + 1);
+    }
+  };
+  visit(body, 0);
+  return [...found];
+}
+
+export function cvuNormalized(cvu: string): string {
+  return cvu.replace(/\D/g, '');
+}

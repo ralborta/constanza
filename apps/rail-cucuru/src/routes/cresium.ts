@@ -2,6 +2,14 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
+import {
+  buildCresiumPaymentMetadata,
+  cvuNormalized,
+  extractCvuDigitsFromPayload,
+  extractTaxIdsFromPayload,
+  pickSingleExactPendingInvoice,
+  type InvoicePendingRow,
+} from '../lib/cresium-helpers.js';
 
 const prisma = new PrismaClient();
 
@@ -76,6 +84,51 @@ function externalKey(body: Record<string, unknown>): string {
   const id = body.id;
   if (id != null) return String(id);
   return crypto.randomUUID();
+}
+
+function cvuStrictMismatch(tenantCvu: string | null | undefined, body: unknown): boolean {
+  if (tenantCvu == null || String(tenantCvu).trim() === '') return false;
+  const exp = cvuNormalized(String(tenantCvu));
+  if (exp.length < 8) return false;
+  const found = extractCvuDigitsFromPayload(body);
+  if (found.length === 0) return false;
+  return !found.some((c) => c === exp || c.endsWith(exp) || exp.endsWith(c));
+}
+
+async function loadOpenInvoiceRows(tenantId: string): Promise<InvoicePendingRow[]> {
+  const invs = await prisma.invoice.findMany({
+    where: {
+      tenantId,
+      estado: { in: ['ABIERTA', 'VENCIDA', 'PARCIAL'] },
+    },
+    include: { paymentApplications: true },
+    take: 3000,
+  });
+  return invs.map((i) => ({
+    id: i.id,
+    numero: i.numero,
+    customerId: i.customerId,
+    monto: i.monto,
+    appliedSum: i.paymentApplications.reduce((s, a) => s + a.amount, 0),
+  }));
+}
+
+async function customerIdsForTaxIds(tenantId: string, taxIds: string[]): Promise<Set<string>> {
+  if (taxIds.length === 0) return new Set();
+  const norm = (c: string) => c.replace(/\D/g, '');
+  const allCuits = await prisma.customerCuit.findMany({
+    where: { tenantId },
+    select: { customerId: true, cuit: true },
+  });
+  const set = new Set<string>();
+  for (const t of taxIds) {
+    const tn = norm(t);
+    if (tn.length !== 11) continue;
+    for (const r of allCuits) {
+      if (norm(r.cuit) === tn) set.add(r.customerId);
+    }
+  }
+  return set;
 }
 
 async function findInvoiceMatch(
@@ -221,10 +274,57 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
       return reply.status(200).send({ status: 'duplicate' });
     }
 
-    const invoice = await findInvoiceMatch(tenantId, body);
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { cresiumCvuCobro: true },
+    });
+
+    if (process.env.CRESIUM_REJECT_CVU_MISMATCH === 'true' && cvuStrictMismatch(tenant?.cresiumCvuCobro, body)) {
+      fastify.log.warn('Cresium deposit rejected: CVU cobro no coincide con tenant');
+      return reply.status(400).send({ error: 'CVU de cobro no coincide con el configurado en Constanza' });
+    }
+
+    const taxIds = extractTaxIdsFromPayload(body);
+    const custFilter = await customerIdsForTaxIds(tenantId, taxIds);
+    const rows = await loadOpenInvoiceRows(tenantId);
+
+    let matched: { id: string; numero: string; reason: string } | null = null;
+
+    const invoiceByText = await findInvoiceMatch(tenantId, body);
+    if (invoiceByText) {
+      matched = { id: invoiceByText.id, numero: invoiceByText.numero, reason: 'invoice_number_in_payload' };
+    }
+
+    if (!matched && custFilter.size > 0) {
+      const byCuit = pickSingleExactPendingInvoice(
+        rows,
+        amountCents,
+        custFilter
+      );
+      if (byCuit) {
+        matched = { id: byCuit.id, numero: byCuit.numero, reason: 'cuit_unique_exact_balance' };
+      }
+    }
+
+    if (!matched && process.env.CRESIUM_AUTO_MATCH_AMOUNT_ONLY === 'true') {
+      const byAmt = pickSingleExactPendingInvoice(rows, amountCents, null);
+      if (byAmt) {
+        matched = { id: byAmt.id, numero: byAmt.numero, reason: 'amount_only_unique_open_invoice' };
+      }
+    }
+
+    const metadata = {
+      ...buildCresiumPaymentMetadata(body, {
+        tenantCvuConfigured: Boolean(tenant?.cresiumCvuCobro),
+        cvuMismatchStrictWouldFail:
+          process.env.CRESIUM_REJECT_CVU_MISMATCH !== 'true' && cvuStrictMismatch(tenant?.cresiumCvuCobro, body),
+        autoMatchReason: matched?.reason ?? null,
+        matchedInvoiceId: matched?.id ?? null,
+      }),
+    };
 
     try {
-      if (invoice) {
+      if (matched) {
         const payment = await prisma.payment.create({
           data: {
             tenantId,
@@ -234,26 +334,28 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
             externalRef: extRef,
             settledAt: new Date(),
             totalAmountCents: null,
+            metadata: metadata as object,
           },
         });
         await prisma.paymentApplication.create({
           data: {
             tenantId,
             paymentId: payment.id,
-            invoiceId: invoice.id,
+            invoiceId: matched.id,
             amount: amountCents,
             isAuthoritative: true,
             appliedAt: new Date(),
-            externalApplicationRef: `cresium:${extRef}:${invoice.id}`,
+            externalApplicationRef: `cresium:${extRef}:${matched.id}`,
           },
         });
         fastify.log.info(
-          { paymentId: payment.id, invoiceId: invoice.id, externalRef: extRef, amountCents },
+          { paymentId: payment.id, invoiceId: matched.id, reason: matched.reason, externalRef: extRef, amountCents },
           'Cresium deposit applied to invoice'
         );
         return reply.status(200).send({
           status: 'ok',
-          matchedInvoice: invoice.numero,
+          matchedInvoice: matched.numero,
+          matchReason: matched.reason,
           paymentId: payment.id,
         });
       }
@@ -266,6 +368,7 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
           status: 'PEND_LIQ',
           externalRef: extRef,
           totalAmountCents: amountCents,
+          metadata: metadata as object,
         },
       });
       fastify.log.info(

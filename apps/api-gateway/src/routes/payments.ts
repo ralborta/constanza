@@ -2,6 +2,10 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
+import {
+  buildCresiumConciliationCandidates,
+  type ConciliationCandidate,
+} from '../services/cresium-conciliation-candidates.js';
 
 /** Monto mostrado: suma de applications, o total declarado por el origen si aún no hay imputación. */
 function transferTotalCents(payment: {
@@ -160,6 +164,45 @@ export async function paymentRoutes(fastify: FastifyInstance) {
         orderBy: { createdAt: 'desc' },
       });
 
+      const pendingEnriched = await Promise.all(
+        pendingLiquidation.map(async (payment) => {
+          const base = {
+            id: payment.id,
+            sourceSystem: payment.sourceSystem,
+            method: payment.method,
+            status: payment.status,
+            externalRef: payment.externalRef,
+            createdAt: payment.createdAt,
+            totalAmount: transferTotalCents(payment),
+            applications: payment.applications.map((app) => ({
+              invoice: {
+                numero: app.invoice.numero,
+                customer: app.invoice.customer.razonSocial,
+              },
+              amount: app.amount,
+              isAuthoritative: app.isAuthoritative,
+            })),
+            metadata: payment.metadata ?? null,
+            extractedTaxIds: null as string[] | null,
+            candidates: [] as ConciliationCandidate[],
+          };
+
+          if (payment.sourceSystem === 'CRESIUM' && payment.applications.length === 0) {
+            const { extractedTaxIds, candidates } = await buildCresiumConciliationCandidates(
+              user.tenant_id,
+              {
+                totalAmountCents: payment.totalAmountCents,
+                metadata: payment.metadata,
+              }
+            );
+            base.extractedTaxIds = extractedTaxIds;
+            base.candidates = candidates;
+          }
+
+          return base;
+        })
+      );
+
       // Pagos autoritativos (Cresium) vs manuales
       const authoritativePayments = await prisma.payment.findMany({
         where: {
@@ -205,23 +248,7 @@ export async function paymentRoutes(fastify: FastifyInstance) {
       };
 
       return {
-        pendingLiquidation: pendingLiquidation.map((payment) => ({
-          id: payment.id,
-          sourceSystem: payment.sourceSystem,
-          method: payment.method,
-          status: payment.status,
-          externalRef: payment.externalRef,
-          createdAt: payment.createdAt,
-          totalAmount: transferTotalCents(payment),
-          applications: payment.applications.map((app) => ({
-            invoice: {
-              numero: app.invoice.numero,
-              customer: app.invoice.customer.razonSocial,
-            },
-            amount: app.amount,
-            isAuthoritative: app.isAuthoritative,
-          })),
-        })),
+        pendingLiquidation: pendingEnriched,
         summary: {
           pendingLiquidation: {
             count: pendingLiquidation.length,
@@ -345,9 +372,18 @@ export async function paymentRoutes(fastify: FastifyInstance) {
 
       const invoice = await prisma.invoice.findFirst({
         where: { id: body.invoiceId, tenantId: user.tenant_id },
+        include: { paymentApplications: true },
       });
       if (!invoice) {
         return reply.status(404).send({ error: 'Factura no encontrada' });
+      }
+
+      const applied = invoice.paymentApplications.reduce((s, a) => s + a.amount, 0);
+      const pendingInvoice = invoice.monto - applied;
+      if (cents > pendingInvoice) {
+        return reply.status(400).send({
+          error: `El monto del depósito (${cents}) supera el saldo pendiente de la factura (${pendingInvoice}).`,
+        });
       }
 
       await prisma.paymentApplication.create({
@@ -436,6 +472,7 @@ export async function paymentRoutes(fastify: FastifyInstance) {
           updatedAt: payment.updatedAt,
           totalAmount: transferTotalCents(payment),
           unappliedAmountCents: payment.totalAmountCents,
+          metadata: payment.metadata ?? null,
           applications: payment.applications.map((app) => ({
             id: app.id,
             invoice: {

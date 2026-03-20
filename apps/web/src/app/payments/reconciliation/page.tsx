@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,9 +27,26 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Loader2, CheckCircle2, Clock, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+
+interface ConciliationCandidate {
+  invoiceId: string;
+  numero: string;
+  customerName: string;
+  pendingCents: number;
+  exactAmountMatch: boolean;
+}
 
 interface PendingPayment {
   id: string;
@@ -47,6 +64,9 @@ interface PendingPayment {
     amount: number;
     isAuthoritative: boolean;
   }>;
+  metadata?: unknown;
+  extractedTaxIds?: string[] | null;
+  candidates?: ConciliationCandidate[];
 }
 
 interface ReconciliationSummary {
@@ -72,6 +92,32 @@ export default function ReconciliationPage() {
   const queryClient = useQueryClient();
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   const [reconcileAction, setReconcileAction] = useState<'LIQUIDATE' | 'REJECT' | null>(null);
+  const [imputeInvoiceByPayment, setImputeInvoiceByPayment] = useState<Record<string, string>>({});
+  const [cvuDraft, setCvuDraft] = useState('');
+
+  const { data: tenantCresium } = useQuery({
+    queryKey: ['tenant-cresium'],
+    queryFn: async () => {
+      const r = await api.get('/v1/tenant/cresium');
+      return r.data as { cresiumCvuCobro: string | null };
+    },
+  });
+
+  const patchCvuMutation = useMutation({
+    mutationFn: async (cresiumCvuCobro: string | null) => {
+      const r = await api.patch('/v1/tenant/cresium', { cresiumCvuCobro: cresiumCvuCobro ?? null });
+      return r.data;
+    },
+    onSuccess: (_d, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-cresium'] });
+      if (vars === null) setCvuDraft('');
+      else if (typeof vars === 'string') setCvuDraft(vars);
+    },
+  });
+
+  useEffect(() => {
+    if (tenantCresium?.cresiumCvuCobro) setCvuDraft(tenantCresium.cresiumCvuCobro);
+  }, [tenantCresium?.cresiumCvuCobro]);
 
   const { data, isLoading } = useQuery<{
     pendingLiquidation: PendingPayment[];
@@ -83,6 +129,17 @@ export default function ReconciliationPage() {
       return response.data;
     },
     refetchInterval: 30000, // Refrescar cada 30 segundos
+  });
+
+  const imputeMutation = useMutation({
+    mutationFn: async ({ paymentId, invoiceId }: { paymentId: string; invoiceId: string }) => {
+      const r = await api.post(`/v1/payments/${paymentId}/impute`, { invoiceId });
+      return r.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments-reconciliation'] });
+      queryClient.invalidateQueries({ queryKey: ['payments-transfers'] });
+    },
   });
 
   const reconcileMutation = useMutation({
@@ -151,6 +208,55 @@ export default function ReconciliationPage() {
             Actualizar
           </Button>
         </div>
+
+        <Card className="mb-6 border-amber-200 bg-amber-50/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-gray-800">CVU de cobro (Cresium)</CardTitle>
+            <p className="text-xs text-gray-600">
+              Debe coincidir con el CVU de la empresa en Cresium. Solo administradores pueden guardar.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">CVU (solo dígitos)</Label>
+              <Input
+                className="w-64 font-mono text-sm"
+                placeholder="0000000000000000222222"
+                value={cvuDraft}
+                onChange={(e) => setCvuDraft(e.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                const d = cvuDraft.replace(/\D/g, '');
+                if (d.length < 8) {
+                  window.alert('El CVU debe tener al menos 8 dígitos.');
+                  return;
+                }
+                patchCvuMutation.mutate(d);
+              }}
+              disabled={patchCvuMutation.isPending}
+            >
+              Guardar CVU
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => patchCvuMutation.mutate(null)}
+              disabled={patchCvuMutation.isPending}
+            >
+              Borrar
+            </Button>
+            {patchCvuMutation.isError && (
+              <span className="text-xs text-red-600">
+                {(patchCvuMutation.error as any)?.response?.data?.error || 'Error al guardar'}
+              </span>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Resumen */}
         {data?.summary && (
@@ -245,6 +351,7 @@ export default function ReconciliationPage() {
                     <TableHead className="font-semibold text-gray-800">Monto</TableHead>
                     <TableHead className="font-semibold text-gray-800">Estado</TableHead>
                     <TableHead className="font-semibold text-gray-800">Facturas</TableHead>
+                    <TableHead className="font-semibold text-gray-800 min-w-[240px]">Imputar (Cresium)</TableHead>
                     <TableHead className="font-semibold text-gray-800">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -287,6 +394,66 @@ export default function ReconciliationPage() {
                         </div>
                       </TableCell>
                       <TableCell>
+                        {payment.sourceSystem === 'CRESIUM' &&
+                        payment.applications.length === 0 &&
+                        (payment.candidates?.length ?? 0) > 0 ? (
+                          <div className="space-y-2 max-w-xs">
+                            {(payment.extractedTaxIds?.length ?? 0) > 0 && (
+                              <p className="text-[10px] text-gray-500 font-mono">
+                                CUIT detectados: {payment.extractedTaxIds?.join(', ')}
+                              </p>
+                            )}
+                            <Select
+                              value={imputeInvoiceByPayment[payment.id] || ''}
+                              onValueChange={(v) =>
+                                setImputeInvoiceByPayment((s) => ({ ...s, [payment.id]: v }))
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Elegir factura" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {payment.candidates!.map((c) => (
+                                  <SelectItem key={c.invoiceId} value={c.invoiceId}>
+                                    {c.numero} · {c.customerName.slice(0, 24)}
+                                    {c.exactAmountMatch ? ' · ✓ monto' : ''} · $
+                                    {(c.pendingCents / 100).toLocaleString('es-AR', {
+                                      minimumFractionDigits: 2,
+                                    })}{' '}
+                                    pend.
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              className="h-7 text-xs"
+                              disabled={
+                                !imputeInvoiceByPayment[payment.id] || imputeMutation.isPending
+                              }
+                              onClick={() =>
+                                imputeMutation.mutate({
+                                  paymentId: payment.id,
+                                  invoiceId: imputeInvoiceByPayment[payment.id],
+                                })
+                              }
+                            >
+                              {imputeMutation.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                'Imputar'
+                              )}
+                            </Button>
+                          </div>
+                        ) : payment.sourceSystem === 'CRESIUM' && payment.applications.length === 0 ? (
+                          <span className="text-xs text-gray-400">Sin candidatos automáticos</span>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex gap-2">
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -301,7 +468,7 @@ export default function ReconciliationPage() {
                                 }
                                 title={
                                   payment.applications.length === 0
-                                    ? 'Imputá primero el pago a una factura (API impute)'
+                                    ? 'Imputá primero el pago a una factura'
                                     : undefined
                                 }
                               >
@@ -398,6 +565,15 @@ export default function ReconciliationPage() {
                 <AlertDescription>
                   {(reconcileMutation.error as any)?.response?.data?.error ||
                     'Error al reconciliar el pago'}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {imputeMutation.isError && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {(imputeMutation.error as any)?.response?.data?.error || 'Error al imputar'}
                 </AlertDescription>
               </Alert>
             )}
