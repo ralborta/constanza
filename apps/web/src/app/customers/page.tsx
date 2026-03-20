@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Upload, Download, Search, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, Download, Search, AlertCircle, CheckCircle2, UserPlus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
@@ -25,6 +25,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 interface Customer {
   id: string;
@@ -41,6 +42,7 @@ interface Customer {
     razonSocial?: string;
     isPrimary: boolean;
   }>;
+  externalRef?: string | null;
 }
 
 interface UploadResult {
@@ -55,14 +57,55 @@ export default function CustomersPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    codigoUnico: '',
+    razonSocial: '',
+    email: '',
+    telefono: '',
+    cuit: '',
+    codigoVenta: '000',
+    externalRef: '',
+  });
 
   const { data, isLoading } = useQuery<{ customers: Customer[] }>({
     queryKey: ['customers'],
     queryFn: async () => {
       const response = await api.get('/v1/customers');
       return response.data;
+    },
+  });
+
+  const createManualMutation = useMutation({
+    mutationFn: async () => {
+      const payload: Record<string, unknown> = {
+        codigoUnico: manualForm.codigoUnico.trim(),
+        razonSocial: manualForm.razonSocial.trim(),
+        email: manualForm.email.trim().toLowerCase(),
+        codigoVenta: manualForm.codigoVenta.trim() || '000',
+      };
+      if (manualForm.telefono.trim()) payload.telefono = manualForm.telefono.trim();
+      if (manualForm.externalRef.trim()) payload.externalRef = manualForm.externalRef.trim();
+      if (manualForm.cuit.trim()) {
+        payload.cuits = [{ cuit: manualForm.cuit.trim(), isPrimary: true }];
+      }
+      const r = await api.post('/v1/customers', payload);
+      return r.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setManualOpen(false);
+      setManualForm({
+        codigoUnico: '',
+        razonSocial: '',
+        email: '',
+        telefono: '',
+        cuit: '',
+        codigoVenta: '000',
+        externalRef: '',
+      });
     },
   });
 
@@ -155,13 +198,100 @@ export default function CustomersPage() {
             </h1>
             <p className="mt-1 text-sm text-gray-600">Gestiona tus clientes y carga datos desde Excel</p>
           </div>
-          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white shadow-lg">
-                <Upload className="mr-2 h-4 w-4" />
-                Cargar desde Excel
-              </Button>
-            </DialogTrigger>
+          <div className="flex flex-wrap gap-2">
+            <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="border-indigo-300 text-indigo-700 hover:bg-indigo-50">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Nuevo cliente
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Alta manual de cliente</DialogTitle>
+                  <DialogDescription>
+                    Para sincronizar con un ERP podés usar el campo &quot;ID en ERP&quot;. También disponible:{' '}
+                    <code className="text-xs bg-muted px-1 rounded">POST /v1/integrations/ingest</code>.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Código único *</Label>
+                    <Input
+                      value={manualForm.codigoUnico}
+                      onChange={(e) => setManualForm((f) => ({ ...f, codigoUnico: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Razón social *</Label>
+                    <Input
+                      value={manualForm.razonSocial}
+                      onChange={(e) => setManualForm((f) => ({ ...f, razonSocial: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Email *</Label>
+                    <Input
+                      type="email"
+                      value={manualForm.email}
+                      onChange={(e) => setManualForm((f) => ({ ...f, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Teléfono</Label>
+                    <Input
+                      value={manualForm.telefono}
+                      onChange={(e) => setManualForm((f) => ({ ...f, telefono: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">CUIT</Label>
+                    <Input
+                      value={manualForm.cuit}
+                      onChange={(e) => setManualForm((f) => ({ ...f, cuit: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Código venta</Label>
+                    <Input
+                      value={manualForm.codigoVenta}
+                      onChange={(e) => setManualForm((f) => ({ ...f, codigoVenta: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">ID en ERP (externalRef)</Label>
+                    <Input
+                      value={manualForm.externalRef}
+                      onChange={(e) => setManualForm((f) => ({ ...f, externalRef: e.target.value }))}
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  {createManualMutation.isError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        {(createManualMutation.error as any)?.response?.data?.error || 'Error al crear'}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <Button
+                    onClick={() => createManualMutation.mutate()}
+                    disabled={createManualMutation.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {createManualMutation.isPending ? 'Guardando…' : 'Crear cliente'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white shadow-lg">
+                  <Upload className="mr-2 h-4 w-4" />
+                  Cargar desde Excel
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Cargar Clientes desde Excel</DialogTitle>
@@ -238,6 +368,7 @@ export default function CustomersPage() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card className="border-0 shadow-lg bg-white">

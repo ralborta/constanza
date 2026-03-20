@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { UploadInvoiceButton } from '@/components/invoices/upload-invoice-button';
+import { CreateInvoiceManualButton } from '@/components/invoices/create-invoice-manual-button';
 import { InvoiceHistorialDrawer } from '@/components/invoices/invoice-historial-drawer';
 
 interface Invoice {
@@ -81,7 +82,10 @@ export default function InvoicesPage() {
             <h1 className="text-2xl font-bold text-foreground">Facturas</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Gestión y seguimiento de todas las facturas</p>
           </div>
-          <UploadInvoiceButton />
+          <div className="flex flex-wrap gap-2">
+            <CreateInvoiceManualButton />
+            <UploadInvoiceButton />
+          </div>
         </div>
 
         <Card className="border border-border shadow-sm">

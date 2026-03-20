@@ -223,6 +223,20 @@ AGENT_API_KEY=tu_clave_secreta_para_agentes
 
 ---
 
+### Integración ERP / facturación (api-gateway)
+
+**Alta manual:** `POST /v1/customers`, `POST /v1/invoices` (JWT operador).
+
+**Sincronización por lotes (upsert):** `POST /v1/integrations/ingest` con JSON:
+- `customers[]`: `externalRef` opcional (ID en el sistema origen), `codigoUnico`, `razonSocial`, `email`, etc.
+- `invoices[]`: `externalRef` opcional, `numero`, `montoPesos`, `fechaVto`, y vínculo al cliente vía `customerId`, `customerExternalRef` o `codigoUnicoCliente`.
+
+Los registros existentes se actualizan si coinciden `externalRef` o, si no viene, `codigoUnico` / `número de factura`.
+
+Requiere columnas `external_ref` en `core.customers` e `core.invoices` (migración `006_customer_invoice_external_ref.sql`).
+
+---
+
 ### Cresium — `apps/rail-cucuru` (**único** webhook de pagos entrantes: `POST /wh/cresium/deposito`)
 
 | Variable | Obligatoria | Descripción |

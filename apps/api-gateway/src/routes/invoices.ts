@@ -142,6 +142,7 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
       return {
         invoices: invoices.map((inv) => ({
           id: inv.id,
+          externalRef: inv.externalRef,
           customer: {
             id: inv.customer.id,
             razonSocial: inv.customer.razonSocial,
@@ -159,6 +160,101 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
             appliedAt: app.appliedAt,
           })),
         })),
+      };
+    }
+  );
+
+  const createInvoiceBodySchema = z
+    .object({
+      externalRef: z.string().max(200).optional(),
+      customerId: z.string().uuid().optional(),
+      codigoUnicoCliente: z.string().optional(),
+      numero: z.string().min(1),
+      montoPesos: z.number().positive(),
+      fechaVto: z.string().min(8),
+      estado: z.enum(['ABIERTA', 'VENCIDA', 'PARCIAL', 'SALDADA']).optional().default('ABIERTA'),
+    })
+    .refine((d) => d.customerId || (d.codigoUnicoCliente && d.codigoUnicoCliente.length > 0), {
+      message: 'Indicá customerId o codigoUnicoCliente',
+    });
+
+  // POST /invoices - Alta manual
+  fastify.post(
+    '/invoices',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const body = createInvoiceBodySchema.parse(request.body);
+
+      if (body.externalRef?.trim()) {
+        const clash = await prisma.invoice.findFirst({
+          where: { tenantId: user.tenant_id, externalRef: body.externalRef.trim() },
+        });
+        if (clash) {
+          return reply.status(409).send({ error: 'Ya existe una factura con ese externalRef (ERP)' });
+        }
+      }
+
+      let customer: { id: string } | null = null;
+      if (body.customerId) {
+        customer = await prisma.customer.findFirst({
+          where: { id: body.customerId, tenantId: user.tenant_id },
+        });
+      } else if (body.codigoUnicoCliente) {
+        customer = await prisma.customer.findFirst({
+          where: { tenantId: user.tenant_id, codigoUnico: body.codigoUnicoCliente.trim() },
+        });
+      }
+      if (!customer) {
+        return reply.status(400).send({ error: 'Cliente no encontrado para este tenant' });
+      }
+
+      const numero = body.numero.trim();
+      const dup = await prisma.invoice.findFirst({
+        where: { tenantId: user.tenant_id, numero },
+      });
+      if (dup) {
+        return reply.status(409).send({ error: `Ya existe la factura ${numero}` });
+      }
+
+      const monto = Math.round(body.montoPesos * 100);
+      let fechaVto: Date;
+      const fv = body.fechaVto.trim();
+      if (fv.includes('/')) {
+        const [d, m, y] = fv.split('/').map(Number);
+        fechaVto = new Date(y, m - 1, d);
+      } else {
+        fechaVto = new Date(fv);
+      }
+      if (isNaN(fechaVto.getTime())) {
+        return reply.status(400).send({ error: 'fechaVto inválida (usá YYYY-MM-DD o DD/MM/YYYY)' });
+      }
+
+      const invoice = await prisma.invoice.create({
+        data: {
+          tenantId: user.tenant_id,
+          customerId: customer.id,
+          externalRef: body.externalRef?.trim() || null,
+          numero,
+          monto,
+          fechaVto,
+          estado: body.estado,
+        },
+      });
+
+      fastify.log.info({ invoiceId: invoice.id, numero }, 'Invoice created manually');
+      return {
+        invoice: {
+          id: invoice.id,
+          externalRef: invoice.externalRef,
+          numero: invoice.numero,
+          monto: invoice.monto,
+          fechaVto: invoice.fechaVto,
+          estado: invoice.estado,
+          customerId: invoice.customerId,
+        },
       };
     }
   );

@@ -62,6 +62,8 @@ model User {
 model Customer {
   id               String         @id @default(uuid()) @db.Uuid
   tenantId         String         @map("tenant_id") @db.Uuid
+  /// Clave estable en el ERP / sistema de facturación (para sincronizar / upsert).
+  externalRef      String?        @map("external_ref")
   codigoUnico      String         @map("codigo_unico")
   codigoVenta      String         @default("000") @map("codigo_venta")
   razonSocial      String         @map("razon_social")
@@ -82,6 +84,8 @@ model Customer {
 
   @@unique([tenantId, codigoUnico])
   @@unique([tenantId, email])
+  @@unique([tenantId, externalRef])
+  @@index([tenantId, externalRef])
   @@map("customers")
   @@schema("core")
 }
@@ -107,6 +111,8 @@ model Invoice {
   id                  String               @id @default(uuid()) @db.Uuid
   tenantId            String               @map("tenant_id") @db.Uuid
   customerId          String               @map("customer_id") @db.Uuid
+  /// ID en ERP / facturador (para sincronizar sin depender solo del número impreso).
+  externalRef         String?              @map("external_ref")
   numero              String
   monto               Int
   fechaVto            DateTime             @map("fecha_vto") @db.Date
@@ -122,7 +128,9 @@ model Invoice {
   paymentApplications PaymentApplication[]
 
   @@unique([tenantId, numero])
+  @@unique([tenantId, externalRef])
   @@index([tenantId, customerId])
+  @@index([tenantId, externalRef])
   @@index([fechaVto])
   @@index([estado])
   @@map("invoices")

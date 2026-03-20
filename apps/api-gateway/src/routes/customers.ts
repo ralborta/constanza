@@ -5,6 +5,7 @@ import { authenticate, requirePerfil } from '../middleware/auth.js';
 import * as XLSX from 'xlsx';
 
 const createCustomerSchema = z.object({
+  externalRef: z.string().max(200).optional(),
   codigoUnico: z.string(),
   codigoVenta: z.string().default('000'),
   razonSocial: z.string(),
@@ -103,6 +104,7 @@ export async function customerRoutes(fastify: FastifyInstance) {
           id: c.id,
           codigoUnico: c.codigoUnico,
           codigoVenta: c.codigoVenta,
+          externalRef: c.externalRef,
           razonSocial: c.razonSocial,
           email: c.email,
           telefono: c.telefono,
@@ -110,6 +112,79 @@ export async function customerRoutes(fastify: FastifyInstance) {
           accesoHabilitado: c.accesoHabilitado,
           cuits: c.customerCuits,
         })),
+      };
+    }
+  );
+
+  // POST /customers - Alta manual (formulario / integraciones)
+  fastify.post(
+    '/customers',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const body = createCustomerSchema.parse(request.body);
+
+      if (body.externalRef?.trim()) {
+        const clash = await prisma.customer.findFirst({
+          where: {
+            tenantId: user.tenant_id,
+            externalRef: body.externalRef.trim(),
+          },
+        });
+        if (clash) {
+          return reply.status(409).send({ error: 'Ya existe un cliente con ese externalRef (ERP)' });
+        }
+      }
+
+      const existing = await prisma.customer.findFirst({
+        where: {
+          tenantId: user.tenant_id,
+          OR: [{ codigoUnico: body.codigoUnico.trim() }, { email: body.email.trim().toLowerCase() }],
+        },
+      });
+      if (existing) {
+        return reply.status(409).send({ error: 'Ya existe un cliente con ese código único o email' });
+      }
+
+      const normalizeCuit = (raw: string) => raw.replace(/\D/g, '') || raw;
+
+      const customer = await prisma.customer.create({
+        data: {
+          tenantId: user.tenant_id,
+          externalRef: body.externalRef?.trim() || null,
+          codigoUnico: body.codigoUnico.trim(),
+          codigoVenta: body.codigoVenta || '000',
+          razonSocial: body.razonSocial.trim(),
+          email: body.email.trim().toLowerCase(),
+          telefono: body.telefono?.trim(),
+          customerCuits:
+            body.cuits?.length ?
+              {
+                create: body.cuits.map((cu) => ({
+                  tenantId: user.tenant_id,
+                  cuit: normalizeCuit(cu.cuit.trim()),
+                  razonSocial: cu.razonSocial?.trim(),
+                  isPrimary: cu.isPrimary,
+                })),
+              }
+            : undefined,
+        },
+        include: { customerCuits: true },
+      });
+
+      return {
+        customer: {
+          id: customer.id,
+          externalRef: customer.externalRef,
+          codigoUnico: customer.codigoUnico,
+          codigoVenta: customer.codigoVenta,
+          razonSocial: customer.razonSocial,
+          email: customer.email,
+          telefono: customer.telefono,
+          cuits: customer.customerCuits,
+        },
       };
     }
   );
