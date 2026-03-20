@@ -107,10 +107,8 @@ export default function TransfersPage() {
 
   const getSourceSystemBadge = (sourceSystem: string) => {
     switch (sourceSystem) {
-      case 'CUCURU':
-        return <Badge className="bg-blue-100 text-blue-700">Cucuru</Badge>;
-      case 'BINDX':
-        return <Badge className="bg-purple-100 text-purple-700">BindX</Badge>;
+      case 'CRESIUM':
+        return <Badge className="bg-cyan-100 text-cyan-800">Cresium</Badge>;
       case 'MANUAL':
         return <Badge className="bg-gray-100 text-gray-700">Manual</Badge>;
       default:
@@ -211,8 +209,7 @@ export default function TransfersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los orígenes</SelectItem>
-                    <SelectItem value="CUCURU">Cucuru</SelectItem>
-                    <SelectItem value="BINDX">BindX</SelectItem>
+                    <SelectItem value="CRESIUM">Cresium</SelectItem>
                     <SelectItem value="MANUAL">Manual</SelectItem>
                   </SelectContent>
                 </Select>
@@ -261,24 +258,31 @@ export default function TransfersPage() {
                       <TableCell>{getStatusBadge(transfer.status)}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          {transfer.applications.map((app) => (
-                            <div key={app.id} className="text-sm">
-                              <Link
-                                href={`/invoices/${app.invoice.id}`}
-                                className="text-emerald-600 hover:text-emerald-800 hover:underline"
-                              >
-                                {app.invoice.numero}
-                              </Link>
-                              <span className="text-gray-500 ml-2">
-                                ${(app.amount / 100).toLocaleString('es-AR')}
-                              </span>
-                              {app.isAuthoritative && (
-                                <Badge variant="outline" className="ml-2 text-xs">
-                                  🔒 Autoritativo
-                                </Badge>
-                              )}
-                            </div>
-                          ))}
+                          {transfer.applications.length === 0 ? (
+                            <span className="text-sm text-amber-700">
+                              Sin imputación — usar conciliación o POST{' '}
+                              <code className="text-xs">/v1/payments/…/impute</code>
+                            </span>
+                          ) : (
+                            transfer.applications.map((app) => (
+                              <div key={app.id} className="text-sm">
+                                <Link
+                                  href={`/invoices/${app.invoice.id}`}
+                                  className="text-emerald-600 hover:text-emerald-800 hover:underline"
+                                >
+                                  {app.invoice.numero}
+                                </Link>
+                                <span className="text-gray-500 ml-2">
+                                  ${(app.amount / 100).toLocaleString('es-AR')}
+                                </span>
+                                {app.isAuthoritative && (
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    🔒 Autoritativo
+                                  </Badge>
+                                )}
+                              </div>
+                            ))
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>

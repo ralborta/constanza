@@ -39,7 +39,7 @@ import {
   CurrencyDollar,
   Warning,
   CheckCircle,
-  Checks,
+  ArrowsLeftRight,
 } from '@phosphor-icons/react';
 
 interface KPISummary {
@@ -49,14 +49,13 @@ interface KPISummary {
   promisesToday: number;
   promisesBroken: number;
   autoAppliedPct: number;
-  echeqsPending: number;
+  cresiumPendingLiquidation: number;
   totalCollected?: number;
   totalPending?: number;
   efficiency?: number;
   totalCollectedVariation?: number;
   totalPendingVariation?: number;
   efficiencyVariation?: number;
-  echeqsVariation?: number;
 }
 
 interface Invoice {
@@ -70,13 +69,6 @@ interface Invoice {
   monto: number;
   montoAplicado: number;
   fechaVto: string;
-  estado: string;
-}
-
-interface ECheck {
-  id: string;
-  emisor: string;
-  monto: number;
   estado: string;
 }
 
@@ -162,12 +154,6 @@ export default function DashboardPage() {
     },
   });
 
-  const eChecks: ECheck[] = [
-    { id: 'E-78910', emisor: 'Innova Corp', monto: 250000, estado: 'PENDIENTE' },
-    { id: 'E-78911', emisor: 'Global Exports', monto: 55075, estado: 'PENDIENTE' },
-    { id: 'E-78912', emisor: 'Quantum Dynamics', monto: 182000, estado: 'PENDIENTE' },
-  ];
-
   return (
     <MainLayout>
       <div className="p-8">
@@ -213,10 +199,9 @@ export default function DashboardPage() {
             accentColor="bg-blue-100"
           />
           <KpiCard
-            title="E-Checks Pendientes"
-            value={kpisLoading ? '—' : String(kpis?.echeqsPending || 0)}
-            variation={kpis?.echeqsVariation}
-            icon={<Checks size={20} weight="duotone" className="text-amber-600" />}
+            title="Depósitos Cresium pendientes"
+            value={kpisLoading ? '—' : String(kpis?.cresiumPendingLiquidation ?? 0)}
+            icon={<ArrowsLeftRight size={20} weight="duotone" className="text-amber-600" />}
             accentColor="bg-amber-100"
           />
         </div>
@@ -452,50 +437,44 @@ export default function DashboardPage() {
 
           {/* Columna derecha */}
           <div className="space-y-6">
-            {/* E-Checks */}
+            {/* Ingresos Cresium */}
             <Card className="border border-border shadow-sm">
               <CardHeader className="border-b border-border pb-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-base font-semibold text-foreground">E-Checks Pendientes</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-0.5">Pendientes de aprobación</p>
+                    <CardTitle className="text-base font-semibold text-foreground">Pagos vía Cresium</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Transferencias y conciliación (sin otros proveedores)
+                    </p>
                   </div>
-                  <Link href="#" className="text-xs text-primary hover:underline font-medium">Ver todos</Link>
+                  <Link
+                    href="/payments/transfers"
+                    className="text-xs text-primary hover:underline font-medium"
+                  >
+                    Ver transferencias
+                  </Link>
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/40 hover:bg-muted/40">
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ID</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Emisor</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Monto</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {eChecks.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">No hay e-cheques pendientes</TableCell>
-                      </TableRow>
-                    ) : (
-                      eChecks.map((check) => (
-                        <TableRow key={check.id} className="hover:bg-muted/30">
-                          <TableCell className="font-mono text-xs font-medium text-foreground">{check.id}</TableCell>
-                          <TableCell className="text-sm text-foreground">{check.emisor}</TableCell>
-                          <TableCell className="font-mono text-xs font-semibold text-foreground">
-                            ${(check.monto / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                          </TableCell>
-                          <TableCell>
-                            <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white">
-                              Aprobar
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+              <CardContent className="p-6">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Los depósitos informados por Cresium aparecen en{' '}
+                  <Link href="/payments/transfers" className="text-primary font-medium hover:underline">
+                    Transferencias
+                  </Link>
+                  . Si hay pendientes de liquidación, gestionalos en{' '}
+                  <Link href="/payments/reconciliation" className="text-primary font-medium hover:underline">
+                    Conciliación
+                  </Link>
+                  .
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/payments/transfers">Transferencias</Link>
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/payments/reconciliation">Conciliación</Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 

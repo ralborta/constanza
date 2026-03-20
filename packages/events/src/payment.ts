@@ -10,7 +10,7 @@ export const PaymentAppliedAuthoritative = z.object({
       amount: z.number().int().positive(),
     })
   ),
-  provider: z.literal('cucuru'),
+  provider: z.literal('cresium'),
 });
 
 export type PaymentAppliedAuthoritative = z.infer<typeof PaymentAppliedAuthoritative>;
@@ -19,7 +19,7 @@ export const PaymentSettled = z.object({
   tenantId: z.string().uuid(),
   paymentId: z.string().uuid(),
   settledAt: z.string().datetime(),
-  provider: z.enum(['cucuru', 'bindx']),
+  provider: z.literal('cresium'),
 });
 
 export type PaymentSettled = z.infer<typeof PaymentSettled>;

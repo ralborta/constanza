@@ -114,10 +114,8 @@ export default function ReconciliationPage() {
 
   const getSourceSystemBadge = (sourceSystem: string) => {
     switch (sourceSystem) {
-      case 'CUCURU':
-        return <Badge className="bg-blue-100 text-blue-700">Cucuru</Badge>;
-      case 'BINDX':
-        return <Badge className="bg-purple-100 text-purple-700">BindX</Badge>;
+      case 'CRESIUM':
+        return <Badge className="bg-cyan-100 text-cyan-800">Cresium</Badge>;
       case 'MANUAL':
         return <Badge className="bg-gray-100 text-gray-700">Manual</Badge>;
       default:
@@ -272,14 +270,20 @@ export default function ReconciliationPage() {
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          {payment.applications.map((app, idx) => (
-                            <div key={idx} className="text-sm">
-                              <span className="text-gray-900">{app.invoice.numero}</span>
-                              <span className="text-gray-500 ml-2">
-                                ${(app.amount / 100).toLocaleString('es-AR')}
-                              </span>
-                            </div>
-                          ))}
+                          {payment.applications.length === 0 ? (
+                            <span className="text-sm text-amber-700">
+                              Sin factura — imputar vía API antes de liquidar
+                            </span>
+                          ) : (
+                            payment.applications.map((app, idx) => (
+                              <div key={idx} className="text-sm">
+                                <span className="text-gray-900">{app.invoice.numero}</span>
+                                <span className="text-gray-500 ml-2">
+                                  ${(app.amount / 100).toLocaleString('es-AR')}
+                                </span>
+                              </div>
+                            ))
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -290,9 +294,15 @@ export default function ReconciliationPage() {
                                 size="sm"
                                 className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                                 disabled={
-                                  reconcileMutation.isPending &&
-                                  selectedPaymentId === payment.id &&
-                                  reconcileAction === 'LIQUIDATE'
+                                  payment.applications.length === 0 ||
+                                  (reconcileMutation.isPending &&
+                                    selectedPaymentId === payment.id &&
+                                    reconcileAction === 'LIQUIDATE')
+                                }
+                                title={
+                                  payment.applications.length === 0
+                                    ? 'Imputá primero el pago a una factura (API impute)'
+                                    : undefined
                                 }
                               >
                                 {reconcileMutation.isPending &&

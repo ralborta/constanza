@@ -223,14 +223,26 @@ AGENT_API_KEY=tu_clave_secreta_para_agentes
 
 ---
 
-### `CUCURU_WEBHOOK_SECRET` (apps/rail-cucuru)
+### Cresium — `apps/rail-cucuru` (**único** webhook de pagos entrantes: `POST /wh/cresium/deposito`)
 
-**Descripción:** Secreto para validar webhooks de Cucuru.
+| Variable | Obligatoria | Descripción |
+|----------|-------------|-------------|
+| `CRESIUM_TENANT_ID` | Sí | UUID del tenant en Constanza al que se imputan los depósitos. |
+| `CRESIUM_PARTNER_SECRET` | Sí (prod) | *Partner secret* de Cresium para HMAC-SHA256 (misma regla que API: `x-timestamp\|METHOD\|PATH\|BODY` → Base64). |
+| `CRESIUM_COMPANY_ID` | No | Si se define, debe coincidir con header `x-company-id` del webhook (ej. `700`). |
+| `CRESIUM_SKIP_SIGNATURE_VERIFY` | No | `true` solo en pruebas locales si aún no tenés el secret (⚠️ nunca en producción). |
+| `CRESIUM_AMOUNT_UNIT` | No | Por defecto el monto del webhook se interpreta en **pesos** y se convierte a centavos. Si Cresium envía **centavos**, definir `CRESIUM_AMOUNT_UNIT=CENTS`. |
 
 **Ejemplo:**
+```bash
+CRESIUM_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+CRESIUM_PARTNER_SECRET=tu_partner_secret
+CRESIUM_COMPANY_ID=700
 ```
-CUCURU_WEBHOOK_SECRET=tu_secreto_aqui
-```
+
+**Imputación manual** (depósito sin match de factura en el payload): desde API autenticada, `POST /v1/payments/:paymentId/impute` con body `{ "invoiceId": "<uuid-factura>" }`.
+
+**Base de datos:** aplicar migración `infra/supabase/migrations/004_payment_total_amount_cents.sql` (columna `pay.payments.total_amount_cents`).
 
 ---
 
@@ -287,7 +299,9 @@ NODE_ENV=development
 ```bash
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://localhost:6379
-CUCURU_WEBHOOK_SECRET=...
+CRESIUM_TENANT_ID=...       # UUID tenant Constanza
+CRESIUM_PARTNER_SECRET=... # firma webhook (o SKIP solo dev)
+CRESIUM_COMPANY_ID=700      # opcional
 NODE_ENV=development
 ```
 

@@ -184,16 +184,18 @@ model Asociado {
 }
 
 model Payment {
-  id           String               @id @default(uuid()) @db.Uuid
-  tenantId     String               @map("tenant_id") @db.Uuid
-  sourceSystem String               @map("source_system")
-  method       String
-  status       String
-  settledAt    DateTime?            @map("settled_at") @db.Timestamptz(6)
-  externalRef  String?              @map("external_ref")
-  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
-  applications PaymentApplication[]
+  id                 String               @id @default(uuid()) @db.Uuid
+  tenantId           String               @map("tenant_id") @db.Uuid
+  sourceSystem       String               @map("source_system")
+  method             String
+  status             String
+  settledAt          DateTime?            @map("settled_at") @db.Timestamptz(6)
+  externalRef        String?              @map("external_ref")
+  /// Monto en centavos cuando el pago aún no tiene applications (ej. depósito Cresium sin match de factura).
+  totalAmountCents   Int?                 @map("total_amount_cents")
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  applications       PaymentApplication[]
 
   @@index([tenantId, status])
   @@index([externalRef])

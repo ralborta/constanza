@@ -1,7 +1,7 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
-import { cresiumWebhookTestRoutes, webhookRoutes } from './routes/webhooks.js';
+import { cresiumDepositPlugin } from './routes/cresium.js';
 import { healthRoutes } from './routes/health.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
@@ -69,9 +69,7 @@ server.decorate('redis', redis);
 
 // Routes
 await server.register(healthRoutes);
-await server.register(webhookRoutes, { prefix: '/wh/cucuru' });
-// Endpoint temporal de test para capturar el payload de Cresium
-await server.register(cresiumWebhookTestRoutes, { prefix: '/wh/cresium' });
+await server.register(cresiumDepositPlugin, { prefix: '/wh/cresium' });
 
 // Error handler
 server.setErrorHandler((error, request, reply) => {
@@ -87,7 +85,7 @@ const start = async () => {
     const host = process.env.HOST || '0.0.0.0';
 
     await server.listen({ port, host });
-    logger.info(`🚀 Rail Cucuru running on http://${host}:${port}`);
+    logger.info(`🚀 Rail Cresium bridge on http://${host}:${port}`);
   } catch (err) {
     logger.error(err);
     process.exit(1);

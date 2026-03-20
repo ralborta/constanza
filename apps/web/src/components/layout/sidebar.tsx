@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import {
   SquaresFour,
   FileText,
-  CreditCard,
   Bell,
   SignOut,
   User,
@@ -38,7 +37,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: SquaresFour },
   { name: 'Facturas', href: '/invoices', icon: FileText },
   { name: 'Clientes', href: '/customers', icon: Users },
-  { name: 'Cheques', href: '#', icon: CreditCard },
+  { name: 'Ingresos (Cresium)', href: '/payments/transfers', icon: Wallet },
   { name: 'Eventos', href: '#', icon: Bell },
   { name: 'Jobs', href: '/jobs', icon: ChartBar },
 ];

@@ -102,11 +102,13 @@ export async function kpiRoutes(fastify: FastifyInstance) {
 
       const autoAppliedPct = totalApplications > 0 ? authoritativeApplications / totalApplications : 0;
 
-      // E-cheques pendientes
-      const echeqsPending = await prisma.echeq.count({
+      // Depósitos Cresium pendientes de liquidación / conciliación
+      const cresiumPendingLiquidation = await prisma.payment.count({
         where: {
           tenantId,
-          statusOperativo: 'RECIBIDO',
+          sourceSystem: 'CRESIUM',
+          method: 'TRANSFERENCIA',
+          status: 'PEND_LIQ',
         },
       });
 
@@ -117,7 +119,7 @@ export async function kpiRoutes(fastify: FastifyInstance) {
         promisesToday,
         promisesBroken,
         autoAppliedPct: Math.round(autoAppliedPct * 10000) / 100, // Porcentaje con 2 decimales
-        echeqsPending,
+        cresiumPendingLiquidation,
         channelHealth: {
           whatsapp: {
             deliveryRate: 0.95, // TODO: Calcular desde contact.events

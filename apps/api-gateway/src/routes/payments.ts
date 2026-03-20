@@ -3,6 +3,15 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 
+/** Monto mostrado: suma de applications, o total declarado por el origen si aún no hay imputación. */
+function transferTotalCents(payment: {
+  applications: { amount: number }[];
+  totalAmountCents?: number | null;
+}): number {
+  const fromApps = payment.applications.reduce((s, a) => s + a.amount, 0);
+  return fromApps > 0 ? fromApps : payment.totalAmountCents ?? 0;
+}
+
 export async function paymentRoutes(fastify: FastifyInstance) {
   // GET /payments/transfers - Listar transferencias bancarias
   fastify.get(
@@ -70,12 +79,7 @@ export async function paymentRoutes(fastify: FastifyInstance) {
       const total = await prisma.payment.count({ where });
 
       // Calcular totales
-      const totalAmount = payments.reduce((sum, payment) => {
-        return (
-          sum +
-          payment.applications.reduce((appSum, app) => appSum + app.amount, 0)
-        );
-      }, 0);
+      const totalAmount = payments.reduce((sum, payment) => sum + transferTotalCents(payment), 0);
 
       return {
         transfers: payments.map((payment) => ({
@@ -85,7 +89,7 @@ export async function paymentRoutes(fastify: FastifyInstance) {
           externalRef: payment.externalRef,
           createdAt: payment.createdAt,
           settledAt: payment.settledAt,
-          totalAmount: payment.applications.reduce((sum, app) => sum + app.amount, 0),
+          totalAmount: transferTotalCents(payment),
           applications: payment.applications.map((app) => ({
             id: app.id,
             invoice: {
@@ -156,11 +160,11 @@ export async function paymentRoutes(fastify: FastifyInstance) {
         orderBy: { createdAt: 'desc' },
       });
 
-      // Pagos autoritativos (Cucuru) vs manuales
+      // Pagos autoritativos (Cresium) vs manuales
       const authoritativePayments = await prisma.payment.findMany({
         where: {
           tenantId: user.tenant_id,
-          sourceSystem: 'CUCURU',
+          sourceSystem: 'CRESIUM',
           createdAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
         },
         include: {
@@ -197,12 +201,7 @@ export async function paymentRoutes(fastify: FastifyInstance) {
 
       // Calcular totales
       const calculateTotal = (payments: any[]) => {
-        return payments.reduce((sum, payment) => {
-          return (
-            sum +
-            payment.applications.reduce((appSum: number, app: any) => appSum + app.amount, 0)
-          );
-        }, 0);
+        return payments.reduce((sum, payment) => sum + transferTotalCents(payment), 0);
       };
 
       return {
@@ -213,7 +212,7 @@ export async function paymentRoutes(fastify: FastifyInstance) {
           status: payment.status,
           externalRef: payment.externalRef,
           createdAt: payment.createdAt,
-          totalAmount: payment.applications.reduce((sum, app) => sum + app.amount, 0),
+          totalAmount: transferTotalCents(payment),
           applications: payment.applications.map((app) => ({
             invoice: {
               numero: app.invoice.numero,
@@ -278,6 +277,18 @@ export async function paymentRoutes(fastify: FastifyInstance) {
         });
       }
 
+      if (body.action === 'LIQUIDATE') {
+        const appCount = await prisma.paymentApplication.count({
+          where: { paymentId: payment.id },
+        });
+        if (appCount === 0) {
+          return reply.status(400).send({
+            error:
+              'No se puede liquidar sin imputación a factura. Usá POST /v1/payments/:id/impute o esperá el match automático.',
+          });
+        }
+      }
+
       const newStatus = body.action === 'LIQUIDATE' ? 'LIQUIDADO' : 'RECHAZADO';
       const settledAt = body.action === 'LIQUIDATE' ? new Date() : null;
 
@@ -298,6 +309,78 @@ export async function paymentRoutes(fastify: FastifyInstance) {
         paymentId: payment.id,
         status: newStatus,
         settledAt,
+      };
+    }
+  );
+
+  // POST /payments/:paymentId/impute — imputar a factura un depósito Cresium sin match automático
+  fastify.post(
+    '/payments/:paymentId/impute',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const { paymentId } = request.params as { paymentId: string };
+      const body = z.object({ invoiceId: z.string().uuid() }).parse(request.body);
+
+      const payment = await prisma.payment.findFirst({
+        where: { id: paymentId, tenantId: user.tenant_id, sourceSystem: 'CRESIUM' },
+        include: { applications: true },
+      });
+
+      if (!payment) {
+        return reply.status(404).send({ error: 'Pago Cresium no encontrado' });
+      }
+      if (payment.applications.length > 0) {
+        return reply.status(400).send({ error: 'El pago ya tiene imputaciones' });
+      }
+      const cents = payment.totalAmountCents ?? 0;
+      if (cents <= 0) {
+        return reply.status(400).send({ error: 'Sin monto pendiente de imputar' });
+      }
+      if (payment.status !== 'PEND_LIQ') {
+        return reply.status(400).send({ error: `Estado no válido para imputar: ${payment.status}` });
+      }
+
+      const invoice = await prisma.invoice.findFirst({
+        where: { id: body.invoiceId, tenantId: user.tenant_id },
+      });
+      if (!invoice) {
+        return reply.status(404).send({ error: 'Factura no encontrada' });
+      }
+
+      await prisma.paymentApplication.create({
+        data: {
+          tenantId: user.tenant_id,
+          paymentId: payment.id,
+          invoiceId: invoice.id,
+          amount: cents,
+          isAuthoritative: true,
+          appliedAt: new Date(),
+          externalApplicationRef: `cresium-impute:${payment.externalRef ?? payment.id}`,
+        },
+      });
+
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          totalAmountCents: null,
+          status: 'LIQUIDADO',
+          settledAt: new Date(),
+        },
+      });
+
+      fastify.log.info(
+        { paymentId: payment.id, invoiceId: invoice.id, amount: cents, userId: user.user_id },
+        'Cresium payment imputed manually'
+      );
+
+      return {
+        ok: true,
+        paymentId: payment.id,
+        invoiceId: invoice.id,
+        amount: cents,
       };
     }
   );
@@ -351,7 +434,8 @@ export async function paymentRoutes(fastify: FastifyInstance) {
           createdAt: payment.createdAt,
           settledAt: payment.settledAt,
           updatedAt: payment.updatedAt,
-          totalAmount: payment.applications.reduce((sum, app) => sum + app.amount, 0),
+          totalAmount: transferTotalCents(payment),
+          unappliedAmountCents: payment.totalAmountCents,
           applications: payment.applications.map((app) => ({
             id: app.id,
             invoice: {

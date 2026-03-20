@@ -5,7 +5,7 @@ export async function healthRoutes(fastify: FastifyInstance) {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'rail-cucuru',
+      service: 'rail-cresium',
     };
   });
 }
