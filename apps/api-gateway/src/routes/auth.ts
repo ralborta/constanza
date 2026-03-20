@@ -67,16 +67,17 @@ export async function authRoutes(fastify: FastifyInstance) {
             }
           }
         } else {
-          // Si no hay tenant, usar UUIDs temporales
-          tenantId = '00000000-0000-0000-0000-000000000001';
-          userId = '00000000-0000-0000-0000-000000000002';
-          fastify.log.warn('No tenant found in DB, using temporary UUIDs');
+          fastify.log.error('No hay ningún tenant en la DB: ejecutá seed o migración 007_default_tenant_id.sql');
+          return reply.status(503).send({
+            error:
+              'Servidor sin datos de empresa (tenant). Ejecutá el seed de Prisma o la migración SQL 007 en la base.',
+          });
         }
       } catch (error) {
-        // Si falla la DB, usar UUIDs temporales
-        tenantId = '00000000-0000-0000-0000-000000000001';
-        userId = '00000000-0000-0000-0000-000000000002';
-        fastify.log.warn({ error }, 'DB error, using temporary UUIDs for fake user');
+        fastify.log.error({ error }, 'Error leyendo tenants para login de desarrollo');
+        return reply.status(503).send({
+          error: 'No se pudo verificar la base de datos. Revisá DATABASE_URL y migraciones.',
+        });
       }
       
       const token = fastify.jwt.sign({
@@ -162,14 +163,17 @@ export async function authRoutes(fastify: FastifyInstance) {
           tenantId = tenant.id;
           fastify.log.info({ tenantId }, 'Using real tenant from DB for fake customer');
         } else {
-          // Si no hay tenant, usar un UUID válido temporal
-          tenantId = '00000000-0000-0000-0000-000000000001';
-          fastify.log.warn('No tenant found in DB, using temporary UUID');
+          fastify.log.error('No hay tenant en DB para login cliente fake');
+          return reply.status(503).send({
+            error:
+              'Servidor sin datos de empresa (tenant). Ejecutá el seed o la migración SQL 007 en la base.',
+          });
         }
       } catch (error) {
-        // Si falla la DB, usar UUID válido temporal
-        tenantId = '00000000-0000-0000-0000-000000000001';
-        fastify.log.warn({ error }, 'DB error, using temporary UUID for fake customer');
+        fastify.log.error({ error }, 'Error leyendo tenant para login cliente fake');
+        return reply.status(503).send({
+          error: 'No se pudo verificar la base de datos.',
+        });
       }
       
       const fakeCustomerId = '00000000-0000-0000-0000-000000000003';

@@ -6,11 +6,14 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Crear tenant de prueba
+  /** Mismo UUID que usa el fallback del login si hace falta (FK siempre válida). */
+  const TENANT_DEFAULT_ID = '00000000-0000-0000-0000-000000000001';
+
   const tenant = await prisma.tenant.upsert({
-    where: { slug: 'demo' },
+    where: { id: TENANT_DEFAULT_ID },
     update: {},
     create: {
+      id: TENANT_DEFAULT_ID,
       name: 'Demo Tenant',
       slug: 'demo',
     },
