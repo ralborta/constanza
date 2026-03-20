@@ -4,6 +4,8 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
+import { ZodError } from 'zod';
+import { Prisma } from '@prisma/client';
 import { authRoutes } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { invoiceRoutes } from './routes/invoices.js';
@@ -82,8 +84,27 @@ await server.register(cobranzaRoutes, { prefix: '/v1' });
 // chatRoutes ahora está integrado en invoiceRoutes para evitar conflictos de rutas
 await server.register(seedRoutes, { prefix: '/seed' });
 
-// Error handler
+// Error handler — Zod/Prisma sin statusCode terminaban en 500 genérico
 server.setErrorHandler((error, request, reply) => {
+  if (error instanceof ZodError) {
+    logger.warn({ path: request.url, issues: error.flatten() }, 'Validation error');
+    return reply.status(400).send({
+      error: 'Validación fallida',
+      details: error.flatten(),
+    });
+  }
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    logger.error({ code: error.code, meta: error.meta }, error.message);
+    if (error.code === 'P2002') {
+      return reply.status(409).send({ error: 'Registro duplicado (constraint único)' });
+    }
+    if (error.code === 'P2022' || error.code === 'P2010') {
+      return reply.status(500).send({
+        error:
+          'Error de esquema en base de datos (¿falta aplicar migraciones en el servidor?)',
+      });
+    }
+  }
   logger.error(error);
   reply.status(error.statusCode || 500).send({
     error: error.message || 'Internal Server Error',

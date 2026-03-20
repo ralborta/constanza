@@ -33,6 +33,8 @@ export async function paymentRoutes(fastify: FastifyInstance) {
         limit?: string;
         offset?: string;
       };
+      const take = Math.min(500, Math.max(1, parseInt(String(limit), 10) || 50));
+      const skip = Math.max(0, parseInt(String(offset), 10) || 0);
 
       const where: any = {
         tenantId: user.tenant_id,
@@ -60,8 +62,8 @@ export async function paymentRoutes(fastify: FastifyInstance) {
       const payments = await prisma.payment.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: parseInt(limit),
-        skip: parseInt(offset),
+        take,
+        skip,
         include: {
           applications: {
             include: {
@@ -111,8 +113,8 @@ export async function paymentRoutes(fastify: FastifyInstance) {
         })),
         total,
         totalAmount,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        limit: take,
+        offset: skip,
       };
     }
   );
