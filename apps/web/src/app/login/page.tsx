@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login, loginCustomer, setToken } from '@/lib/auth';
+import { setToken } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,8 +19,15 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🔍 FORM SUBMIT ejecutado', { email, password, isCustomer });
-    
+    const emailTrim = email.trim();
+    const passwordTrim = password;
+    console.log('🔍 FORM SUBMIT ejecutado', { email: emailTrim, isCustomer });
+
+    if (!emailTrim || !passwordTrim) {
+      setError('Completá email y contraseña.');
+      return;
+    }
+
     setError('');
     setLoading(true);
 
@@ -33,12 +40,15 @@ export default function LoginPage() {
         setError('Error de configuración: NEXT_PUBLIC_API_URL no está configurada. Por favor, contacta al administrador del sistema.');
         return;
       }
-      
-      console.log('🔍 Intentando login con backend:', `${apiUrl}/auth/login`);
-      const response = await fetch(`${apiUrl}/auth/login`, {
+
+      const path = isCustomer ? '/auth/customer/login' : '/auth/login';
+      const url = `${apiUrl}${path}`;
+      console.log('🔍 Intentando login con backend:', url);
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: emailTrim, password: passwordTrim }),
       });
       
       console.log('🔍 Response status:', response.status);
@@ -95,10 +105,10 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
-          <form 
-            className="space-y-4" 
+          <form
+            className="space-y-4"
             onSubmit={handleSubmit}
-            // IMPORTANTE: que el form envuelva todo el contenido de login
+            noValidate
           >
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">
@@ -107,8 +117,9 @@ export default function LoginPage() {
               <Input
                 id="email"
                 name="email"
-                type="email"
-                required
+                type="text"
+                inputMode="email"
+                autoComplete="email"
                 placeholder="tu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -123,7 +134,7 @@ export default function LoginPage() {
                 id="password"
                 name="password"
                 type="password"
-                required
+                autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -141,7 +152,7 @@ export default function LoginPage() {
                 onChange={(e) => setIsCustomer(e.target.checked)}
               />
               <label htmlFor="customer" className="text-sm text-gray-700">
-                Soy cliente
+                Soy cliente (portal de deudor)
               </label>
             </div>
 
