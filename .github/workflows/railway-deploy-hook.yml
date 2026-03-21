@@ -1,0 +1,32 @@
+# Dispara un deploy en Railway sin depender del webhook GitHub→Railway (a veces se rompe).
+#
+# Configuración única:
+# 1) Railway → tu PROYECTO → el SERVICIO (ej. api-gateway) → Settings → Deploy → Deploy Hooks
+#    → Create Hook → branch main → copiá la URL.
+# 2) GitHub → repo constanza → Settings → Secrets and variables → Actions
+#    → New repository secret → Name: RAILWAY_DEPLOY_HOOK → Value: la URL del hook.
+#
+# Cada push a main hará POST al hook y Railway buildeará el último commit de la rama conectada al servicio.
+
+name: Railway deploy (hook)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Railway deploy via Deploy Hook
+        env:
+          HOOK: ${{ secrets.RAILWAY_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::notice::RAILWAY_DEPLOY_HOOK no está definido en GitHub Secrets. Añadí el Deploy Hook URL (ver .github/workflows/railway-deploy-hook.yml)."
+            exit 0
+          fi
+          echo "Invocando Deploy Hook de Railway..."
+          curl -fsS -X POST "$HOOK" -H "Content-Type: application/json"
+          echo ""
+          echo "Hook invocado. Revisá Railway → Deployments."
