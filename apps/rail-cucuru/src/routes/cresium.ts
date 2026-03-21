@@ -50,7 +50,63 @@ function timestampMsForSkewCheck(headerVal: string): number | null {
   return null;
 }
 
-/** Un intento de verificación HMAC (documentación Cresium: `timestamp|METHOD|path|body`). */
+/** JSON estable (claves ordenadas) por si el body firmado no coincide byte-a-byte con el raw. */
+function stableStringify(obj: unknown): string {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return `[${obj.map((x) => stableStringify(x)).join(',')}]`;
+  }
+  const o = obj as Record<string, unknown>;
+  const keys = Object.keys(o).sort();
+  return `{${keys.map((k) => JSON.stringify(k) + ':' + stableStringify(o[k])).join(',')}}`;
+}
+
+function timingSafeEqualHmac(expectedB64: string, incoming: string): boolean {
+  let expBuf: Buffer;
+  try {
+    expBuf = Buffer.from(expectedB64, 'base64');
+  } catch {
+    return false;
+  }
+  const s = incoming.trim();
+  const tryBuf = (buf: Buffer) =>
+    buf.length === expBuf.length && crypto.timingSafeEqual(buf, expBuf);
+
+  try {
+    const b = Buffer.from(s, 'base64');
+    if (tryBuf(b)) return true;
+  } catch {
+    /* siguiente */
+  }
+
+  const b64url = s.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = b64url.length % 4;
+  try {
+    const b2 = Buffer.from(pad ? b64url + '='.repeat(4 - pad) : b64url, 'base64');
+    if (tryBuf(b2)) return true;
+  } catch {
+    /* siguiente */
+  }
+
+  const hex = s.replace(/^0x/i, '');
+  if (/^[0-9a-fA-F]+$/.test(hex) && hex.length === expBuf.length * 2) {
+    try {
+      const b3 = Buffer.from(hex, 'hex');
+      if (tryBuf(b3)) return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Cresium documenta `timestamp|METHOD|PATH|BODY` con `|` antes del body.
+ * En la misma página hay un ejemplo sin `|` entre PATH y BODY (path y JSON pegados).
+ * Probamos ambas construcciones.
+ */
 function verifyCresiumSignatureOne(opts: {
   timestamp: string;
   method: string;
@@ -59,16 +115,16 @@ function verifyCresiumSignatureOne(opts: {
   signatureB64: string;
   secret: string;
 }): boolean {
-  const data = `${opts.timestamp}|${opts.method}|${opts.pathWithQuery}|${opts.rawBody}`;
-  const expected = crypto.createHmac('sha256', opts.secret).update(data).digest('base64');
-  try {
-    const sigBuf = Buffer.from(opts.signatureB64, 'base64');
-    const expBuf = Buffer.from(expected, 'base64');
-    if (sigBuf.length !== expBuf.length) return false;
-    return crypto.timingSafeEqual(sigBuf, expBuf);
-  } catch {
-    return false;
+  const { timestamp, method, pathWithQuery, rawBody, secret } = opts;
+  const constructions: string[] = [
+    `${timestamp}|${method}|${pathWithQuery}|${rawBody}`,
+    `${timestamp}|${method}|${pathWithQuery}${rawBody}`,
+  ];
+  for (const data of constructions) {
+    const expected = crypto.createHmac('sha256', secret).update(data, 'utf8').digest('base64');
+    if (timingSafeEqualHmac(expected, opts.signatureB64)) return true;
   }
+  return false;
 }
 
 /**
@@ -112,29 +168,52 @@ function candidatePaths(pathWithQuery: string): string[] {
   return [...out];
 }
 
+function candidateBodies(rawBody: string, parsedBody: unknown): string[] {
+  const out = new Set<string>();
+  out.add(rawBody);
+  const t = rawBody.trim();
+  if (t !== rawBody) out.add(t);
+  if (parsedBody !== undefined && parsedBody !== null && typeof parsedBody === 'object') {
+    try {
+      out.add(JSON.stringify(parsedBody));
+      out.add(stableStringify(parsedBody));
+    } catch {
+      /* ignore */
+    }
+  }
+  return [...out];
+}
+
 function verifyCresiumSignatureFlexible(opts: {
   timestampHeader: string;
   method: string;
   pathWithQuery: string;
   rawBody: string;
+  parsedBody: unknown;
   signatureB64: string;
-  secret: string;
+  secrets: string[];
 }): boolean {
   const tsList = candidateTimestampStringsForSignature(opts.timestampHeader);
   const pathList = candidatePaths(opts.pathWithQuery);
-  for (const timestamp of tsList) {
-    for (const pathWithQuery of pathList) {
-      if (
-        verifyCresiumSignatureOne({
-          timestamp,
-          method: opts.method,
-          pathWithQuery,
-          rawBody: opts.rawBody,
-          signatureB64: opts.signatureB64,
-          secret: opts.secret,
-        })
-      ) {
-        return true;
+  const bodyList = candidateBodies(opts.rawBody, opts.parsedBody);
+  for (const secret of opts.secrets) {
+    if (!secret) continue;
+    for (const timestamp of tsList) {
+      for (const pathWithQuery of pathList) {
+        for (const rawBody of bodyList) {
+          if (
+            verifyCresiumSignatureOne({
+              timestamp,
+              method: opts.method,
+              pathWithQuery,
+              rawBody,
+              signatureB64: opts.signatureB64,
+              secret,
+            })
+          ) {
+            return true;
+          }
+        }
       }
     }
   }
@@ -319,7 +398,9 @@ async function findInvoiceMatch(
  * Requiere cuerpo crudo para validar la firma.
  */
 export async function cresiumDepositPlugin(fastify: FastifyInstance) {
-  fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+  // Incluye `application/json; charset=utf-8` — si no, Fastify usa otro parser y `rawBody` queda vacío → firma inválida siempre.
+  const jsonMime = /^application\/json(?:;[\s\S]*)?$/i;
+  fastify.addContentTypeParser(jsonMime, { parseAs: 'string' }, (req, body, done) => {
     (req as FastifyRequest & { rawBody: string }).rawBody = typeof body === 'string' ? body : String(body);
     try {
       const json = JSON.parse((req as FastifyRequest & { rawBody: string }).rawBody);
@@ -338,7 +419,10 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
     const body = request.body as Record<string, unknown>;
 
     const skipVerify = process.env.CRESIUM_SKIP_SIGNATURE_VERIFY === 'true';
-    const secret = process.env.CRESIUM_PARTNER_SECRET ?? '';
+    const partnerSecret = process.env.CRESIUM_PARTNER_SECRET?.trim() ?? '';
+    /** Algunos paneles distinguen “webhook secret” del secret de API partner. */
+    const webhookSecretOnly = process.env.CRESIUM_WEBHOOK_SECRET?.trim() ?? '';
+    const signingSecrets = [...new Set([webhookSecretOnly, partnerSecret].filter(Boolean))];
     const tenantId = process.env.CRESIUM_TENANT_ID ?? '';
 
     if (!tenantId) {
@@ -356,8 +440,8 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
     }
 
     if (!skipVerify) {
-      if (!secret) {
-        fastify.log.error('CRESIUM_PARTNER_SECRET not configured');
+      if (signingSecrets.length === 0) {
+        fastify.log.error('CRESIUM_PARTNER_SECRET or CRESIUM_WEBHOOK_SECRET not configured');
         return reply.status(500).send({ error: 'Server configuration error' });
       }
       const timestamp = request.headers['x-timestamp'] as string | undefined;
@@ -381,13 +465,23 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
         method,
         pathWithQuery,
         rawBody,
+        parsedBody: body,
         signatureB64: signature,
-        secret,
+        secrets: signingSecrets,
       });
       if (!ok) {
+        const debug = process.env.CRESIUM_SIGNATURE_DEBUG === 'true';
         fastify.log.warn(
-          { method, pathWithQuery, ts: timestamp },
-          'Cresium webhook: invalid signature'
+          {
+            method,
+            pathWithQuery,
+            ts: timestamp,
+            rawBodyLength: rawBody.length,
+            bodyKeys: body && typeof body === 'object' ? Object.keys(body as object) : [],
+            secretsTried: signingSecrets.length,
+            ...(debug ? { rawBodyPrefix: rawBody.slice(0, 200) } : {}),
+          },
+          'Cresium webhook: invalid signature (revisá secret; si el panel tiene “webhook secret” distinto, usar CRESIUM_WEBHOOK_SECRET)'
         );
         return reply.status(401).send({ error: 'Invalid signature' });
       }

@@ -31,7 +31,13 @@ Si Railway solo permite “Dockerfile” en la raíz, alternativa: dejar **Root 
 - La URL base será algo como `https://xxxx.up.railway.app`.
 - Webhook en Cresium: `https://xxxx.up.railway.app/wh/cresium/deposito`
 
-## 4. Variables de entorno (mínimo)
+## 4. Firma HMAC (`invalid signature`)
+
+- El servidor debe leer el **JSON crudo** tal cual lo envía Cresium. Si el `Content-Type` es `application/json; charset=utf-8`, el parser debe aceptarlo (en el código usamos regex para JSON + charset).
+- La documentación de Cresium muestra el string a firmar como `timestamp|METHOD|PATH|BODY` **y** en otro ejemplo PATH y BODY **sin** `|` intermedio; el código prueba **ambas** formas.
+- Si sigue fallando: mismo valor que en el panel (**Partner secret** vs **Webhook secret**). Variable opcional: `CRESIUM_WEBHOOK_SECRET`.
+
+## 5. Variables de entorno (mínimo)
 
 Copiá desde el mismo Postgres que usa Constanza (o referencia compartida):
 
@@ -47,7 +53,7 @@ Lista completa: `VARIABLES_ENTORNO.md` (sección Cresium).
 
 `PORT` lo define Railway; el código usa `process.env.PORT` (default 3003).
 
-## 5. Watch paths (si usás auto-deploy por repo)
+## 6. Watch paths (si usás auto-deploy por repo)
 
 Si en otros servicios tenés **Watch Paths** restrictivos, para **este** servicio incluí al menos:
 
@@ -55,7 +61,7 @@ Si en otros servicios tenés **Watch Paths** restrictivos, para **este** servici
 
 y lo que comparta (`infra/prisma/**`, etc.), o desactivá watch paths solo para rail-cucuru para que cada push despliegue.
 
-## 6. Verificar
+## 7. Verificar
 
 ```bash
 curl -sS "https://<tu-host>.up.railway.app/health"
@@ -63,6 +69,6 @@ curl -sS "https://<tu-host>.up.railway.app/health"
 
 Debería responder JSON con `"status":"ok"` y `"service":"rail-cresium"`.
 
-## 7. Deploy Hook (opcional)
+## 8. Deploy Hook (opcional)
 
 Podés crear un **Deploy Hook** solo para este servicio y guardarlo en GitHub como otro secret si querés CI distinto al de api-gateway (ver `.github/workflows/railway-deploy-hook.yml`).
