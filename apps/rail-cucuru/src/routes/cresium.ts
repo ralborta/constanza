@@ -13,7 +13,30 @@ import {
 
 const prisma = new PrismaClient();
 
-const REPLAY_WINDOW_MS = 6 * 60 * 1000;
+/** Ventana anti-replay: por defecto 15 min (reintentos de Cresium). Override: CRESIUM_REPLAY_WINDOW_MS */
+const REPLAY_WINDOW_MS = (() => {
+  const raw = process.env.CRESIUM_REPLAY_WINDOW_MS;
+  if (raw != null && raw !== '') {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 15 * 60 * 1000;
+})();
+
+/**
+ * Cresium suele mandar `x-timestamp` en segundos Unix; Date.now() está en ms.
+ * Si comparamos mal, siempre da "stale" y 401 sin persistir nada.
+ */
+function timestampMsForSkewCheck(headerVal: string): number | null {
+  const n = Number(headerVal);
+  if (!Number.isFinite(n)) return null;
+  const unit = (process.env.CRESIUM_TIMESTAMP_UNIT ?? 'auto').toLowerCase();
+  if (unit === 'seconds') return Math.round(n * 1000);
+  if (unit === 'milliseconds' || unit === 'ms') return Math.round(n);
+  // auto: < 1e12 → asumir segundos (epoch 2026 en seg ≈ 1.7e9; en ms ≈ 1.7e12)
+  if (n < 1e12) return Math.round(n * 1000);
+  return Math.round(n);
+}
 
 function verifyCresiumSignature(opts: {
   timestamp: string;
@@ -54,12 +77,16 @@ function collectStrings(value: unknown, depth: number, out: Set<string>): void {
 }
 
 function parseAmountCents(body: Record<string, unknown>): number | null {
+  const data = body.data as Record<string, unknown> | undefined;
   const raw =
     body.totalAmount ??
     body.amount ??
     body.total_amount ??
     body.value ??
-    (body.data as Record<string, unknown> | undefined)?.totalAmount;
+    data?.totalAmount ??
+    data?.amount ??
+    data?.total_amount ??
+    data?.value;
 
   if (raw == null) return null;
   const n = Number(raw);
@@ -72,10 +99,27 @@ function parseAmountCents(body: Record<string, unknown>): number | null {
   return Math.round(n * 100);
 }
 
+/** Estados que Cresium (u otros PSP) pueden mandar; vacío = asumir éxito (compat). */
+const DEPOSIT_SUCCESS_STATUSES = new Set([
+  'SUCCESS',
+  'COMPLETED',
+  'CONFIRMED',
+  'APPROVED',
+  'ACCREDITED',
+  'SETTLED',
+  // Variantes frecuentes en español / APIs locales
+  'ACREDITADO',
+  'LIQUIDADO',
+  'OK',
+  'PROCESSED',
+  'PAID',
+  'FINALIZED',
+]);
+
 function depositSuccess(body: Record<string, unknown>): boolean {
-  const s = String(body.status ?? body.state ?? '').toUpperCase();
+  const s = String(body.status ?? body.state ?? '').toUpperCase().trim();
   if (!s) return true;
-  return ['SUCCESS', 'COMPLETED', 'CONFIRMED', 'APPROVED', 'ACCREDITED', 'SETTLED'].includes(s);
+  return DEPOSIT_SUCCESS_STATUSES.has(s);
 }
 
 function externalKey(body: Record<string, unknown>): string {
@@ -238,9 +282,13 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
       if (!timestamp || !signature) {
         return reply.status(401).send({ error: 'Missing x-timestamp or x-signature' });
       }
-      const tsNum = Number(timestamp);
-      if (!Number.isFinite(tsNum) || Math.abs(Date.now() - tsNum) > REPLAY_WINDOW_MS) {
-        fastify.log.warn({ timestamp }, 'Cresium webhook: stale or invalid timestamp');
+      const tsMs = timestampMsForSkewCheck(timestamp);
+      const skew = tsMs != null ? Math.abs(Date.now() - tsMs) : Infinity;
+      if (tsMs == null || skew > REPLAY_WINDOW_MS) {
+        fastify.log.warn(
+          { timestamp, tsMs, skewMs: skew, windowMs: REPLAY_WINDOW_MS },
+          'Cresium webhook: stale or invalid timestamp'
+        );
         return reply.status(401).send({ error: 'Invalid timestamp' });
       }
       const method = request.method.toUpperCase();
@@ -263,6 +311,16 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
     } else {
       fastify.log.warn('CRESIUM_SKIP_SIGNATURE_VERIFY=true — no se valida firma');
     }
+
+    fastify.log.info(
+      {
+        bodyKeys: Object.keys(body),
+        status: body.status,
+        state: body.state,
+        hasTotalAmount: body.totalAmount != null || body.amount != null,
+      },
+      'Cresium deposit: request accepted (post-signature)'
+    );
 
     const amountCents = parseAmountCents(body);
     if (amountCents == null || amountCents <= 0) {
