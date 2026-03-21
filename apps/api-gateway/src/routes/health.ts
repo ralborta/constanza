@@ -8,6 +8,8 @@ export async function healthRoutes(fastify: FastifyInstance) {
       status: 'ok',
       timestamp: new Date().toISOString(),
       service: 'api-gateway',
+      /** Sin efecto funcional: solo para comprobar que Railway redeployó tras push en apps/api-gateway */
+      deployProbe: 'railway-watch-path-test-1',
     };
   });
 
