@@ -52,6 +52,8 @@ Copiá desde el mismo Postgres que usa Constanza (o referencia compartida):
 
 Lista completa: `VARIABLES_ENTORNO.md` (sección Cresium).
 
+**Base de datos:** si Prisma falla con `total_amount_cents` / `metadata`, aplicá el SQL en [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md) en tu Postgres de Railway (misma `DATABASE_URL` que usa este servicio).
+
 `PORT` lo define Railway; el código usa `process.env.PORT` (default 3003).
 
 ## 6. Watch paths (si usás auto-deploy por repo)

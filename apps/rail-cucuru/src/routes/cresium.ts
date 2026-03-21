@@ -372,6 +372,8 @@ function extractAmountCentsDeep(obj: unknown, depth: number): number | null {
 
 function parseAmountCents(body: Record<string, unknown>): number | null {
   const data = body.data as Record<string, unknown> | undefined;
+  /** Cresium suele anidar el cobro en `data.transaction`. */
+  const tx = data?.transaction as Record<string, unknown> | undefined;
 
   const flatCandidates: unknown[] = [
     body.totalAmount,
@@ -390,6 +392,15 @@ function parseAmountCents(body: Record<string, unknown>): number | null {
     data?.montopesos,
     data?.importeTotal,
     data?.importe_total,
+    tx?.amount,
+    tx?.totalAmount,
+    tx?.total_amount,
+    tx?.monto,
+    tx?.importe,
+    tx?.value,
+    tx?.total,
+    tx?.originalAmount,
+    tx?.netAmount,
   ];
 
   for (const raw of flatCandidates) {
@@ -431,15 +442,24 @@ function depositSuccess(body: Record<string, unknown>): boolean {
 
 function externalKey(body: Record<string, unknown>): string {
   const data = body.data as Record<string, unknown> | undefined;
+  const tx = data?.transaction as Record<string, unknown> | undefined;
   const ext =
     body.externalId ??
     body.external_id ??
     data?.externalId ??
     data?.external_id ??
     data?.externalRef ??
-    data?.external_ref;
+    data?.external_ref ??
+    tx?.externalId ??
+    tx?.external_id;
   if (typeof ext === 'string' && ext.length > 0) return ext;
-  const id = body.id ?? data?.id ?? data?.transactionId ?? data?.transaction_id;
+  const id =
+    body.id ??
+    data?.id ??
+    data?.transactionId ??
+    data?.transaction_id ??
+    tx?.id ??
+    tx?.transactionId;
   if (id != null) return String(id);
   return crypto.randomUUID();
 }
