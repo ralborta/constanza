@@ -50,7 +50,8 @@ function timestampMsForSkewCheck(headerVal: string): number | null {
   return null;
 }
 
-function verifyCresiumSignature(opts: {
+/** Un intento de verificación HMAC (documentación Cresium: `timestamp|METHOD|path|body`). */
+function verifyCresiumSignatureOne(opts: {
   timestamp: string;
   method: string;
   pathWithQuery: string;
@@ -68,6 +69,76 @@ function verifyCresiumSignature(opts: {
   } catch {
     return false;
   }
+}
+
+/**
+ * Cresium V3 documenta `x-timestamp` en ms para la API; en webhooks a veces mandan ISO.
+ * El string que entra al HMAC debe coincidir con el que usaron al firmar (epoch ms, epoch seg, o ISO).
+ */
+function candidateTimestampStringsForSignature(headerVal: string): string[] {
+  const raw = String(headerVal).trim();
+  const out = new Set<string>([raw]);
+
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) {
+    if (n < 1e12) {
+      out.add(String(Math.floor(n)));
+      out.add(String(Math.round(n * 1000)));
+    } else {
+      out.add(String(Math.floor(n)));
+      out.add(String(Math.floor(n / 1000)));
+    }
+  }
+
+  const ms = Date.parse(raw);
+  if (Number.isFinite(ms)) {
+    out.add(String(ms));
+    out.add(String(Math.floor(ms / 1000)));
+  }
+
+  return [...out];
+}
+
+function candidatePaths(pathWithQuery: string): string[] {
+  const u = String(pathWithQuery ?? '');
+  const out = new Set<string>([u]);
+  const pathOnly = u.includes('?') ? u.slice(0, u.indexOf('?')) : u;
+  const query = u.includes('?') ? u.slice(u.indexOf('?')) : '';
+  if (pathOnly.startsWith('/')) {
+    out.add(pathOnly.slice(1) + query);
+  } else if (pathOnly.length > 0) {
+    out.add(`/${pathOnly}${query}`);
+  }
+  return [...out];
+}
+
+function verifyCresiumSignatureFlexible(opts: {
+  timestampHeader: string;
+  method: string;
+  pathWithQuery: string;
+  rawBody: string;
+  signatureB64: string;
+  secret: string;
+}): boolean {
+  const tsList = candidateTimestampStringsForSignature(opts.timestampHeader);
+  const pathList = candidatePaths(opts.pathWithQuery);
+  for (const timestamp of tsList) {
+    for (const pathWithQuery of pathList) {
+      if (
+        verifyCresiumSignatureOne({
+          timestamp,
+          method: opts.method,
+          pathWithQuery,
+          rawBody: opts.rawBody,
+          signatureB64: opts.signatureB64,
+          secret: opts.secret,
+        })
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function collectStrings(value: unknown, depth: number, out: Set<string>): void {
@@ -305,8 +376,8 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
       }
       const method = request.method.toUpperCase();
       const pathWithQuery = request.url;
-      const ok = verifyCresiumSignature({
-        timestamp,
+      const ok = verifyCresiumSignatureFlexible({
+        timestampHeader: timestamp,
         method,
         pathWithQuery,
         rawBody,
