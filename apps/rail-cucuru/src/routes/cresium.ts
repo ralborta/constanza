@@ -102,10 +102,28 @@ function timingSafeEqualHmac(expectedB64: string, incoming: string): boolean {
   return false;
 }
 
+/** Si pegaron el secret en base64 por error, probamos también la decodificación UTF-8. */
+function secretVariants(secret: string): string[] {
+  const s = secret.trim();
+  const out = new Set<string>([s]);
+  if (s.length >= 16 && /^[A-Za-z0-9+/]+=*$/.test(s.replace(/\s/g, ''))) {
+    try {
+      const dec = Buffer.from(s.replace(/\s/g, ''), 'base64');
+      if (dec.length > 0 && dec.length < 512) {
+        const asUtf8 = dec.toString('utf8');
+        if (asUtf8.length > 0) out.add(asUtf8);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return [...out];
+}
+
 /**
- * Cresium documenta `timestamp|METHOD|PATH|BODY` con `|` antes del body.
- * En la misma página hay un ejemplo sin `|` entre PATH y BODY (path y JSON pegados).
- * Probamos ambas construcciones.
+ * Cresium API: `timestamp|METHOD|PATH|BODY` (y a veces PATH+BODY sin `|` intermedio).
+ * Webhooks con envelope `{ type, data }` a veces firman solo el JSON de `data`.
+ * Probamos varias construcciones + HMAC solo del body (modo usado por otros PSP).
  */
 function verifyCresiumSignatureOne(opts: {
   timestamp: string;
@@ -114,16 +132,31 @@ function verifyCresiumSignatureOne(opts: {
   rawBody: string;
   signatureB64: string;
   secret: string;
+  companyId?: string;
+  apiKey?: string;
 }): boolean {
   const { timestamp, method, pathWithQuery, rawBody, secret } = opts;
   const constructions: string[] = [
     `${timestamp}|${method}|${pathWithQuery}|${rawBody}`,
     `${timestamp}|${method}|${pathWithQuery}${rawBody}`,
+    `${method}|${timestamp}|${pathWithQuery}|${rawBody}`,
+    `${timestamp}|${pathWithQuery}|${method}|${rawBody}`,
   ];
+  if (opts.companyId) {
+    constructions.push(
+      `${timestamp}|${opts.companyId}|${method}|${pathWithQuery}|${rawBody}`,
+      `${timestamp}|${method}|${opts.companyId}|${pathWithQuery}|${rawBody}`
+    );
+  }
+  if (opts.apiKey) {
+    constructions.push(`${timestamp}|${opts.apiKey}|${method}|${pathWithQuery}|${rawBody}`);
+  }
   for (const data of constructions) {
     const expected = crypto.createHmac('sha256', secret).update(data, 'utf8').digest('base64');
     if (timingSafeEqualHmac(expected, opts.signatureB64)) return true;
   }
+  const bodyOnly = crypto.createHmac('sha256', secret).update(rawBody, 'utf8').digest('base64');
+  if (timingSafeEqualHmac(bodyOnly, opts.signatureB64)) return true;
   return false;
 }
 
@@ -171,14 +204,28 @@ function candidatePaths(pathWithQuery: string): string[] {
 function candidateBodies(rawBody: string, parsedBody: unknown): string[] {
   const out = new Set<string>();
   out.add(rawBody);
-  const t = rawBody.trim();
-  if (t !== rawBody) out.add(t);
+  const tr = rawBody.trim();
+  if (tr !== rawBody) out.add(tr);
   if (parsedBody !== undefined && parsedBody !== null && typeof parsedBody === 'object') {
     try {
       out.add(JSON.stringify(parsedBody));
       out.add(stableStringify(parsedBody));
     } catch {
       /* ignore */
+    }
+    // Webhook tipo { type, data, retry? } — a veces solo `data` entra al HMAC
+    if ('data' in (parsedBody as object)) {
+      const d = (parsedBody as { data: unknown }).data;
+      if (d !== undefined) {
+        try {
+          out.add(JSON.stringify(d));
+          if (d !== null && typeof d === 'object') {
+            out.add(stableStringify(d));
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }
   return [...out];
@@ -192,11 +239,18 @@ function verifyCresiumSignatureFlexible(opts: {
   parsedBody: unknown;
   signatureB64: string;
   secrets: string[];
+  companyIdHeader?: string;
+  apiKeyHeader?: string;
 }): boolean {
   const tsList = candidateTimestampStringsForSignature(opts.timestampHeader);
   const pathList = candidatePaths(opts.pathWithQuery);
   const bodyList = candidateBodies(opts.rawBody, opts.parsedBody);
-  for (const secret of opts.secrets) {
+  const companyId = opts.companyIdHeader?.trim();
+  const apiKey = opts.apiKeyHeader?.trim();
+
+  const secretList = opts.secrets.flatMap((s) => secretVariants(s));
+
+  for (const secret of secretList) {
     if (!secret) continue;
     for (const timestamp of tsList) {
       for (const pathWithQuery of pathList) {
@@ -209,6 +263,8 @@ function verifyCresiumSignatureFlexible(opts: {
               rawBody,
               signatureB64: opts.signatureB64,
               secret,
+              companyId: companyId || undefined,
+              apiKey: apiKey || undefined,
             })
           ) {
             return true;
@@ -496,6 +552,8 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
         parsedBody: body,
         signatureB64: signature,
         secrets: signingSecrets,
+        companyIdHeader: request.headers['x-company-id'] as string | undefined,
+        apiKeyHeader: request.headers['x-api-key'] as string | undefined,
       });
       if (!ok) {
         const debug = process.env.CRESIUM_SIGNATURE_DEBUG === 'true';
@@ -506,10 +564,12 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
             ts: timestamp,
             rawBodyLength: rawBody.length,
             bodyKeys: body && typeof body === 'object' ? Object.keys(body as object) : [],
-            secretsTried: signingSecrets.length,
+            secretsConfigured: signingSecrets.length,
+            hasXCompanyId: Boolean(request.headers['x-company-id']),
+            hasXApiKey: Boolean(request.headers['x-api-key']),
             ...(debug ? { rawBodyPrefix: rawBody.slice(0, 200) } : {}),
           },
-          'Cresium webhook: invalid signature (revisá secret; si el panel tiene “webhook secret” distinto, usar CRESIUM_WEBHOOK_SECRET)'
+          'Cresium webhook: invalid signature — con raw body OK el 401 es casi siempre **CRESIUM_PARTNER_SECRET** distinto al que usa Cresium para este webhook, o secret distinto de “API Partner”. Probar CRESIUM_WEBHOOK_SECRET o pedir a Cresium el ejemplo oficial string→firma.'
         );
         return reply.status(401).send({ error: 'Invalid signature' });
       }
