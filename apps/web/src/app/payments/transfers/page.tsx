@@ -51,7 +51,7 @@ export default function TransfersPage() {
   const [sourceSystemFilter, setSourceSystemFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data, isLoading } = useQuery<{
+  const { data, isLoading, isError, error } = useQuery<{
     transfers: Transfer[];
     total: number;
     totalAmount: number;
@@ -119,11 +119,13 @@ export default function TransfersPage() {
   const filteredTransfers = data?.transfers.filter((transfer) => {
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
+      const apps = transfer.applications ?? [];
       return (
         transfer.externalRef?.toLowerCase().includes(search) ||
-        transfer.applications.some((app) =>
-          app.invoice.numero.toLowerCase().includes(search) ||
-          app.invoice.customer.razonSocial.toLowerCase().includes(search)
+        apps.some(
+          (app) =>
+            app.invoice?.numero?.toLowerCase().includes(search) ||
+            app.invoice?.customer?.razonSocial?.toLowerCase().includes(search)
         )
       );
     }
@@ -141,6 +143,15 @@ export default function TransfersPage() {
             Pagos recibidos por transferencias bancarias
           </p>
         </div>
+
+        {isError && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <strong>Error al cargar transferencias.</strong>{' '}
+            {(error as Error & { response?: { data?: { error?: string } } })?.response?.data?.error ??
+              (error as Error)?.message ??
+              'Revisá la consola de red / que NEXT_PUBLIC_API_URL apunte al api-gateway.'}
+          </div>
+        )}
 
         {/* Resumen */}
         {data && (
@@ -223,8 +234,16 @@ export default function TransfersPage() {
                 <p className="mt-2 text-sm text-gray-500">Cargando transferencias...</p>
               </div>
             ) : !data || filteredTransfers.length === 0 ? (
-              <div className="text-center py-8">
+              <div className="text-center py-8 space-y-2">
                 <p className="text-sm text-gray-500">No se encontraron transferencias</p>
+                {data && data.total === 0 && !searchTerm && (
+                  <p className="text-xs text-amber-800 max-w-lg mx-auto">
+                    Si ves pagos en la base pero acá no: el depósito debe tener el mismo{' '}
+                    <code className="bg-amber-100 px-1 rounded">tenant_id</code> que tu usuario (
+                    <code className="bg-amber-100 px-1 rounded">CRESIUM_TENANT_ID</code> en Railway = tenant
+                    del login).
+                  </p>
+                )}
               </div>
             ) : (
               <Table>
