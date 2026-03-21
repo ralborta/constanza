@@ -33,7 +33,8 @@ Si Railway solo permite “Dockerfile” en la raíz, alternativa: dejar **Root 
 
 ## 4. Firma HMAC (`invalid signature`)
 
-- El servidor debe leer el **JSON crudo** tal cual lo envía Cresium. Si el `Content-Type` es `application/json; charset=utf-8`, el parser debe aceptarlo (en el código usamos regex para JSON + charset).
+- El servidor debe leer el **JSON crudo** byte a byte. Si en logs ves `rawBodyLength: 0` y igual hay `body` parseado, el stream se estaba consumiendo mal: el código usa el hook **`preParsing`** para guardar el cuerpo antes de los parsers.
+- El `Content-Type` `application/json; charset=utf-8` lo cubre un regex en el content-type parser.
 - La documentación de Cresium muestra el string a firmar como `timestamp|METHOD|PATH|BODY` **y** en otro ejemplo PATH y BODY **sin** `|` intermedio; el código prueba **ambas** formas.
 - Si sigue fallando: mismo valor que en el panel (**Partner secret** vs **Webhook secret**). Variable opcional: `CRESIUM_WEBHOOK_SECRET`.
 
