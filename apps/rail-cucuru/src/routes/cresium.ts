@@ -398,12 +398,40 @@ async function findInvoiceMatch(
  * Requiere cuerpo crudo para validar la firma.
  */
 export async function cresiumDepositPlugin(fastify: FastifyInstance) {
-  // Incluye `application/json; charset=utf-8` — si no, Fastify usa otro parser y `rawBody` queda vacío → firma inválida siempre.
+  /**
+   * Sin esto, `rawBody` suele quedar en "" (el stream ya se consumió o otro parser no rellena el string)
+   * mientras `request.body` sí tiene JSON → HMAC con body "" vs body real = invalid signature siempre.
+   * Leemos el stream acá y lo devolvemos de nuevo para los parsers posteriores.
+   */
+  fastify.addHook('preParsing', async (request, _reply, payload) => {
+    const pathOnly = String(request.url ?? '').split('?')[0];
+    if (request.method !== 'POST' || !pathOnly.endsWith('/deposito')) {
+      return payload;
+    }
+    const chunks: Buffer[] = [];
+    try {
+      for await (const chunk of payload as AsyncIterable<Buffer | string>) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+      }
+    } catch {
+      return payload;
+    }
+    const buf = Buffer.concat(chunks);
+    const raw = buf.toString('utf8');
+    (request as FastifyRequest & { rawBody?: string }).rawBody = raw;
+    const { Readable } = await import('stream');
+    return Readable.from(buf);
+  });
+
+  // Incluye `application/json; charset=utf-8`.
   const jsonMime = /^application\/json(?:;[\s\S]*)?$/i;
   fastify.addContentTypeParser(jsonMime, { parseAs: 'string' }, (req, body, done) => {
-    (req as FastifyRequest & { rawBody: string }).rawBody = typeof body === 'string' ? body : String(body);
+    const pre = (req as FastifyRequest & { rawBody?: string }).rawBody;
+    const rawBody =
+      pre != null && pre.length > 0 ? pre : typeof body === 'string' ? body : String(body);
+    (req as FastifyRequest & { rawBody: string }).rawBody = rawBody;
     try {
-      const json = JSON.parse((req as FastifyRequest & { rawBody: string }).rawBody);
+      const json = JSON.parse(rawBody);
       done(null, json);
     } catch (e: unknown) {
       const err = e as Error & { statusCode?: number };
