@@ -24,18 +24,30 @@ const REPLAY_WINDOW_MS = (() => {
 })();
 
 /**
- * Cresium suele mandar `x-timestamp` en segundos Unix; Date.now() está en ms.
- * Si comparamos mal, siempre da "stale" y 401 sin persistir nada.
+ * `x-timestamp` puede venir como:
+ * - segundos o milisegundos Unix (número en string)
+ * - fecha ISO 8601 (Cresium a veces manda esto → Number(iso) es NaN y antes fallábamos con tsMs: null)
  */
 function timestampMsForSkewCheck(headerVal: string): number | null {
-  const n = Number(headerVal);
-  if (!Number.isFinite(n)) return null;
+  const raw = String(headerVal).trim();
+  if (!raw) return null;
+
   const unit = (process.env.CRESIUM_TIMESTAMP_UNIT ?? 'auto').toLowerCase();
-  if (unit === 'seconds') return Math.round(n * 1000);
-  if (unit === 'milliseconds' || unit === 'ms') return Math.round(n);
-  // auto: < 1e12 → asumir segundos (epoch 2026 en seg ≈ 1.7e9; en ms ≈ 1.7e12)
-  if (n < 1e12) return Math.round(n * 1000);
-  return Math.round(n);
+
+  const n = Number(raw);
+  if (Number.isFinite(n)) {
+    if (unit === 'seconds') return Math.round(n * 1000);
+    if (unit === 'milliseconds' || unit === 'ms') return Math.round(n);
+    if (n < 1e12) return Math.round(n * 1000);
+    return Math.round(n);
+  }
+
+  const parsed = Date.parse(raw);
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+
+  return null;
 }
 
 function verifyCresiumSignature(opts: {
