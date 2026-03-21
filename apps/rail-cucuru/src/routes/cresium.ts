@@ -294,27 +294,115 @@ function collectStrings(value: unknown, depth: number, out: Set<string>): void {
   }
 }
 
-function parseAmountCents(body: Record<string, unknown>): number | null {
-  const data = body.data as Record<string, unknown> | undefined;
-  const raw =
-    body.totalAmount ??
-    body.amount ??
-    body.total_amount ??
-    body.value ??
-    data?.totalAmount ??
-    data?.amount ??
-    data?.total_amount ??
-    data?.value;
+function normalizeAmountKey(k: string): string {
+  return k.toLowerCase().replace(/[_-]/g, '');
+}
 
+/** Claves típicas de monto en webhooks Cresium / AR (root o anidadas en `data`). */
+const AMOUNT_KEY_HINTS = new Set([
+  'totalamount',
+  'amount',
+  'totalamountcents',
+  'amountcents',
+  'total_amount',
+  'value',
+  'monto',
+  'importe',
+  'montopesos',
+  'montototal',
+  'montorecibido',
+  'total',
+  'paidamount',
+  'transactionamount',
+  'netamount',
+  'grossamount',
+  'originalamount',
+  'principal',
+  'importetotal',
+]);
+
+function amountKeyMatches(normalizedKey: string): boolean {
+  if (AMOUNT_KEY_HINTS.has(normalizedKey)) return true;
+  if (normalizedKey.includes('monto') || normalizedKey.includes('importe')) return true;
+  if (normalizedKey.includes('amount') && !normalizedKey.includes('tax')) return true;
+  return false;
+}
+
+function toAmountCents(raw: unknown): number | null {
   if (raw == null) return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return null;
-
+  const n = typeof raw === 'string' ? Number(raw.replace(',', '.')) : Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
   const asCents = process.env.CRESIUM_AMOUNT_UNIT === 'CENTS';
   if (asCents) return Math.round(n);
-
-  // Por defecto: unidades de moneda → centavos
   return Math.round(n * 100);
+}
+
+/**
+ * Busca un número de monto en un objeto (prioridad: claves conocidas, luego subobjetos).
+ */
+function extractAmountCentsDeep(obj: unknown, depth: number): number | null {
+  if (depth > 12 || obj == null) return null;
+  if (typeof obj !== 'object') return null;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const f = extractAmountCentsDeep(item, depth + 1);
+      if (f != null) return f;
+    }
+    return null;
+  }
+  const o = obj as Record<string, unknown>;
+  const pairs: [string, unknown][] = [];
+  for (const [k, v] of Object.entries(o)) {
+    pairs.push([k, v]);
+  }
+  for (const [k, v] of pairs) {
+    if (amountKeyMatches(normalizeAmountKey(k))) {
+      const c = toAmountCents(v);
+      if (c != null) return c;
+    }
+  }
+  for (const [, v] of pairs) {
+    if (v && typeof v === 'object') {
+      const c = extractAmountCentsDeep(v, depth + 1);
+      if (c != null) return c;
+    }
+  }
+  return null;
+}
+
+function parseAmountCents(body: Record<string, unknown>): number | null {
+  const data = body.data as Record<string, unknown> | undefined;
+
+  const flatCandidates: unknown[] = [
+    body.totalAmount,
+    body.amount,
+    body.total_amount,
+    body.value,
+    body.monto,
+    body.importe,
+    data?.totalAmount,
+    data?.amount,
+    data?.total_amount,
+    data?.value,
+    data?.monto,
+    data?.importe,
+    data?.total,
+    data?.montopesos,
+    data?.importeTotal,
+    data?.importe_total,
+  ];
+
+  for (const raw of flatCandidates) {
+    const c = toAmountCents(raw);
+    if (c != null) return c;
+  }
+
+  if (data) {
+    const deep = extractAmountCentsDeep(data, 0);
+    if (deep != null) return deep;
+  }
+
+  return extractAmountCentsDeep(body, 0);
 }
 
 /** Estados que Cresium (u otros PSP) pueden mandar; vacío = asumir éxito (compat). */
@@ -335,15 +423,23 @@ const DEPOSIT_SUCCESS_STATUSES = new Set([
 ]);
 
 function depositSuccess(body: Record<string, unknown>): boolean {
-  const s = String(body.status ?? body.state ?? '').toUpperCase().trim();
+  const data = body.data as Record<string, unknown> | undefined;
+  const s = String(body.status ?? body.state ?? data?.status ?? data?.state ?? '').toUpperCase().trim();
   if (!s) return true;
   return DEPOSIT_SUCCESS_STATUSES.has(s);
 }
 
 function externalKey(body: Record<string, unknown>): string {
-  const ext = body.externalId ?? body.external_id;
+  const data = body.data as Record<string, unknown> | undefined;
+  const ext =
+    body.externalId ??
+    body.external_id ??
+    data?.externalId ??
+    data?.external_id ??
+    data?.externalRef ??
+    data?.external_ref;
   if (typeof ext === 'string' && ext.length > 0) return ext;
-  const id = body.id;
+  const id = body.id ?? data?.id ?? data?.transactionId ?? data?.transaction_id;
   if (id != null) return String(id);
   return crypto.randomUUID();
 }
@@ -577,19 +673,36 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
       fastify.log.warn('CRESIUM_SKIP_SIGNATURE_VERIFY=true — no se valida firma');
     }
 
+    const dataObj = body.data as Record<string, unknown> | undefined;
     fastify.log.info(
       {
         bodyKeys: Object.keys(body),
-        status: body.status,
-        state: body.state,
-        hasTotalAmount: body.totalAmount != null || body.amount != null,
+        dataKeys: dataObj && typeof dataObj === 'object' ? Object.keys(dataObj) : [],
+        status: body.status ?? dataObj?.status,
+        state: body.state ?? dataObj?.state,
+        hasTotalAmount:
+          body.totalAmount != null ||
+          body.amount != null ||
+          (dataObj != null &&
+            (dataObj.totalAmount != null ||
+              dataObj.amount != null ||
+              dataObj.monto != null ||
+              dataObj.importe != null)),
       },
       'Cresium deposit: request accepted (post-signature)'
     );
 
     const amountCents = parseAmountCents(body);
     if (amountCents == null || amountCents <= 0) {
-      fastify.log.warn({ bodyKeys: Object.keys(body) }, 'Cresium deposit: could not parse amount');
+      const data = body.data as Record<string, unknown> | undefined;
+      fastify.log.warn(
+        {
+          bodyKeys: Object.keys(body),
+          dataKeys: data && typeof data === 'object' ? Object.keys(data) : [],
+          type: body.type,
+        },
+        'Cresium deposit: could not parse amount (revisá nombres de monto en `data`)'
+      );
       return reply.status(400).send({ error: 'Invalid or missing amount' });
     }
 
