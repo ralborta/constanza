@@ -107,9 +107,59 @@ export function getToken(): string | null {
   return null;
 }
 
+const SESSION_USER_KEY = 'constanza_session_user';
+
+/** Guarda usuario devuelto por POST /auth/login (para menú / permisos en cliente). */
+export function setSessionUser(user: User | null) {
+  if (typeof window === 'undefined') return;
+  if (user) {
+    localStorage.setItem(SESSION_USER_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(SESSION_USER_KEY);
+  }
+}
+
+export function getSessionUser(): User | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(SESSION_USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as User;
+  } catch {
+    return null;
+  }
+}
+
+function decodeJwtPayload(token: string): { perfil?: string } | null {
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+  try {
+    return JSON.parse(atob(padded)) as { perfil?: string };
+  } catch {
+    return null;
+  }
+}
+
+/** Perfil para UI (sidebar): sesión guardada o payload JWT. */
+export function getEffectivePerfil(): 'ADM' | 'OPERADOR_1' | 'OPERADOR_2' | 'CLIENTE' | null {
+  if (typeof window === 'undefined') return null;
+  const fromStore = getSessionUser();
+  if (fromStore?.perfil) return fromStore.perfil;
+  const t = getToken();
+  if (!t) return null;
+  if (t.startsWith('fake-token')) return 'ADM';
+  const payload = decodeJwtPayload(t);
+  const p = payload?.perfil;
+  if (p === 'ADM' || p === 'OPERADOR_1' || p === 'OPERADOR_2' || p === 'CLIENTE') return p;
+  return null;
+}
+
 export function removeToken() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('token');
+    setSessionUser(null);
   }
 }
 

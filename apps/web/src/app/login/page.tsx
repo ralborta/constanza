@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { setToken } from '@/lib/auth';
+import { setToken, setSessionUser } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,6 +71,11 @@ export default function LoginPage() {
       console.log('✅ Login exitoso:', data);
       
       setToken(data.token);
+      if (data.user) {
+        setSessionUser(data.user);
+      } else {
+        setSessionUser(null);
+      }
       router.push('/dashboard');
     } catch (err: any) {
       console.error('❌ Error en login:', err);

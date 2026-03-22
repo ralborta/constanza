@@ -24,8 +24,10 @@ import {
   ChartBar,
   Timer,
   Buildings,
+  UserGear,
 } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
+import { getEffectivePerfil, removeToken } from '@/lib/auth';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Collapsible,
@@ -110,9 +112,10 @@ export function Sidebar() {
   const [notifyOpen, setNotifyOpen] = useState(pathname?.startsWith('/notify') || false);
   const [callsOpen, setCallsOpen] = useState(pathname?.startsWith('/calls') || false);
   const [paymentsOpen, setPaymentsOpen] = useState(pathname?.startsWith('/payments') || false);
+  const isAdm = getEffectivePerfil() === 'ADM';
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    removeToken();
     window.location.href = '/login';
   };
 
@@ -183,6 +186,18 @@ export function Sidebar() {
             ))}
           </CollapsibleContent>
         </Collapsible>
+
+        {isAdm && (
+          <>
+            <SectionLabel>Administración</SectionLabel>
+            <NavItem
+              href="/settings/users"
+              icon={UserGear}
+              name="Usuarios"
+              active={pathname?.startsWith('/settings') ?? false}
+            />
+          </>
+        )}
 
         <SectionLabel>Finanzas</SectionLabel>
 
