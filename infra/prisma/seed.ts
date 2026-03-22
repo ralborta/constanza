@@ -6,7 +6,11 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  /** Mismo UUID que usa el fallback del login si hace falta (FK siempre válida). */
+  /**
+   * Mismo UUID que usa el fallback del login si hace falta (FK siempre válida).
+   * En pruebas Cresium: en rail-cucuru, CRESIUM_TENANT_ID debe ser este UUID para que
+   * admin/operador del seed vean los depósitos en Transferencias.
+   */
   const TENANT_DEFAULT_ID = '00000000-0000-0000-0000-000000000001';
 
   const tenant = await prisma.tenant.upsert({

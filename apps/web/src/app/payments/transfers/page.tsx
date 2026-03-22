@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Loader2, CheckCircle2, Clock, XCircle, Eye } from 'lucide-react';
+import { Search, Loader2, CheckCircle2, Clock, XCircle, Eye, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
@@ -50,6 +50,17 @@ export default function TransfersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sourceSystemFilter, setSourceSystemFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [copied, setCopied] = useState<'uuid' | 'env' | null>(null);
+
+  const copyText = async (text: string, kind: 'uuid' | 'env') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(kind);
+      window.setTimeout(() => setCopied(null), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const { data, isLoading, isError, error } = useQuery<{
     transfers: Transfer[];
@@ -68,6 +79,20 @@ export default function TransfersPage() {
       const response = await api.get('/v1/payments/transfers', { params });
       return response.data;
     },
+  });
+
+  /** Tenant real del JWT (mismo que filtra la API). Si no coincide con CRESIUM_TENANT_ID o con pay.payments, la lista queda vacía. */
+  const { data: session } = useQuery({
+    queryKey: ['auth-me'],
+    queryFn: async () => {
+      const r = await api.get<{
+        tenantId: string;
+        tenantName: string | null;
+        email: string | null;
+      }>('/auth/me');
+      return r.data;
+    },
+    staleTime: 60_000,
   });
 
   const getStatusBadge = (status: string) => {
@@ -143,6 +168,76 @@ export default function TransfersPage() {
             Pagos recibidos por transferencias bancarias
           </p>
         </div>
+
+        {/* Prueba: mismo UUID en sesión (JWT) y en CRESIUM_TENANT_ID (Railway rail-cucuru) */}
+        {session && (
+          <Card className="mb-6 border border-cyan-200 bg-gradient-to-br from-cyan-50 to-teal-50/80 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base text-cyan-900">
+                Prueba Cresium — coincidencia de IDs
+              </CardTitle>
+              <p className="text-sm text-gray-700">
+                Tu usuario ({session.email ?? 'sesión'}) ve solo pagos del tenant del token. Los webhooks guardan con{' '}
+                <code className="rounded bg-white px-1 py-0.5 text-xs">CRESIUM_TENANT_ID</code>. Para la prueba, ese
+                valor tiene que ser <strong>exactamente el mismo</strong> que abajo.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800">
+                  1) Tenant de tu usuario (sesión API / JWT)
+                </p>
+                <code className="mt-1 block break-all rounded border border-cyan-100 bg-white px-2 py-2 text-sm">
+                  {session.tenantId}
+                </code>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800">
+                  2) Poné este mismo UUID en Railway → servicio rail-cucuru → variable{' '}
+                  <code className="rounded bg-cyan-100 px-1">CRESIUM_TENANT_ID</code>
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 border-cyan-300 bg-white"
+                    onClick={() => copyText(session.tenantId, 'uuid')}
+                  >
+                    {copied === 'uuid' ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                    Copiar UUID
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 border-cyan-300 bg-white"
+                    onClick={() =>
+                      copyText(`CRESIUM_TENANT_ID=${session.tenantId}`, 'env')
+                    }
+                  >
+                    {copied === 'env' ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                    Copiar línea .env
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-gray-600">
+                  Guardá en Railway, redeploy <strong>rail-cucuru</strong>. Depósitos nuevos quedarán alineados. Si ya
+                  hay filas en <code className="rounded bg-white px-0.5">pay.payments</code> con otro{' '}
+                  <code className="rounded bg-white px-0.5">tenant_id</code>, actualizalas o repetí el webhook de
+                  prueba.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {isError && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -237,12 +332,36 @@ export default function TransfersPage() {
               <div className="text-center py-8 space-y-2">
                 <p className="text-sm text-gray-500">No se encontraron transferencias</p>
                 {data && data.total === 0 && !searchTerm && (
-                  <p className="text-xs text-amber-800 max-w-lg mx-auto">
-                    Si ves pagos en la base pero acá no: el depósito debe tener el mismo{' '}
-                    <code className="bg-amber-100 px-1 rounded">tenant_id</code> que tu usuario (
-                    <code className="bg-amber-100 px-1 rounded">CRESIUM_TENANT_ID</code> en Railway = tenant
-                    del login).
-                  </p>
+                  <div className="text-xs text-amber-900 max-w-2xl mx-auto space-y-2 text-left bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="font-medium">Diagnóstico (ambos usuarios ven lo mismo → mismo tenant en el token)</p>
+                    {session && (
+                      <p>
+                        <span className="text-gray-600">Tu sesión API usa tenant:</span>{' '}
+                        <code className="bg-amber-100 px-1 rounded break-all">{session.tenantId}</code>
+                        {session.tenantName ? (
+                          <span className="text-gray-600"> ({session.tenantName})</span>
+                        ) : null}
+                      </p>
+                    )}
+                    <ul className="list-disc pl-4 space-y-1 text-gray-700">
+                      <li>
+                        En <strong>rail-cucuru</strong>: <code className="bg-amber-100 px-1">CRESIUM_TENANT_ID</code>{' '}
+                        debe ser <strong>exactamente</strong> ese UUID (los depósitos se insertan con ese tenant).
+                      </li>
+                      <li>
+                        <strong>Misma base:</strong> <code className="bg-amber-100 px-1">DATABASE_URL</code> de{' '}
+                        <strong>rail-cucuru</strong> y <strong>api-gateway</strong> tiene que apuntar al mismo Postgres
+                        donde mirás los datos; si el webhook escribe en otra DB, acá nunca va a aparecer.
+                      </li>
+                      <li>
+                        En SQL:{' '}
+                        <code className="bg-amber-100 px-0.5 text-[11px] break-all">
+                          SELECT tenant_id, method, source_system, external_ref FROM pay.payments WHERE source_system =
+                          &apos;CRESIUM&apos; ORDER BY created_at DESC LIMIT 5;
+                        </code>
+                      </li>
+                    </ul>
+                  </div>
                 )}
               </div>
             ) : (

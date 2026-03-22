@@ -268,6 +268,8 @@ CRESIUM_COMPANY_ID=700
 
 **Imputación manual** (depósito sin match de factura en el payload): desde API autenticada, `POST /v1/payments/:paymentId/impute` con body `{ "invoiceId": "<uuid-factura>" }`.
 
+**Prueba (ver transferencias en la web):** tiene que coincidir el UUID de **`CRESIUM_TENANT_ID`** (Railway, servicio **rail-cucuru**) con el **`tenant_id` de tu sesión** (JWT tras login). En la pantalla **Transferencias** hay un bloque “Prueba Cresium” con el UUID y botones para copiar; o `GET /auth/me` con el Bearer token. No alcanza con otro producto (p. ej. Cleexs) que use el mismo número en otra URL: tiene que ser la misma base y la misma variable en **rail-cucuru**. SQL de apoyo: [`scripts/prueba-cresium-tenant-align.sql`](scripts/prueba-cresium-tenant-align.sql).
+
 **Base de datos:** aplicar migraciones `004_payment_total_amount_cents.sql` y `005_tenant_cvu_payment_metadata.sql` (`core.tenants.cresium_cvu_cobro`, `pay.payments.metadata`).
 
 ---

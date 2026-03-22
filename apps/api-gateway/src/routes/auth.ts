@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
+import { authenticate } from '../middleware/auth.js';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -215,5 +216,42 @@ export async function authRoutes(fastify: FastifyInstance) {
       return reply.status(401).send({ valid: false, error: 'Token inválido' });
     }
   });
+
+  /**
+   * Sesión actual (JWT): tenant y usuario. Sirve para alinear CRESIUM_TENANT_ID / depósitos con el login.
+   * GET /auth/me
+   */
+  fastify.get(
+    '/me',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const jwt = request.user!;
+      if (jwt.perfil === 'CLIENTE') {
+        return reply.status(403).send({ error: 'Solo usuarios internos' });
+      }
+
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: jwt.tenant_id },
+        select: { id: true, name: true, slug: true },
+      });
+
+      const dbUser = jwt.user_id
+        ? await prisma.user.findUnique({
+            where: { id: jwt.user_id },
+            select: { id: true, email: true, codigoUnico: true },
+          })
+        : null;
+
+      return {
+        tenantId: jwt.tenant_id,
+        tenantName: tenant?.name ?? null,
+        tenantSlug: tenant?.slug ?? null,
+        perfil: jwt.perfil,
+        userId: jwt.user_id ?? null,
+        email: dbUser?.email ?? null,
+        codigoUnico: dbUser?.codigoUnico ?? null,
+      };
+    }
+  );
 }
 
