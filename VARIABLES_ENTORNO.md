@@ -4,6 +4,13 @@
 
 Este documento lista todas las variables de entorno necesarias para el proyecto Constanza.
 
+### Frontend (`apps/web`, p. ej. Vercel)
+
+| Variable | Obligatoria | Descripción |
+|----------|-------------|-------------|
+| `NEXT_PUBLIC_API_URL` | Sí (prod) | URL base del api-gateway (ej. `https://…railway.app`). |
+| `NEXT_PUBLIC_SHOW_CRESIUM_DEBUG` | No | `true` solo en entornos internos: muestra cajas de diagnóstico Cresium en Transferencias. **En producción para clientes no definir o `false`.** |
+
 ---
 
 ## 🗄️ Variables de Base de Datos

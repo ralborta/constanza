@@ -22,6 +22,9 @@ import { es } from 'date-fns/locale';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
+/** Solo true si en build está NEXT_PUBLIC_SHOW_CRESIUM_DEBUG=true (dev/staging). Nunca en cliente final. */
+const SHOW_CRESIUM_DEBUG = process.env.NEXT_PUBLIC_SHOW_CRESIUM_DEBUG === 'true';
+
 interface Transfer {
   id: string;
   sourceSystem: string;
@@ -81,7 +84,7 @@ export default function TransfersPage() {
     },
   });
 
-  /** Tenant real del JWT (mismo que filtra la API). Si no coincide con CRESIUM_TENANT_ID o con pay.payments, la lista queda vacía. */
+  /** Solo para diagnóstico interno (SHOW_CRESIUM_DEBUG). */
   const { data: session } = useQuery({
     queryKey: ['auth-me'],
     queryFn: async () => {
@@ -93,6 +96,7 @@ export default function TransfersPage() {
       return r.data;
     },
     staleTime: 60_000,
+    enabled: SHOW_CRESIUM_DEBUG,
   });
 
   const getStatusBadge = (status: string) => {
@@ -169,8 +173,7 @@ export default function TransfersPage() {
           </p>
         </div>
 
-        {/* Prueba: mismo UUID en sesión (JWT) y en CRESIUM_TENANT_ID (Railway rail-cucuru) */}
-        {session && (
+        {SHOW_CRESIUM_DEBUG && session && (
           <Card className="mb-6 border border-cyan-200 bg-gradient-to-br from-cyan-50 to-teal-50/80 shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-cyan-900">
@@ -241,10 +244,16 @@ export default function TransfersPage() {
 
         {isError && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <strong>Error al cargar transferencias.</strong>{' '}
-            {(error as Error & { response?: { data?: { error?: string } } })?.response?.data?.error ??
-              (error as Error)?.message ??
-              'Revisá la consola de red / que NEXT_PUBLIC_API_URL apunte al api-gateway.'}
+            <strong>No pudimos cargar las transferencias.</strong>{' '}
+            {SHOW_CRESIUM_DEBUG ? (
+              <>
+                {(error as Error & { response?: { data?: { error?: string } } })?.response?.data?.error ??
+                  (error as Error)?.message ??
+                  'Revisá red / NEXT_PUBLIC_API_URL.'}
+              </>
+            ) : (
+              'Intentá de nuevo en unos minutos. Si el problema continúa, contactá a soporte.'
+            )}
           </div>
         )}
 
@@ -329,14 +338,17 @@ export default function TransfersPage() {
                 <p className="mt-2 text-sm text-gray-500">Cargando transferencias...</p>
               </div>
             ) : !data || filteredTransfers.length === 0 ? (
-              <div className="text-center py-8 space-y-2">
-                <p className="text-sm text-gray-500">No se encontraron transferencias</p>
-                {data && data.total === 0 && !searchTerm && (
-                  <div className="text-xs text-amber-900 max-w-2xl mx-auto space-y-2 text-left bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <p className="font-medium">Diagnóstico (ambos usuarios ven lo mismo → mismo tenant en el token)</p>
+              <div className="text-center py-12 space-y-2">
+                <p className="text-sm text-gray-600">No hay transferencias para mostrar.</p>
+                {(searchTerm || statusFilter !== 'all' || sourceSystemFilter !== 'all') && (
+                  <p className="text-xs text-gray-500">Probá limpiar filtros o la búsqueda.</p>
+                )}
+                {SHOW_CRESIUM_DEBUG && data && data.total === 0 && !searchTerm && (
+                  <div className="text-xs text-amber-900 max-w-2xl mx-auto space-y-2 text-left bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
+                    <p className="font-medium">Diagnóstico (solo dev)</p>
                     {session && (
                       <p>
-                        <span className="text-gray-600">Tu sesión API usa tenant:</span>{' '}
+                        <span className="text-gray-600">Tenant sesión:</span>{' '}
                         <code className="bg-amber-100 px-1 rounded break-all">{session.tenantId}</code>
                         {session.tenantName ? (
                           <span className="text-gray-600"> ({session.tenantName})</span>
@@ -345,20 +357,10 @@ export default function TransfersPage() {
                     )}
                     <ul className="list-disc pl-4 space-y-1 text-gray-700">
                       <li>
-                        En <strong>rail-cucuru</strong>: <code className="bg-amber-100 px-1">CRESIUM_TENANT_ID</code>{' '}
-                        debe ser <strong>exactamente</strong> ese UUID (los depósitos se insertan con ese tenant).
+                        <code className="bg-amber-100 px-1">CRESIUM_TENANT_ID</code> (rail-cucuru) = mismo UUID.
                       </li>
                       <li>
-                        <strong>Misma base:</strong> <code className="bg-amber-100 px-1">DATABASE_URL</code> de{' '}
-                        <strong>rail-cucuru</strong> y <strong>api-gateway</strong> tiene que apuntar al mismo Postgres
-                        donde mirás los datos; si el webhook escribe en otra DB, acá nunca va a aparecer.
-                      </li>
-                      <li>
-                        En SQL:{' '}
-                        <code className="bg-amber-100 px-0.5 text-[11px] break-all">
-                          SELECT tenant_id, method, source_system, external_ref FROM pay.payments WHERE source_system =
-                          &apos;CRESIUM&apos; ORDER BY created_at DESC LIMIT 5;
-                        </code>
+                        Misma <code className="bg-amber-100 px-1">DATABASE_URL</code> que api-gateway.
                       </li>
                     </ul>
                   </div>
@@ -398,8 +400,7 @@ export default function TransfersPage() {
                         <div className="space-y-1">
                           {transfer.applications.length === 0 ? (
                             <span className="text-sm text-amber-700">
-                              Sin imputación — usar conciliación o POST{' '}
-                              <code className="text-xs">/v1/payments/…/impute</code>
+                              Sin imputación a factura — podés completarlo desde Conciliación.
                             </span>
                           ) : (
                             transfer.applications.map((app) => (
