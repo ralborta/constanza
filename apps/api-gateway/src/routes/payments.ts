@@ -7,7 +7,10 @@ import {
   buildCresiumConciliationCandidates,
   type ConciliationCandidate,
 } from '../services/cresium-conciliation-candidates.js';
-import { extractPayerDisplayNameFromMetadata } from '../services/cresium-helpers.js';
+import {
+  extractPayerDisplayNameFromMetadata,
+  extractPayerCvuFromMetadata,
+} from '../services/cresium-helpers.js';
 
 /** Monto mostrado: suma de applications, o total declarado por el origen si aún no hay imputación. */
 function transferTotalCents(payment: {
@@ -96,6 +99,10 @@ export async function paymentRoutes(fastify: FastifyInstance) {
               payment.sourceSystem === 'CRESIUM'
                 ? extractPayerDisplayNameFromMetadata(payment.metadata)
                 : null;
+            const payerCvu =
+              payment.sourceSystem === 'CRESIUM'
+                ? extractPayerCvuFromMetadata(payment.metadata)
+                : null;
             return {
             id: payment.id,
             sourceSystem: payment.sourceSystem,
@@ -106,6 +113,8 @@ export async function paymentRoutes(fastify: FastifyInstance) {
             totalAmount: transferTotalCents(payment),
             /** Nombre del ordenante/emisor si vino en el aviso Cresium (metadata). */
             payerDisplayName: payerFromWebhook,
+            /** CVU detectado en el payload (extractedCvuDigits o escaneo). */
+            payerCvu,
             /** Cliente de la factura si ya hay imputación. */
             imputedCustomerName: firstCustomer?.razonSocial ?? null,
             applications: payment.applications.map((app) => ({

@@ -35,6 +35,8 @@ interface Transfer {
   totalAmount: number;
   /** Nombre del ordenante si vino en el webhook Cresium */
   payerDisplayName?: string | null;
+  /** CVU detectado en el payload (extractedCvuDigits / escaneo) */
+  payerCvu?: string | null;
   /** Cliente (deudor) si ya está imputado a factura */
   imputedCustomerName?: string | null;
   applications: Array<{
@@ -156,6 +158,7 @@ export default function TransfersPage() {
       return (
         transfer.externalRef?.toLowerCase().includes(search) ||
         transfer.payerDisplayName?.toLowerCase().includes(search) ||
+        transfer.payerCvu?.replace(/\s/g, '').includes(search.replace(/\s/g, '')) ||
         transfer.imputedCustomerName?.toLowerCase().includes(search) ||
         apps.some(
           (app) =>
@@ -413,18 +416,38 @@ export default function TransfersPage() {
                           <p className="font-mono text-sm break-all">{transfer.externalRef || '—'}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Quién pagó</p>
-                          <p className="text-sm">
+                          <p className="text-xs text-gray-500">Quién pagó / CVU</p>
+                          <div className="text-sm space-y-1">
+                            {transfer.payerCvu ? (
+                              <p className="font-mono text-xs text-gray-800 break-all">
+                                <span className="text-gray-500 font-sans">CVU: </span>
+                                {transfer.payerCvu}
+                              </p>
+                            ) : null}
                             {transfer.payerDisplayName ? (
-                              <span className="font-medium">{transfer.payerDisplayName}</span>
-                            ) : transfer.imputedCustomerName ? (
+                              <p className="font-medium">
+                                {transfer.payerDisplayName}
+                                <span className="block text-xs font-normal text-gray-500 font-sans mt-0.5">
+                                  Nombre según aviso (verificá con CVU si no coincide)
+                                </span>
+                              </p>
+                            ) : null}
+                            {!transfer.payerCvu && !transfer.payerDisplayName && transfer.imputedCustomerName ? (
                               <span>{transfer.imputedCustomerName} (cliente imputado)</span>
-                            ) : transfer.sourceSystem === 'CRESIUM' ? (
-                              <span className="text-amber-800 text-sm">Sin nombre en el aviso Cresium</span>
-                            ) : (
-                              '—'
-                            )}
-                          </p>
+                            ) : null}
+                            {!transfer.payerCvu &&
+                            !transfer.payerDisplayName &&
+                            !transfer.imputedCustomerName &&
+                            transfer.sourceSystem === 'CRESIUM' ? (
+                              <span className="text-amber-800 text-sm">Sin nombre ni CVU en el aviso</span>
+                            ) : null}
+                            {!transfer.payerCvu &&
+                            !transfer.payerDisplayName &&
+                            !transfer.imputedCustomerName &&
+                            transfer.sourceSystem !== 'CRESIUM' ? (
+                              <span className="text-gray-400">—</span>
+                            ) : null}
+                          </div>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Factura / imputación</p>
@@ -469,8 +492,8 @@ export default function TransfersPage() {
                         <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Fecha</TableHead>
                         <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Origen</TableHead>
                         <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Referencia</TableHead>
-                        <TableHead className="font-semibold text-gray-800 whitespace-nowrap min-w-[140px]">
-                          Quién pagó
+                        <TableHead className="font-semibold text-gray-800 whitespace-nowrap min-w-[200px]">
+                          Quién pagó / CVU
                         </TableHead>
                         <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Monto</TableHead>
                         <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Estado</TableHead>
@@ -490,21 +513,43 @@ export default function TransfersPage() {
                           <TableCell className="font-mono text-sm max-w-[160px]">
                             <span className="break-all">{transfer.externalRef || '-'}</span>
                           </TableCell>
-                          <TableCell className="text-sm max-w-[220px]">
-                            {transfer.payerDisplayName ? (
-                              <span className="font-medium text-gray-900">{transfer.payerDisplayName}</span>
-                            ) : transfer.imputedCustomerName ? (
-                              <span className="text-gray-800">
-                                <span className="text-xs text-gray-500 block">Cliente (imputado)</span>
-                                {transfer.imputedCustomerName}
-                              </span>
-                            ) : transfer.sourceSystem === 'CRESIUM' ? (
-                              <span className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 inline-block">
-                                Sin nombre en aviso Cresium
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
+                          <TableCell className="text-sm max-w-[260px]">
+                            <div className="space-y-1.5">
+                              {transfer.payerCvu ? (
+                                <p className="font-mono text-xs text-gray-900 break-all leading-snug">
+                                  <span className="text-gray-500 font-sans">CVU </span>
+                                  {transfer.payerCvu}
+                                </p>
+                              ) : null}
+                              {transfer.payerDisplayName ? (
+                                <div>
+                                  <span className="font-medium text-gray-900">{transfer.payerDisplayName}</span>
+                                  <span className="block text-[10px] text-gray-500 font-sans">
+                                    Nombre según aviso
+                                  </span>
+                                </div>
+                              ) : null}
+                              {!transfer.payerCvu && !transfer.payerDisplayName && transfer.imputedCustomerName ? (
+                                <span className="text-gray-800">
+                                  <span className="text-xs text-gray-500 block">Cliente (imputado)</span>
+                                  {transfer.imputedCustomerName}
+                                </span>
+                              ) : null}
+                              {!transfer.payerCvu &&
+                              !transfer.payerDisplayName &&
+                              !transfer.imputedCustomerName &&
+                              transfer.sourceSystem === 'CRESIUM' ? (
+                                <span className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 inline-block">
+                                  Sin nombre ni CVU en el aviso
+                                </span>
+                              ) : null}
+                              {!transfer.payerCvu &&
+                              !transfer.payerDisplayName &&
+                              !transfer.imputedCustomerName &&
+                              transfer.sourceSystem !== 'CRESIUM' ? (
+                                <span className="text-gray-400">—</span>
+                              ) : null}
+                            </div>
                           </TableCell>
                           <TableCell className="font-semibold text-gray-900 whitespace-nowrap">
                             ${(transfer.totalAmount / 100).toLocaleString('es-AR', {

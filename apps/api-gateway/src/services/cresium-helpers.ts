@@ -152,3 +152,34 @@ export function extractPayerDisplayNameFromMetadata(metadata: unknown): string |
   visit2(root, 0);
   return fallback[0] ?? null;
 }
+
+/**
+ * CVU detectado en el aviso: usa `extractedCvuDigits` del metadata (rellenado al persistir el webhook)
+ * o vuelve a escanear `metadata.payload` si hace falta.
+ */
+export function extractPayerCvuFromMetadata(metadata: unknown): string | null {
+  if (metadata == null || typeof metadata !== 'object') return null;
+  const m = metadata as Record<string, unknown>;
+
+  let list: string[] = [];
+  if (Array.isArray(m.extractedCvuDigits)) {
+    list = m.extractedCvuDigits
+      .filter((x): x is string => typeof x === 'string')
+      .map((s) => s.replace(/\D/g, ''))
+      .filter((d) => d.length >= 8);
+  }
+  if (list.length === 0 && m.payload != null) {
+    list = extractCvuDigitsFromPayload(m.payload).map((s) => s.replace(/\D/g, ''));
+  }
+
+  if (list.length === 0) return null;
+
+  const cvu22 = list.find((d) => d.length === 22);
+  const digits = cvu22 ?? [...list].sort((a, b) => b.length - a.length)[0];
+  if (!digits || digits.length < 8) return null;
+
+  if (digits.length === 22) {
+    return `${digits.slice(0, 8)} ${digits.slice(8, 14)} ${digits.slice(14, 22)}`;
+  }
+  return digits;
+}
