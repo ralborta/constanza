@@ -373,94 +373,190 @@ export default function TransfersPage() {
                 )}
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gradient-to-r from-emerald-50 to-teal-50">
-                    <TableHead className="font-semibold text-gray-800">Fecha</TableHead>
-                    <TableHead className="font-semibold text-gray-800">Origen</TableHead>
-                    <TableHead className="font-semibold text-gray-800">Referencia Externa</TableHead>
-                    <TableHead className="font-semibold text-gray-800">Quién pagó</TableHead>
-                    <TableHead className="font-semibold text-gray-800">Monto</TableHead>
-                    <TableHead className="font-semibold text-gray-800">Estado</TableHead>
-                    <TableHead className="font-semibold text-gray-800">Facturas</TableHead>
-                    <TableHead className="font-semibold text-gray-800">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <p className="text-xs text-gray-500 mb-3 md:hidden">
+                  Vista resumida: deslizá hacia abajo para ver cada transferencia completa.
+                </p>
+                <p className="text-xs text-gray-500 mb-2 hidden md:block">
+                  Si la tabla es ancha, usá el scroll horizontal debajo para ver fecha, monto y referencia.
+                </p>
+
+                {/* Móvil / pantalla angosta: tarjetas (evita que solo se vean Facturas + Acciones) */}
+                <div className="space-y-3 md:hidden">
                   {filteredTransfers.map((transfer) => (
-                    <TableRow key={transfer.id}>
-                      <TableCell className="text-sm">
-                        {format(new Date(transfer.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
-                      </TableCell>
-                      <TableCell>{getSourceSystemBadge(transfer.sourceSystem)}</TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {transfer.externalRef || '-'}
-                      </TableCell>
-                      <TableCell className="text-sm max-w-[220px]">
-                        {transfer.payerDisplayName ? (
-                          <span className="font-medium text-gray-900">{transfer.payerDisplayName}</span>
-                        ) : transfer.imputedCustomerName ? (
-                          <span className="text-gray-800">
-                            <span className="text-xs text-gray-500 block">Cliente (imputado)</span>
-                            {transfer.imputedCustomerName}
-                          </span>
-                        ) : transfer.sourceSystem === 'CRESIUM' ? (
-                          <span className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 inline-block">
-                            Nombre del pagador no vino en el aviso Cresium
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-semibold text-gray-900">
-                        ${(transfer.totalAmount / 100).toLocaleString('es-AR', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(transfer.status)}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
+                    <Card key={transfer.id} className="border border-gray-200 shadow-sm">
+                      <CardContent className="pt-4 space-y-3">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <p className="text-xs text-gray-500">Fecha</p>
+                            <p className="text-sm font-medium">
+                              {format(new Date(transfer.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">Monto</p>
+                            <p className="text-lg font-bold text-gray-900">
+                              $
+                              {(transfer.totalAmount / 100).toLocaleString('es-AR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 items-center">
+                          {getSourceSystemBadge(transfer.sourceSystem)}
+                          {getStatusBadge(transfer.status)}
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Referencia</p>
+                          <p className="font-mono text-sm break-all">{transfer.externalRef || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Quién pagó</p>
+                          <p className="text-sm">
+                            {transfer.payerDisplayName ? (
+                              <span className="font-medium">{transfer.payerDisplayName}</span>
+                            ) : transfer.imputedCustomerName ? (
+                              <span>{transfer.imputedCustomerName} (cliente imputado)</span>
+                            ) : transfer.sourceSystem === 'CRESIUM' ? (
+                              <span className="text-amber-800 text-sm">Sin nombre en el aviso Cresium</span>
+                            ) : (
+                              '—'
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Factura / imputación</p>
                           {transfer.applications.length === 0 ? (
-                            <span className="text-sm text-amber-700">
-                              Sin imputación a factura — podés completarlo desde Conciliación.
-                            </span>
+                            <p className="text-sm text-amber-700">
+                              Sin imputación — completar en Conciliación.
+                            </p>
                           ) : (
-                            transfer.applications.map((app) => (
-                              <div key={app.id} className="text-sm">
-                                <div className="text-xs text-gray-500 truncate max-w-[200px]">
-                                  {app.invoice.customer?.razonSocial}
+                            <div className="space-y-1">
+                              {transfer.applications.map((app) => (
+                                <div key={app.id} className="text-sm">
+                                  <span className="text-gray-600">{app.invoice.customer?.razonSocial}</span>
+                                  <Link
+                                    href={`/invoices/${app.invoice.id}`}
+                                    className="block text-emerald-600 font-medium hover:underline"
+                                  >
+                                    {app.invoice.numero}
+                                  </Link>
                                 </div>
-                                <Link
-                                  href={`/invoices/${app.invoice.id}`}
-                                  className="text-emerald-600 hover:text-emerald-800 hover:underline"
-                                >
-                                  {app.invoice.numero}
-                                </Link>
-                                <span className="text-gray-500 ml-2">
-                                  ${(app.amount / 100).toLocaleString('es-AR')}
-                                </span>
-                                {app.isAuthoritative && (
-                                  <Badge variant="outline" className="ml-2 text-xs">
-                                    🔒 Autoritativo
-                                  </Badge>
-                                )}
-                              </div>
-                            ))
+                              ))}
+                            </div>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/payments/${transfer.id}`}>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
+                        <div className="pt-1 border-t flex justify-end">
+                          <Link href={`/payments/${transfer.id}`}>
+                            <Button variant="outline" size="sm" className="gap-2">
+                              <Eye className="h-4 w-4" />
+                              Ver detalle
+                            </Button>
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Escritorio: tabla con scroll horizontal */}
+                <div className="hidden md:block w-full overflow-x-auto rounded-lg border border-gray-100">
+                  <Table className="min-w-[980px]">
+                    <TableHeader>
+                      <TableRow className="bg-gradient-to-r from-emerald-50 to-teal-50">
+                        <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Fecha</TableHead>
+                        <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Origen</TableHead>
+                        <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Referencia</TableHead>
+                        <TableHead className="font-semibold text-gray-800 whitespace-nowrap min-w-[140px]">
+                          Quién pagó
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Monto</TableHead>
+                        <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Estado</TableHead>
+                        <TableHead className="font-semibold text-gray-800 min-w-[180px]">Facturas</TableHead>
+                        <TableHead className="font-semibold text-gray-800 whitespace-nowrap w-[90px]">
+                          Acciones
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTransfers.map((transfer) => (
+                        <TableRow key={transfer.id}>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {format(new Date(transfer.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
+                          </TableCell>
+                          <TableCell>{getSourceSystemBadge(transfer.sourceSystem)}</TableCell>
+                          <TableCell className="font-mono text-sm max-w-[160px]">
+                            <span className="break-all">{transfer.externalRef || '-'}</span>
+                          </TableCell>
+                          <TableCell className="text-sm max-w-[220px]">
+                            {transfer.payerDisplayName ? (
+                              <span className="font-medium text-gray-900">{transfer.payerDisplayName}</span>
+                            ) : transfer.imputedCustomerName ? (
+                              <span className="text-gray-800">
+                                <span className="text-xs text-gray-500 block">Cliente (imputado)</span>
+                                {transfer.imputedCustomerName}
+                              </span>
+                            ) : transfer.sourceSystem === 'CRESIUM' ? (
+                              <span className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 inline-block">
+                                Sin nombre en aviso Cresium
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-semibold text-gray-900 whitespace-nowrap">
+                            ${(transfer.totalAmount / 100).toLocaleString('es-AR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(transfer.status)}</TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              {transfer.applications.length === 0 ? (
+                                <span className="text-sm text-amber-700">
+                                  Sin imputación — Conciliación.
+                                </span>
+                              ) : (
+                                transfer.applications.map((app) => (
+                                  <div key={app.id} className="text-sm">
+                                    <div className="text-xs text-gray-500 truncate max-w-[200px]">
+                                      {app.invoice.customer?.razonSocial}
+                                    </div>
+                                    <Link
+                                      href={`/invoices/${app.invoice.id}`}
+                                      className="text-emerald-600 hover:text-emerald-800 hover:underline"
+                                    >
+                                      {app.invoice.numero}
+                                    </Link>
+                                    <span className="text-gray-500 ml-2">
+                                      ${(app.amount / 100).toLocaleString('es-AR')}
+                                    </span>
+                                    {app.isAuthoritative && (
+                                      <Badge variant="outline" className="ml-2 text-xs">
+                                        🔒 Autoritativo
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Link href={`/payments/${transfer.id}`}>
+                              <Button variant="ghost" size="sm" title="Ver detalle">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
