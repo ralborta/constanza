@@ -13,6 +13,8 @@ const createUserBody = z.object({
   apellido: z.string().min(1).max(120),
   codigoUnico: z.string().min(1).max(64),
   perfil: perfilSchema,
+  /** Si no se envía, se usa la empresa de la sesión. */
+  tenantId: z.string().uuid().optional(),
 });
 
 const patchUserBody = z
@@ -24,23 +26,30 @@ const patchUserBody = z
     codigoUnico: z.string().min(1).max(64).optional(),
     perfil: perfilSchema.optional(),
     activo: z.boolean().optional(),
+    /** Cambiar empresa del usuario (mismo efecto que el UPDATE SQL manual). Debe existir en core.tenants. */
+    tenantId: z.string().uuid().optional(),
   })
   .refine((b) => Object.keys(b).length > 0, { message: 'Enviá al menos un campo para actualizar' });
 
-function userPublic(u: {
-  id: string;
-  tenantId: string;
-  email: string;
-  nombre: string;
-  apellido: string;
-  codigoUnico: string;
-  perfil: string;
-  activo: boolean;
-  createdAt: Date;
-}) {
+function userPublic(
+  u: {
+    id: string;
+    tenantId: string;
+    email: string;
+    nombre: string;
+    apellido: string;
+    codigoUnico: string;
+    perfil: string;
+    activo: boolean;
+    createdAt: Date;
+  },
+  tenant?: { name: string; slug: string } | null
+) {
   return {
     id: u.id,
     tenantId: u.tenantId,
+    tenantName: tenant?.name ?? null,
+    tenantSlug: tenant?.slug ?? null,
     email: u.email,
     nombre: u.nombre,
     apellido: u.apellido,
@@ -60,8 +69,13 @@ export async function userRoutes(fastify: FastifyInstance) {
       const users = await prisma.user.findMany({
         where: { tenantId: tenant_id },
         orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
+        include: {
+          tenant: { select: { name: true, slug: true } },
+        },
       });
-      return { users: users.map(userPublic) };
+      return {
+        users: users.map((u) => userPublic(u, u.tenant)),
+      };
     }
   );
 
@@ -72,12 +86,18 @@ export async function userRoutes(fastify: FastifyInstance) {
       const body = createUserBody.parse(request.body);
       const { tenant_id } = request.user!;
 
+      const targetTenantId = body.tenantId ?? tenant_id;
+      const tenantOk = await prisma.tenant.findUnique({ where: { id: targetTenantId } });
+      if (!tenantOk) {
+        return reply.status(400).send({ error: 'Empresa (tenant) inválida' });
+      }
+
       const passwordHash = await bcrypt.hash(body.password, 10);
 
       try {
         const created = await prisma.user.create({
           data: {
-            tenantId: tenant_id,
+            tenantId: targetTenantId,
             email: body.email.trim().toLowerCase(),
             passwordHash,
             nombre: body.nombre.trim(),
@@ -87,7 +107,11 @@ export async function userRoutes(fastify: FastifyInstance) {
             activo: true,
           },
         });
-        return reply.status(201).send({ user: userPublic(created) });
+        const t = await prisma.tenant.findUnique({
+          where: { id: created.tenantId },
+          select: { name: true, slug: true },
+        });
+        return reply.status(201).send({ user: userPublic(created, t) });
       } catch (e: unknown) {
         fastify.log.error({ e }, 'create user failed');
         throw e;
@@ -110,6 +134,13 @@ export async function userRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Usuario no encontrado' });
       }
 
+      if (body.tenantId !== undefined) {
+        const t = await prisma.tenant.findUnique({ where: { id: body.tenantId } });
+        if (!t) {
+          return reply.status(400).send({ error: 'Empresa (tenant) inválida' });
+        }
+      }
+
       const data: Record<string, unknown> = {};
       if (body.nombre !== undefined) data.nombre = body.nombre.trim();
       if (body.apellido !== undefined) data.apellido = body.apellido.trim();
@@ -117,6 +148,7 @@ export async function userRoutes(fastify: FastifyInstance) {
       if (body.codigoUnico !== undefined) data.codigoUnico = body.codigoUnico.trim();
       if (body.perfil !== undefined) data.perfil = body.perfil;
       if (body.activo !== undefined) data.activo = body.activo;
+      if (body.tenantId !== undefined) data.tenantId = body.tenantId;
       if (body.password !== undefined) {
         data.passwordHash = await bcrypt.hash(body.password, 10);
       }
@@ -126,7 +158,11 @@ export async function userRoutes(fastify: FastifyInstance) {
           where: { id, tenantId: tenant_id },
           data: data as any,
         });
-        return { user: userPublic(updated) };
+        const t = await prisma.tenant.findUnique({
+          where: { id: updated.tenantId },
+          select: { name: true, slug: true },
+        });
+        return { user: userPublic(updated, t) };
       } catch (e: unknown) {
         fastify.log.error({ e }, 'patch user failed');
         throw e;

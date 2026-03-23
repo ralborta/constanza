@@ -4,6 +4,11 @@
 
 Este documento lista todas las variables de entorno necesarias para el proyecto Constanza.
 
+### API — administración de usuarios
+
+- **`GET /v1/tenants`** (ADM): lista empresas (`core.tenants`) para asignar usuarios sin SQL.
+- **`PATCH /v1/users/:id`** puede incluir **`tenantId`** para mover el usuario a otra empresa (misma validación que un `UPDATE` manual). Tras el cambio, el usuario debe **cerrar sesión y volver a entrar**.
+
 ### Frontend (`apps/web`, p. ej. Vercel)
 
 | Variable | Obligatoria | Descripción |

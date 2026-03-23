@@ -35,13 +35,16 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Pencil, UserPlus } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, Pencil, UserPlus, Building2 } from 'lucide-react';
 
 type Perfil = 'ADM' | 'OPERADOR_1' | 'OPERADOR_2';
 
 interface OrgUser {
   id: string;
   tenantId: string;
+  tenantName?: string | null;
+  tenantSlug?: string | null;
   email: string;
   nombre: string;
   apellido: string;
@@ -49,6 +52,12 @@ interface OrgUser {
   perfil: string;
   activo: boolean;
   createdAt: string;
+}
+
+interface TenantOption {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 const perfilLabel: Record<string, string> = {
@@ -64,6 +73,8 @@ const emptyCreate = {
   apellido: '',
   codigoUnico: '',
   perfil: 'OPERADOR_1' as Perfil,
+  /** vacío = misma empresa que la sesión */
+  tenantId: '' as string,
 };
 
 export default function SettingsUsersPage() {
@@ -80,6 +91,7 @@ export default function SettingsUsersPage() {
     perfil: 'OPERADOR_1' as Perfil,
     activo: true,
     password: '',
+    tenantId: '',
   });
 
   useEffect(() => {
@@ -97,16 +109,42 @@ export default function SettingsUsersPage() {
     enabled: getEffectivePerfil() === 'ADM',
   });
 
+  const { data: tenantsData } = useQuery<{ tenants: TenantOption[] }>({
+    queryKey: ['tenants-list'],
+    queryFn: async () => {
+      const r = await api.get('/v1/tenants');
+      return r.data;
+    },
+    enabled: getEffectivePerfil() === 'ADM',
+  });
+
+  const { data: me } = useQuery<{
+    tenantId: string;
+    tenantName: string | null;
+    tenantSlug: string | null;
+  }>({
+    queryKey: ['auth-me'],
+    queryFn: async () => {
+      const r = await api.get('/auth/me');
+      return r.data;
+    },
+    enabled: getEffectivePerfil() === 'ADM',
+  });
+
   const createMutation = useMutation({
     mutationFn: async () => {
-      await api.post('/v1/users', {
+      const payload: Record<string, unknown> = {
         email: createForm.email.trim().toLowerCase(),
         password: createForm.password,
         nombre: createForm.nombre.trim(),
         apellido: createForm.apellido.trim(),
         codigoUnico: createForm.codigoUnico.trim(),
         perfil: createForm.perfil,
-      });
+      };
+      if (createForm.tenantId.trim()) {
+        payload.tenantId = createForm.tenantId.trim();
+      }
+      await api.post('/v1/users', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['org-users'] });
@@ -125,6 +163,7 @@ export default function SettingsUsersPage() {
         codigoUnico: editForm.codigoUnico.trim(),
         perfil: editForm.perfil,
         activo: editForm.activo,
+        tenantId: editForm.tenantId,
       };
       if (editForm.password.trim().length >= 6) {
         body.password = editForm.password.trim();
@@ -133,8 +172,9 @@ export default function SettingsUsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['org-users'] });
+      queryClient.invalidateQueries({ queryKey: ['auth-me'] });
       setEditUser(null);
-      setEditForm({ ...editForm, password: '' });
+      setEditForm((f) => ({ ...f, password: '' }));
     },
   });
 
@@ -148,6 +188,7 @@ export default function SettingsUsersPage() {
       perfil: u.perfil as Perfil,
       activo: u.activo,
       password: '',
+      tenantId: u.tenantId,
     });
   };
 
@@ -166,7 +207,8 @@ export default function SettingsUsersPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
             <p className="text-sm text-gray-600">
-              Alta y edición de usuarios internos de tu empresa (mismos permisos que ves en Constanza).
+              Cada usuario pertenece a una <strong>empresa</strong> en el sistema: ahí verá facturas, clientes e
+              ingresos (Cresium). Podés asignar o cambiar la empresa abajo.
             </p>
           </div>
           <Button onClick={() => setCreateOpen(true)} className="gap-2">
@@ -180,6 +222,28 @@ export default function SettingsUsersPage() {
             {(error as { response?: { data?: { error?: string } } })?.response?.data?.error ??
               'No se pudo cargar la lista. Si no sos administrador, esta sección no está disponible.'}
           </div>
+        )}
+
+        {me && (
+          <Alert>
+            <Building2 className="h-4 w-4" />
+            <AlertTitle>Tu sesión ahora</AlertTitle>
+            <AlertDescription className="text-sm space-y-1">
+              <p>
+                <span className="font-medium">{me.tenantName ?? 'Empresa'}</span>
+                {me.tenantSlug ? (
+                  <span className="text-muted-foreground"> ({me.tenantSlug})</span>
+                ) : null}
+              </p>
+              <p className="font-mono text-xs text-muted-foreground break-all">
+                ID empresa (tenant): {me.tenantId}
+              </p>
+              <p className="text-xs pt-1">
+                Los pagos Cresium deben guardarse con el mismo ID en Railway (<code className="rounded bg-muted px-1">CRESIUM_TENANT_ID</code>).
+                Si cambiás de empresa a un usuario, que cierre sesión y vuelva a entrar.
+              </p>
+            </AlertDescription>
+          </Alert>
         )}
 
         <Card>
@@ -198,6 +262,7 @@ export default function SettingsUsersPage() {
                     <TableHead>Nombre</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Código</TableHead>
+                    <TableHead>Empresa</TableHead>
                     <TableHead>Perfil</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="w-[100px]" />
@@ -211,6 +276,14 @@ export default function SettingsUsersPage() {
                       </TableCell>
                       <TableCell>{u.email}</TableCell>
                       <TableCell className="font-mono text-sm">{u.codigoUnico}</TableCell>
+                      <TableCell className="max-w-[200px]">
+                        <span className="text-sm font-medium line-clamp-2">
+                          {u.tenantName ?? '—'}
+                        </span>
+                        <span className="block font-mono text-[10px] text-muted-foreground truncate" title={u.tenantId}>
+                          {u.tenantId}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">{perfilLabel[u.perfil] ?? u.perfil}</Badge>
                       </TableCell>
@@ -243,10 +316,31 @@ export default function SettingsUsersPage() {
             <DialogHeader>
               <DialogTitle>Nuevo usuario</DialogTitle>
               <DialogDescription>
-                El usuario quedará en la misma empresa que tu sesión actual.
+                Elegí la empresa donde verá datos; si no, se usa la de tu sesión actual.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-3 py-2">
+              <div className="grid gap-2">
+                <Label>Empresa</Label>
+                <Select
+                  value={createForm.tenantId || '__session__'}
+                  onValueChange={(v) =>
+                    setCreateForm((f) => ({ ...f, tenantId: v === '__session__' ? '' : v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__session__">Misma que tu sesión actual</SelectItem>
+                    {(tenantsData?.tenants ?? []).map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name} ({t.slug})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="c-email">Email</Label>
                 <Input
@@ -336,9 +430,33 @@ export default function SettingsUsersPage() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Editar usuario</DialogTitle>
-              <DialogDescription>Cambios en nombre, acceso y perfil.</DialogDescription>
+              <DialogDescription>
+                Incluye la empresa (tenant): define qué facturas e ingresos ve este usuario.
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-3 py-2">
+              <div className="grid gap-2">
+                <Label>Empresa (tenant)</Label>
+                <Select
+                  value={editForm.tenantId}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, tenantId: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(tenantsData?.tenants ?? []).map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name} — {t.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Elegí la misma empresa donde están los pagos Cresium (ej. la que coincide con{' '}
+                  <code className="rounded bg-muted px-0.5">CRESIUM_TENANT_ID</code> en Railway).
+                </p>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="e-email">Email</Label>
                 <Input
