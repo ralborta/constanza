@@ -7,6 +7,7 @@ import {
   buildCresiumConciliationCandidates,
   type ConciliationCandidate,
 } from '../services/cresium-conciliation-candidates.js';
+import { extractPayerDisplayNameFromMetadata } from '../services/cresium-helpers.js';
 
 /** Monto mostrado: suma de applications, o total declarado por el origen si aún no hay imputación. */
 function transferTotalCents(payment: {
@@ -89,7 +90,13 @@ export async function paymentRoutes(fastify: FastifyInstance) {
         const totalAmount = payments.reduce((sum, payment) => sum + transferTotalCents(payment), 0);
 
         return {
-          transfers: payments.map((payment) => ({
+          transfers: payments.map((payment) => {
+            const firstCustomer = payment.applications[0]?.invoice?.customer;
+            const payerFromWebhook =
+              payment.sourceSystem === 'CRESIUM'
+                ? extractPayerDisplayNameFromMetadata(payment.metadata)
+                : null;
+            return {
             id: payment.id,
             sourceSystem: payment.sourceSystem,
             status: payment.status,
@@ -97,6 +104,10 @@ export async function paymentRoutes(fastify: FastifyInstance) {
             createdAt: payment.createdAt,
             settledAt: payment.settledAt,
             totalAmount: transferTotalCents(payment),
+            /** Nombre del ordenante/emisor si vino en el aviso Cresium (metadata). */
+            payerDisplayName: payerFromWebhook,
+            /** Cliente de la factura si ya hay imputación. */
+            imputedCustomerName: firstCustomer?.razonSocial ?? null,
             applications: payment.applications.map((app) => ({
               id: app.id,
               invoice: {
@@ -111,7 +122,8 @@ export async function paymentRoutes(fastify: FastifyInstance) {
               isAuthoritative: app.isAuthoritative,
               appliedAt: app.appliedAt,
             })),
-          })),
+          };
+          }),
           total,
           totalAmount,
           limit: take,

@@ -33,6 +33,10 @@ interface Transfer {
   createdAt: string;
   settledAt: string | null;
   totalAmount: number;
+  /** Nombre del ordenante si vino en el webhook Cresium */
+  payerDisplayName?: string | null;
+  /** Cliente (deudor) si ya está imputado a factura */
+  imputedCustomerName?: string | null;
   applications: Array<{
     id: string;
     invoice: {
@@ -151,6 +155,8 @@ export default function TransfersPage() {
       const apps = transfer.applications ?? [];
       return (
         transfer.externalRef?.toLowerCase().includes(search) ||
+        transfer.payerDisplayName?.toLowerCase().includes(search) ||
+        transfer.imputedCustomerName?.toLowerCase().includes(search) ||
         apps.some(
           (app) =>
             app.invoice?.numero?.toLowerCase().includes(search) ||
@@ -373,6 +379,7 @@ export default function TransfersPage() {
                     <TableHead className="font-semibold text-gray-800">Fecha</TableHead>
                     <TableHead className="font-semibold text-gray-800">Origen</TableHead>
                     <TableHead className="font-semibold text-gray-800">Referencia Externa</TableHead>
+                    <TableHead className="font-semibold text-gray-800">Quién pagó</TableHead>
                     <TableHead className="font-semibold text-gray-800">Monto</TableHead>
                     <TableHead className="font-semibold text-gray-800">Estado</TableHead>
                     <TableHead className="font-semibold text-gray-800">Facturas</TableHead>
@@ -388,6 +395,22 @@ export default function TransfersPage() {
                       <TableCell>{getSourceSystemBadge(transfer.sourceSystem)}</TableCell>
                       <TableCell className="font-mono text-sm">
                         {transfer.externalRef || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[220px]">
+                        {transfer.payerDisplayName ? (
+                          <span className="font-medium text-gray-900">{transfer.payerDisplayName}</span>
+                        ) : transfer.imputedCustomerName ? (
+                          <span className="text-gray-800">
+                            <span className="text-xs text-gray-500 block">Cliente (imputado)</span>
+                            {transfer.imputedCustomerName}
+                          </span>
+                        ) : transfer.sourceSystem === 'CRESIUM' ? (
+                          <span className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 inline-block">
+                            Nombre del pagador no vino en el aviso Cresium
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="font-semibold text-gray-900">
                         ${(transfer.totalAmount / 100).toLocaleString('es-AR', {
@@ -405,6 +428,9 @@ export default function TransfersPage() {
                           ) : (
                             transfer.applications.map((app) => (
                               <div key={app.id} className="text-sm">
+                                <div className="text-xs text-gray-500 truncate max-w-[200px]">
+                                  {app.invoice.customer?.razonSocial}
+                                </div>
                                 <Link
                                   href={`/invoices/${app.invoice.id}`}
                                   className="text-emerald-600 hover:text-emerald-800 hover:underline"
