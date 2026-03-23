@@ -5,13 +5,15 @@
   "scripts": {
     "seed": "cd infra/prisma && pnpm seed",
     "build": "pnpm --filter @constanza/web build",
-    "build:web": "pnpm --filter @constanza/web build"
+    "build:web": "pnpm --filter @constanza/web build",
+    "doc:descripcion": "node scripts/generar-descripcion-word.mjs"
   },
   "dependencies": {
     "@prisma/client": "5.22.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.25",
+    "docx": "^9.6.1",
     "prisma": "5.22.0"
   }
 }
