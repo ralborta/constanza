@@ -60,24 +60,58 @@ export async function generateInvoiceSummary(
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, tenantId },
     include: {
-      paymentApplications: true,
+      paymentApplications: { include: { payment: true } },
       promises: { orderBy: { dueDate: 'desc' }, take: 10 },
     },
   });
 
+  const appliedTotal = invoice
+    ? invoice.paymentApplications.reduce((s, a) => s + a.amount, 0)
+    : 0;
+  const saldoPendiente = invoice ? Math.max(0, invoice.monto - appliedTotal) : 0;
+  const cobradaCompleta = invoice ? invoice.monto > 0 && appliedTotal >= invoice.monto : false;
+  const estadoEfectivo = cobradaCompleta
+    ? 'COBRADA (monto aplicado cubre el total; tratar como pagada aunque el campo estado en ERP sea otro)'
+    : appliedTotal > 0
+      ? 'PARCIALMENTE COBRADA'
+      : `según campo estado: ${invoice?.estado ?? 'N/A'}`;
+
+  const pagosRegistrados =
+    invoice && invoice.paymentApplications.length > 0
+      ? invoice.paymentApplications
+          .map((a) => {
+            const fecha = new Date(a.appliedAt).toLocaleString('es-AR');
+            const monto = (a.amount / 100).toLocaleString('es-AR');
+            const origen = a.payment?.sourceSystem ?? 'desconocido';
+            const liq = a.payment?.settledAt
+              ? `, liquidado ${new Date(a.payment.settledAt).toLocaleString('es-AR')}`
+              : '';
+            return `- ${fecha}: aplicado $${monto} (${origen})${liq}`;
+          })
+          .join('\n')
+      : '';
+
   const invoiceFacts = invoice
     ? [
-        `Factura ${invoice.numero}. Estado: ${invoice.estado}.`,
+        `Factura ${invoice.numero}.`,
+        `IMPORTANTE — Estado de cobro efectivo: ${estadoEfectivo}.`,
+        cobradaCompleta
+          ? 'Saldo pendiente: $0. La deuda de esta factura está saldada.'
+          : `Saldo pendiente (centavos): ${saldoPendiente}.`,
+        `Campo estado en sistema (puede estar desactualizado): ${invoice.estado}.`,
         `Vencimiento: ${invoice.fechaVto.toLocaleDateString('es-AR')}.`,
         `Monto total: ${(invoice.monto / 100).toLocaleString('es-AR')}.`,
-        `Monto aplicado: ${(invoice.paymentApplications.reduce((s, a) => s + a.amount, 0) / 100).toLocaleString('es-AR')}.`,
+        `Monto aplicado acumulado: ${(appliedTotal / 100).toLocaleString('es-AR')}.`,
+        pagosRegistrados
+          ? `Pagos aplicados registrados en sistema:\n${pagosRegistrados}`
+          : 'No hay pagos aplicados registrados en sistema.',
         `Promesas registradas: ${invoice.promises.length}.`,
         invoice.promises.length > 0
           ? `Última promesa: vence ${invoice.promises[0].dueDate.toLocaleDateString('es-AR')}, estado ${invoice.promises[0].status}.`
           : '',
       ]
           .filter(Boolean)
-          .join(' ')
+          .join('\n')
     : '';
 
   const conversationContext = events.length > 0 ? buildConversationContext(events) : '';
@@ -192,13 +226,19 @@ async function generateInvoiceSummaryWithOpenAI(
   }
 
   const systemPrompt = `Eres un experto en cobranzas. Redactas la "historia" de una factura en formato narrativo y profesional.
+REGLAS OBLIGATORIAS SOBRE COBRANZA:
+- Si en los datos figura "Estado de cobro efectivo: COBRADA" o saldo pendiente $0, la factura ESTÁ PAGADA/SALDADA: el resumen debe decirlo claramente y el sentimiento no debe ser "negative" por falta de pago.
+- El campo "estado en sistema" puede estar desactualizado; prevalece siempre monto aplicado vs monto total y la lista de "Pagos aplicados registrados".
+- Si hay líneas de pagos aplicados, NO digas que no hubo pagos ni que el monto sigue íntegramente pendiente.
+
 El relato debe ser breve (párrafos claros, tono formal) e incluir:
-- Cuándo venció la factura y el estado actual (abierta, vencida, parcial, pagada).
-- Si hay pagos aplicados o no; si no hay pagos, indicarlo de forma explícita.
+- Cuándo venció la factura y la situación real de cobro (cobrada al 100%, parcial, o pendiente).
+- Pagos aplicados (montos, fechas, origen) cuando existan.
 - Cuántas veces se contactó al cliente y por qué canales; si el cliente respondió o no.
-- Promesas de pago: si existen, fechas y cumplimiento; si están vencidas sin pago, indicarlo.
-- Si se evidencia riesgo de incobrabilidad (sin respuesta, promesas incumplidas, antigüedad), mencionarlo de forma directa pero profesional.
-- Próximos pasos sugeridos (contacto, gestión judicial, etc.) cuando aplique.
+- Promesas de pago: si existen, fechas y cumplimiento; si están vencidas sin pago, indicarlo (solo si aún hay saldo).
+- Riesgo de incobrabilidad solo si queda saldo pendiente y no hay pagos o hay señales de impago.
+- Próximos pasos sugeridos cuando quede saldo; si está cobrada, indica que no requiere gestión de cobro por saldo.
+
 Usa solo los datos proporcionados. Sé conciso y claro.`;
 
   const userPrompt = noEvents
