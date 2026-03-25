@@ -477,6 +477,7 @@ export async function paymentRoutes(fastify: FastifyInstance) {
                       telefono: true,
                     },
                   },
+                  paymentApplications: { select: { amount: true } },
                 },
               },
             },
@@ -501,12 +502,15 @@ export async function paymentRoutes(fastify: FastifyInstance) {
           totalAmount: transferTotalCents(payment),
           unappliedAmountCents: payment.totalAmountCents,
           metadata: payment.metadata ?? null,
-          applications: payment.applications.map((app) => ({
+          applications: payment.applications.map((app) => {
+            const montoAplicado = app.invoice.paymentApplications.reduce((s, p) => s + p.amount, 0);
+            return {
             id: app.id,
             invoice: {
               id: app.invoice.id,
               numero: app.invoice.numero,
               monto: app.invoice.monto,
+              montoAplicado,
               fechaVto: app.invoice.fechaVto,
               estado: app.invoice.estado,
               customer: app.invoice.customer,
@@ -515,7 +519,8 @@ export async function paymentRoutes(fastify: FastifyInstance) {
             isAuthoritative: app.isAuthoritative,
             appliedAt: app.appliedAt,
             externalApplicationRef: app.externalApplicationRef,
-          })),
+          };
+          }),
         },
       };
     }

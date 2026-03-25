@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InvoiceChat } from '@/components/invoices/invoice-chat';
 import { InvoiceHistorialDrawer } from '@/components/invoices/invoice-historial-drawer';
+import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
 
 interface TimelineItem {
   type: 'CONTACT' | 'PROMISE' | 'PAYMENT';
@@ -310,7 +311,11 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Estado</p>
-                  <div className="mt-1">{getStatusBadge(invoice.estado)}</div>
+                  <div className="mt-1">
+                    {getStatusBadge(
+                      resolveInvoiceEstadoForDisplay(invoice.estado, invoice.monto, invoice.montoAplicado)
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

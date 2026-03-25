@@ -35,6 +35,7 @@ import {
 import { UploadInvoiceButton } from '@/components/invoices/upload-invoice-button';
 import { CreateInvoiceManualButton } from '@/components/invoices/create-invoice-manual-button';
 import { InvoiceHistorialDrawer } from '@/components/invoices/invoice-historial-drawer';
+import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
 
 interface Invoice {
   id: string;
@@ -165,7 +166,11 @@ export default function InvoicesPage() {
                           ${(invoice.montoAplicado / 100).toLocaleString('es-AR')}
                         </TableCell>
                         <TableCell className="text-sm text-foreground">{format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}</TableCell>
-                        <TableCell>{getStatusBadge(invoice.estado)}</TableCell>
+                        <TableCell>
+                          {getStatusBadge(
+                            resolveInvoiceEstadoForDisplay(invoice.estado, invoice.monto, invoice.montoAplicado)
+                          )}
+                        </TableCell>
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

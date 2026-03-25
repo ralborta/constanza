@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
@@ -80,6 +81,9 @@ function getDaysSinceDue(date: string): number {
 }
 
 function getStatusBadge(estado: string) {
+  if (estado === 'SALDADA' || estado === 'PAGADA') {
+    return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 font-medium">Pagada</Badge>;
+  }
   if (estado === 'ABIERTA' || estado === 'POR_VENCER') {
     return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-50 font-medium">Por vencer</Badge>;
   }
@@ -373,6 +377,11 @@ export default function DashboardPage() {
                       ) : (
                         invoices?.invoices.map((invoice) => {
                           const daysSinceDue = getDaysSinceDue(invoice.fechaVto);
+                          const displayEstado = resolveInvoiceEstadoForDisplay(
+                            invoice.estado,
+                            invoice.monto,
+                            invoice.montoAplicado
+                          );
                           return (
                             <TableRow key={invoice.id} className="hover:bg-muted/30">
                               <TableCell className="font-mono text-sm font-medium text-foreground">{invoice.numero}</TableCell>
@@ -393,15 +402,15 @@ export default function DashboardPage() {
                                   {daysSinceDue > 0 ? `${daysSinceDue}d` : 'Al día'}
                                 </span>
                               </TableCell>
-                              <TableCell>{getStatusBadge(invoice.estado)}</TableCell>
+                              <TableCell>{getStatusBadge(displayEstado)}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
                                   <Button variant="ghost" size="sm" className="h-8 text-xs text-primary hover:text-primary hover:bg-primary/10" asChild>
                                     <Link href={`/invoices/${invoice.id}`}>Ver</Link>
                                   </Button>
-                                  {(invoice.estado === 'ABIERTA' || invoice.estado === 'VENCIDA') && (
+                                  {(displayEstado === 'ABIERTA' || displayEstado === 'VENCIDA') && (
                                     <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground">
-                                      {invoice.estado === 'ABIERTA' ? 'Recordar' : 'Llamar'}
+                                      {displayEstado === 'ABIERTA' ? 'Recordar' : 'Llamar'}
                                     </Button>
                                   )}
                                 </div>

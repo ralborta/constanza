@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
 import {
   Clock,
   DollarSign,
@@ -326,7 +327,9 @@ export function InvoiceHistorialView({ data }: InvoiceHistorialViewProps) {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500">Estado</p>
-              {getStatusBadge(invoice.estado)}
+              {getStatusBadge(
+                resolveInvoiceEstadoForDisplay(invoice.estado, invoice.monto, invoice.montoAplicado)
+              )}
             </div>
           </div>
         </CardContent>

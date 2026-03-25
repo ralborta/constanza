@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
+import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +40,7 @@ interface PaymentDetailResponse {
         id: string;
         numero: string;
         monto: number;
+        montoAplicado: number;
         fechaVto: string;
         estado: string;
         customer: {
@@ -197,7 +199,15 @@ export default function PaymentDetailPage() {
                               maximumFractionDigits: 2,
                             })}
                           </TableCell>
-                          <TableCell>{invoiceEstadoBadge(app.invoice.estado)}</TableCell>
+                          <TableCell>
+                            {invoiceEstadoBadge(
+                              resolveInvoiceEstadoForDisplay(
+                                app.invoice.estado,
+                                app.invoice.monto,
+                                app.invoice.montoAplicado
+                              )
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
