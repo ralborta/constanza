@@ -11,6 +11,7 @@ import {
   extractPayerDisplayNameFromMetadata,
   extractPayerCvuFromMetadata,
 } from '../services/cresium-helpers.js';
+import { syncInvoiceEstadoFromApplications } from '../services/invoice-estado-sync.js';
 
 /** Monto mostrado: suma de applications, o total declarado por el origen si aún no hay imputación. */
 function transferTotalCents(payment: {
@@ -422,6 +423,8 @@ export async function paymentRoutes(fastify: FastifyInstance) {
           externalApplicationRef: `cresium-impute:${payment.externalRef ?? payment.id}`,
         },
       });
+
+      await syncInvoiceEstadoFromApplications(prisma, invoice.id);
 
       await prisma.payment.update({
         where: { id: payment.id },

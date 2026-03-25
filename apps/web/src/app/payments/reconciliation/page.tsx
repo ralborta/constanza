@@ -139,6 +139,7 @@ export default function ReconciliationPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments-reconciliation'] });
       queryClient.invalidateQueries({ queryKey: ['payments-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     },
   });
 

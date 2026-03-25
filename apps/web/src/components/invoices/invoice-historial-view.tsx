@@ -75,6 +75,7 @@ function getStatusBadge(estado: string) {
     VENCIDA: { label: 'Vencido', variant: 'destructive' },
     PARCIAL: { label: 'Parcial', variant: 'outline' },
     PAGADA: { label: 'Pagada', variant: 'default' },
+    SALDADA: { label: 'Pagada', variant: 'default' },
     PROGRAMADA: { label: 'Programado', variant: 'default' },
   };
   const status = statusMap[estado] || { label: estado, variant: 'outline' as const };

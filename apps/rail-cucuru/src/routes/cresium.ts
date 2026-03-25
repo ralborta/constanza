@@ -10,6 +10,7 @@ import {
   pickSingleExactPendingInvoice,
   type InvoicePendingRow,
 } from '../lib/cresium-helpers.js';
+import { syncInvoiceEstadoFromApplications } from '../services/invoice-estado-sync.js';
 
 const prisma = new PrismaClient();
 
@@ -836,6 +837,7 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
             externalApplicationRef: `cresium:${extRef}:${matched.id}`,
           },
         });
+        await syncInvoiceEstadoFromApplications(prisma, matched.id);
         fastify.log.info(
           { paymentId: payment.id, invoiceId: matched.id, reason: matched.reason, externalRef: extRef, amountCents },
           'Cresium deposit applied to invoice'

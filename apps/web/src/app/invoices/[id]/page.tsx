@@ -71,6 +71,7 @@ function getStatusBadge(estado: string) {
     VENCIDA:    { label: 'Vencido',    className: 'bg-red-50 text-red-700 border border-red-200' },
     PARCIAL:    { label: 'Parcial',    className: 'bg-blue-50 text-blue-700 border border-blue-200' },
     PAGADA:     { label: 'Pagada',     className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+    SALDADA:    { label: 'Pagada',     className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
     PROGRAMADA: { label: 'Programado', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
   };
   const s = map[estado] || { label: estado, className: '' };
