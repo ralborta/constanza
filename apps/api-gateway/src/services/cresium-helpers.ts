@@ -221,34 +221,3 @@ export function extractPayerCuitFromMetadata(metadata: unknown): string | null {
 
   return null;
 }
-
-/**
- * CUITs del pagador (11 dígitos, sin duplicados, orden del aviso)
- * para cruzar con `customer_cuits`.
- */
-export function extractPayerCuitDigitsListForMatch(metadata: unknown): string[] {
-  if (metadata == null || typeof metadata !== 'object') return [];
-  const m = metadata as Record<string, unknown>;
-  const ordered: string[] = [];
-  const seen = new Set<string>();
-
-  const push = (raw: string) => {
-    const n = normalizeArgentineTaxId(raw);
-    if (n && !seen.has(n)) {
-      seen.add(n);
-      ordered.push(n);
-    }
-  };
-
-  if (Array.isArray(m.extractedTaxIds)) {
-    for (const id of m.extractedTaxIds) {
-      if (typeof id === 'string') push(id);
-    }
-  }
-  if (ordered.length === 0 && m.payload != null) {
-    for (const id of extractTaxIdsFromPayload(m.payload)) {
-      push(id);
-    }
-  }
-  return ordered;
-}

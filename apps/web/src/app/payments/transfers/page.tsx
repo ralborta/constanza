@@ -39,8 +39,6 @@ interface Transfer {
   payerCvu?: string | null;
   /** CUIT del pagador (11 dígitos, formato XX-XXXXXXXX-X) desde extractedTaxIds / payload */
   payerCuit?: string | null;
-  /** Cliente en cartera si el CUIT del aviso coincide con customer_cuits */
-  payerMatchedClientName?: string | null;
   /** Cliente (deudor) si ya está imputado a factura */
   imputedCustomerName?: string | null;
   applications: Array<{
@@ -164,7 +162,6 @@ export default function TransfersPage() {
         transfer.payerDisplayName?.toLowerCase().includes(search) ||
         transfer.payerCvu?.replace(/\s/g, '').includes(search.replace(/\s/g, '')) ||
         transfer.payerCuit?.replace(/[-\s]/g, '').includes(search.replace(/[-\s]/g, '')) ||
-        transfer.payerMatchedClientName?.toLowerCase().includes(search) ||
         transfer.imputedCustomerName?.toLowerCase().includes(search) ||
         apps.some(
           (app) =>
@@ -436,12 +433,6 @@ export default function TransfersPage() {
                                 {transfer.payerCuit}
                               </p>
                             ) : null}
-                            {transfer.payerMatchedClientName ? (
-                              <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-100 rounded px-2 py-1">
-                                <span className="font-medium text-emerald-900">En cartera: </span>
-                                {transfer.payerMatchedClientName}
-                              </p>
-                            ) : null}
                             {transfer.payerDisplayName ? (
                               <p className="font-medium">
                                 {transfer.payerDisplayName}
@@ -548,12 +539,6 @@ export default function TransfersPage() {
                                 <p className="font-mono text-xs text-gray-900">
                                   <span className="text-gray-500 font-sans">CUIT </span>
                                   {transfer.payerCuit}
-                                </p>
-                              ) : null}
-                              {transfer.payerMatchedClientName ? (
-                                <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-100 rounded px-2 py-0.5 leading-snug">
-                                  <span className="font-medium text-emerald-900">En cartera </span>
-                                  {transfer.payerMatchedClientName}
                                 </p>
                               ) : null}
                               {transfer.payerDisplayName ? (
