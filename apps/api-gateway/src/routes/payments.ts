@@ -8,6 +8,7 @@ import {
   type ConciliationCandidate,
 } from '../services/cresium-conciliation-candidates.js';
 import {
+  extractPayerCuitDigitsListForMatch,
   extractPayerCuitFromMetadata,
   extractPayerDisplayNameFromMetadata,
   extractPayerCvuFromMetadata,
@@ -94,6 +95,39 @@ export async function paymentRoutes(fastify: FastifyInstance) {
 
         const totalAmount = payments.reduce((sum, payment) => sum + transferTotalCents(payment), 0);
 
+        const cuitsInPage = new Set<string>();
+        for (const p of payments) {
+          if (p.sourceSystem !== 'CRESIUM') continue;
+          for (const c of extractPayerCuitDigitsListForMatch(p.metadata)) {
+            cuitsInPage.add(c);
+          }
+        }
+
+        const cuitToRazonSocial = new Map<string, string>();
+        if (cuitsInPage.size > 0) {
+          const cuitVariants = new Set<string>();
+          for (const d of cuitsInPage) {
+            cuitVariants.add(d);
+            cuitVariants.add(`${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}`);
+          }
+          const matches = await tx.customerCuit.findMany({
+            where: {
+              tenantId: user.tenant_id,
+              cuit: { in: [...cuitVariants] },
+            },
+            select: {
+              cuit: true,
+              customer: { select: { razonSocial: true } },
+            },
+          });
+          for (const row of matches) {
+            const norm = row.cuit.replace(/\D/g, '');
+            if (norm.length === 11 && !cuitToRazonSocial.has(norm)) {
+              cuitToRazonSocial.set(norm, row.customer.razonSocial);
+            }
+          }
+        }
+
         return {
           transfers: payments.map((payment) => {
             const firstCustomer = payment.applications[0]?.invoice?.customer;
@@ -109,6 +143,18 @@ export async function paymentRoutes(fastify: FastifyInstance) {
               payment.sourceSystem === 'CRESIUM'
                 ? extractPayerCuitFromMetadata(payment.metadata)
                 : null;
+
+            let payerMatchedClientName: string | null = null;
+            if (payment.sourceSystem === 'CRESIUM') {
+              for (const c of extractPayerCuitDigitsListForMatch(payment.metadata)) {
+                const rs = cuitToRazonSocial.get(c);
+                if (rs) {
+                  payerMatchedClientName = rs;
+                  break;
+                }
+              }
+            }
+
             return {
             id: payment.id,
             sourceSystem: payment.sourceSystem,
@@ -123,6 +169,8 @@ export async function paymentRoutes(fastify: FastifyInstance) {
             payerCvu,
             /** CUIT del pagador (11 dígitos) desde extractedTaxIds / payload. */
             payerCuit,
+            /** Razon social del cliente en cartera si algún CUIT del aviso coincide con customer_cuits. */
+            payerMatchedClientName,
             /** Cliente de la factura si ya hay imputación. */
             imputedCustomerName: firstCustomer?.razonSocial ?? null,
             applications: payment.applications.map((app) => ({
