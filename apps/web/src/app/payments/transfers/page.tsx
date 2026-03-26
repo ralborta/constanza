@@ -37,6 +37,8 @@ interface Transfer {
   payerDisplayName?: string | null;
   /** CVU detectado en el payload (extractedCvuDigits / escaneo) */
   payerCvu?: string | null;
+  /** CUIT del pagador (11 dígitos, formato XX-XXXXXXXX-X) desde extractedTaxIds / payload */
+  payerCuit?: string | null;
   /** Cliente (deudor) si ya está imputado a factura */
   imputedCustomerName?: string | null;
   applications: Array<{
@@ -159,6 +161,7 @@ export default function TransfersPage() {
         transfer.externalRef?.toLowerCase().includes(search) ||
         transfer.payerDisplayName?.toLowerCase().includes(search) ||
         transfer.payerCvu?.replace(/\s/g, '').includes(search.replace(/\s/g, '')) ||
+        transfer.payerCuit?.replace(/[-\s]/g, '').includes(search.replace(/[-\s]/g, '')) ||
         transfer.imputedCustomerName?.toLowerCase().includes(search) ||
         apps.some(
           (app) =>
@@ -424,6 +427,12 @@ export default function TransfersPage() {
                                 {transfer.payerCvu}
                               </p>
                             ) : null}
+                            {transfer.payerCuit ? (
+                              <p className="font-mono text-xs text-gray-800">
+                                <span className="text-gray-500 font-sans">CUIT: </span>
+                                {transfer.payerCuit}
+                              </p>
+                            ) : null}
                             {transfer.payerDisplayName ? (
                               <p className="font-medium">
                                 {transfer.payerDisplayName}
@@ -432,16 +441,21 @@ export default function TransfersPage() {
                                 </span>
                               </p>
                             ) : null}
-                            {!transfer.payerCvu && !transfer.payerDisplayName && transfer.imputedCustomerName ? (
+                            {!transfer.payerCvu &&
+                            !transfer.payerCuit &&
+                            !transfer.payerDisplayName &&
+                            transfer.imputedCustomerName ? (
                               <span>{transfer.imputedCustomerName} (cliente imputado)</span>
                             ) : null}
                             {!transfer.payerCvu &&
+                            !transfer.payerCuit &&
                             !transfer.payerDisplayName &&
                             !transfer.imputedCustomerName &&
                             transfer.sourceSystem === 'CRESIUM' ? (
-                              <span className="text-amber-800 text-sm">Sin nombre ni CVU en el aviso</span>
+                              <span className="text-amber-800 text-sm">Sin CUIT, nombre ni CVU en el aviso</span>
                             ) : null}
                             {!transfer.payerCvu &&
+                            !transfer.payerCuit &&
                             !transfer.payerDisplayName &&
                             !transfer.imputedCustomerName &&
                             transfer.sourceSystem !== 'CRESIUM' ? (
@@ -521,6 +535,12 @@ export default function TransfersPage() {
                                   {transfer.payerCvu}
                                 </p>
                               ) : null}
+                              {transfer.payerCuit ? (
+                                <p className="font-mono text-xs text-gray-900">
+                                  <span className="text-gray-500 font-sans">CUIT </span>
+                                  {transfer.payerCuit}
+                                </p>
+                              ) : null}
                               {transfer.payerDisplayName ? (
                                 <div>
                                   <span className="font-medium text-gray-900">{transfer.payerDisplayName}</span>
@@ -529,21 +549,26 @@ export default function TransfersPage() {
                                   </span>
                                 </div>
                               ) : null}
-                              {!transfer.payerCvu && !transfer.payerDisplayName && transfer.imputedCustomerName ? (
+                              {!transfer.payerCvu &&
+                              !transfer.payerCuit &&
+                              !transfer.payerDisplayName &&
+                              transfer.imputedCustomerName ? (
                                 <span className="text-gray-800">
                                   <span className="text-xs text-gray-500 block">Cliente (imputado)</span>
                                   {transfer.imputedCustomerName}
                                 </span>
                               ) : null}
                               {!transfer.payerCvu &&
+                              !transfer.payerCuit &&
                               !transfer.payerDisplayName &&
                               !transfer.imputedCustomerName &&
                               transfer.sourceSystem === 'CRESIUM' ? (
                                 <span className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 inline-block">
-                                  Sin nombre ni CVU en el aviso
+                                  Sin CUIT, nombre ni CVU en el aviso
                                 </span>
                               ) : null}
                               {!transfer.payerCvu &&
+                              !transfer.payerCuit &&
                               !transfer.payerDisplayName &&
                               !transfer.imputedCustomerName &&
                               transfer.sourceSystem !== 'CRESIUM' ? (

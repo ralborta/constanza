@@ -183,3 +183,41 @@ export function extractPayerCvuFromMetadata(metadata: unknown): string | null {
   }
   return digits;
 }
+
+/** Formato visual CUIT AR (11 dígitos). */
+function formatCuitArDisplay(digits11: string): string {
+  const d = digits11.replace(/\D/g, '');
+  if (d.length !== 11) return digits11;
+  return `${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}`;
+}
+
+/**
+ * CUIT del pagador (11 dígitos) desde `extractedTaxIds` del metadata del webhook
+ * o re-escaneo de `metadata.payload` si hace falta.
+ */
+export function extractPayerCuitFromMetadata(metadata: unknown): string | null {
+  if (metadata == null || typeof metadata !== 'object') return null;
+  const m = metadata as Record<string, unknown>;
+
+  const pickFromStrings = (ids: string[]): string | null => {
+    for (const id of ids) {
+      const n = normalizeArgentineTaxId(id);
+      if (n) return formatCuitArDisplay(n);
+    }
+    return null;
+  };
+
+  if (Array.isArray(m.extractedTaxIds) && m.extractedTaxIds.length > 0) {
+    const strs = m.extractedTaxIds.filter((x): x is string => typeof x === 'string');
+    const hit = pickFromStrings(strs);
+    if (hit) return hit;
+  }
+
+  if (m.payload != null) {
+    const ids = extractTaxIdsFromPayload(m.payload);
+    const hit = pickFromStrings(ids);
+    if (hit) return hit;
+  }
+
+  return null;
+}
