@@ -15,6 +15,7 @@ import { syncInvoiceEstadoFromApplications } from '../services/invoice-estado-sy
 const prisma = new PrismaClient();
 const NOTIFIER_URL = process.env.NOTIFIER_URL?.replace(/\/+$/, '') ?? '';
 const PAYMENT_RECEIVER_PHONE = process.env.PAYMENT_RECEIVER_PHONE?.trim() ?? '';
+const PAYMENT_COMPANY_NAME = process.env.PAYMENT_COMPANY_NAME?.trim() ?? '';
 
 /** Ventana anti-replay: por defecto 15 min (reintentos de Cresium). Override: CRESIUM_REPLAY_WINDOW_MS */
 const REPLAY_WINDOW_MS = (() => {
@@ -476,22 +477,53 @@ function formatArsFromCents(cents: number): string {
   });
 }
 
-async function sendWhatsAppViaNotifier(number: string, message: string): Promise<void> {
-  if (!NOTIFIER_URL || !number || !message) return;
+async function sendWhatsAppViaNotifier(opts: {
+  number: string;
+  message: string;
+  fastify: FastifyInstance;
+  target: 'receiver' | 'payer';
+}): Promise<void> {
+  const { number, message, fastify, target } = opts;
+  if (!NOTIFIER_URL || !number || !message) {
+    fastify.log.warn(
+      {
+        notifierConfigured: Boolean(NOTIFIER_URL),
+        numberPresent: Boolean(number),
+        messagePresent: Boolean(message),
+        target,
+      },
+      'Payment notification skipped: missing notifier config/data'
+    );
+    return;
+  }
   try {
-    const res = await fetch(`${NOTIFIER_URL}/wa/test-send`, {
+    fastify.log.info(
+      { target, numberPreview: number.slice(0, 6) + '***' },
+      'Payment notification attempt'
+    );
+    const res = await fetch(`${NOTIFIER_URL}/notify/send-direct`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        number,
+        channel: 'WHATSAPP',
+        to: number,
         message,
+        source: 'cresium-deposito',
       }),
     });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
     }
-  } catch {
+    fastify.log.info({ target }, 'Payment notification queued via notifier');
+  } catch (error: unknown) {
     // No cortar el webhook de cobro si falla WhatsApp.
+    fastify.log.error(
+      {
+        target,
+        err: error instanceof Error ? error.message : String(error),
+      },
+      'Payment notification failed'
+    );
   }
 }
 
@@ -501,6 +533,7 @@ async function sendPaymentNotifications(opts: {
   customerName: string | null;
   customerPhone: string | null;
   invoiceNumber: string | null;
+  fastify: FastifyInstance;
 }): Promise<void> {
   const amount = formatArsFromCents(opts.amountCents);
   const fromCustomer = opts.customerName ?? 'Cliente no identificado';
@@ -513,7 +546,14 @@ async function sendPaymentNotifications(opts: {
       `🧾 *Factura:* ${invoiceText}`,
       `💵 *Monto:* ${amount}`,
     ].join('\n');
-    await sendWhatsAppViaNotifier(PAYMENT_RECEIVER_PHONE, receiverMsg);
+    await sendWhatsAppViaNotifier({
+      number: PAYMENT_RECEIVER_PHONE,
+      message: receiverMsg,
+      fastify: opts.fastify,
+      target: 'receiver',
+    });
+  } else {
+    opts.fastify.log.warn('Payment receiver notification skipped: PAYMENT_RECEIVER_PHONE missing');
   }
 
   if (opts.customerPhone && opts.invoiceNumber) {
@@ -525,7 +565,20 @@ async function sendPaymentNotifications(opts: {
       '',
       'Gracias por tu pago.',
     ].join('\n');
-    await sendWhatsAppViaNotifier(opts.customerPhone, payerMsg);
+    await sendWhatsAppViaNotifier({
+      number: opts.customerPhone,
+      message: payerMsg,
+      fastify: opts.fastify,
+      target: 'payer',
+    });
+  } else {
+    opts.fastify.log.info(
+      {
+        hasCustomerPhone: Boolean(opts.customerPhone),
+        hasInvoiceNumber: Boolean(opts.invoiceNumber),
+      },
+      'Payer notification skipped: requires matched invoice and customer phone'
+    );
   }
 }
 
@@ -917,10 +970,11 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
         await syncInvoiceEstadoFromApplications(prisma, matched.id);
         void sendPaymentNotifications({
           amountCents,
-          tenantName: tenant?.name ?? 'Tu empresa',
+          tenantName: PAYMENT_COMPANY_NAME || tenant?.name || 'Tu empresa',
           customerName: invoiceForNotification?.customer?.razonSocial ?? null,
           customerPhone: invoiceForNotification?.customer?.telefono ?? null,
           invoiceNumber: invoiceForNotification?.numero ?? matched.numero,
+          fastify,
         });
         fastify.log.info(
           { paymentId: payment.id, invoiceId: matched.id, reason: matched.reason, externalRef: extRef, amountCents },
@@ -951,10 +1005,11 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
       );
       void sendPaymentNotifications({
         amountCents,
-        tenantName: tenant?.name ?? 'Tu empresa',
+        tenantName: PAYMENT_COMPANY_NAME || tenant?.name || 'Tu empresa',
         customerName: null,
         customerPhone: null,
         invoiceNumber: null,
+        fastify,
       });
       return reply.status(200).send({
         status: 'ok',

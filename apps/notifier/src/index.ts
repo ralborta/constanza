@@ -345,6 +345,56 @@ server.post('/notify/send', async (request, reply) => {
   };
 });
 
+// Envío directo (sin customerId) para notificaciones operativas internas.
+// Usa la misma integración de WhatsApp que el worker normal.
+server.post('/notify/send-direct', async (request, reply) => {
+  const { channel, to, message, tenantId, source } = request.body as {
+    channel: 'WHATSAPP' | string;
+    to: string;
+    message: string;
+    tenantId?: string;
+    source?: string;
+  };
+
+  if (channel !== 'WHATSAPP') {
+    return reply.status(400).send({ error: 'Only WHATSAPP is supported in /notify/send-direct' });
+  }
+  if (!to || !message) {
+    return reply.status(400).send({ error: 'Missing `to` or `message`' });
+  }
+
+  try {
+    const result = await sendWhatsApp({ to, message });
+    logger.info(
+      {
+        tenantId: tenantId ?? null,
+        source: source ?? 'unknown',
+        toPreview: String(to).slice(0, 6) + '***',
+        status: result.status,
+      },
+      'Direct WhatsApp notification sent'
+    );
+    return reply.send({
+      ok: true,
+      status: result.status,
+      messageId: result.messageId,
+    });
+  } catch (error: any) {
+    logger.error(
+      {
+        tenantId: tenantId ?? null,
+        source: source ?? 'unknown',
+        err: error?.message ?? String(error),
+      },
+      'Direct WhatsApp notification failed'
+    );
+    return reply.status(500).send({
+      ok: false,
+      error: error?.message ?? 'send-direct failed',
+    });
+  }
+});
+
 const start = async () => {
   try {
     // Registrar webhooks (builderbot puede enviar webhooks)
