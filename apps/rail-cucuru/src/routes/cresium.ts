@@ -13,7 +13,13 @@ import {
 import { syncInvoiceEstadoFromApplications } from '../services/invoice-estado-sync.js';
 
 const prisma = new PrismaClient();
-const NOTIFIER_URL = process.env.NOTIFIER_URL?.replace(/\/+$/, '') ?? '';
+function normalizeNotifierUrl(raw: string | undefined): string {
+  const base = (raw ?? '').trim().replace(/\.+$/, '').replace(/\/+$/, '');
+  if (!base) return '';
+  if (/^https?:\/\//i.test(base)) return base;
+  return `https://${base}`;
+}
+const NOTIFIER_URL = normalizeNotifierUrl(process.env.NOTIFIER_URL);
 const PAYMENT_RECEIVER_PHONE = process.env.PAYMENT_RECEIVER_PHONE?.trim() ?? '';
 const PAYMENT_COMPANY_NAME = process.env.PAYMENT_COMPANY_NAME?.trim() ?? '';
 
