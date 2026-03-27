@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-const BUILDERBOT_BASE_URL =
-  process.env.BUILDERBOT_BASE_URL || 'https://app.builderbot.cloud';
+const DEFAULT_BUILDERBOT_URLS = ['https://app.builderbot.cloud', 'https://api.builderbot.cloud'];
 
 export interface SendWhatsAppOptions {
   number: string; // número en formato internacional
@@ -43,27 +42,81 @@ export async function sendWhatsAppMessage(options: SendWhatsAppOptions) {
     );
   }
 
-  const url = `${BUILDERBOT_BASE_URL}/api/v2/${BOT_ID}/messages`;
+  const baseUrlCandidates = [
+    process.env.BUILDERBOT_BASE_URL?.trim(),
+    process.env.BUILDERBOT_API_URL?.trim(),
+    ...DEFAULT_BUILDERBOT_URLS,
+  ]
+    .filter((x): x is string => Boolean(x && x.length > 0))
+    .map((x) => x.replace(/\/+$/, ''));
 
-  const body: Record<string, any> = {
-    messages: {
-      content: message,
+  const payloadVariants: Record<string, any>[] = [
+    // Variante histórica en este proyecto
+    {
+      messages: {
+        content: message,
+        ...(mediaUrl ? { mediaUrl } : {}),
+      },
+      number,
+      checkIfExists,
     },
-    number,
-    checkIfExists,
-  };
+    // Variante simple usada por algunos ejemplos de Builderbot
+    {
+      number,
+      message,
+      checkIfExists,
+      ...(mediaUrl ? { mediaUrl } : {}),
+    },
+    // Variante "messages array"
+    {
+      number,
+      messages: [
+        {
+          content: message,
+          ...(mediaUrl ? { mediaUrl } : {}),
+        },
+      ],
+      checkIfExists,
+    },
+  ];
 
-  if (mediaUrl) {
-    body.messages.mediaUrl = mediaUrl;
+  const headerVariants = [
+    {
+      'Content-Type': 'application/json',
+      'x-api-builderbot': API_KEY as string,
+    },
+    {
+      'Content-Type': 'application/json',
+      'x-api-key': API_KEY as string,
+    },
+    {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${API_KEY}`,
+    },
+  ];
+
+  const errors: string[] = [];
+  for (const base of baseUrlCandidates) {
+    const url = `${base}/api/v2/${BOT_ID}/messages`;
+    for (const headers of headerVariants) {
+      for (const body of payloadVariants) {
+        try {
+          const response = await axios.post(url, body, { headers, timeout: 30000 });
+          return response.data;
+        } catch (err: any) {
+          const status = err?.response?.status;
+          const data = err?.response?.data;
+          errors.push(
+            `${url} status=${status ?? 'n/a'} header=${Object.keys(headers).find((k) =>
+              k.toLowerCase().includes('api') || k.toLowerCase() === 'authorization'
+            )} bodyKeys=${Object.keys(body).join(',')} detail=${typeof data === 'string' ? data.slice(0, 120) : JSON.stringify(data ?? err?.message).slice(0, 120)}`
+          );
+        }
+      }
+    }
   }
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-api-builderbot': API_KEY as string,
-  };
-
-  const response = await axios.post(url, body, { headers, timeout: 30000 });
-  return response.data;
+  throw new Error(`Builderbot send failed after fallbacks: ${errors.slice(0, 6).join(' | ')}`);
 }
 
 
