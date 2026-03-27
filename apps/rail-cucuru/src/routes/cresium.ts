@@ -501,7 +501,7 @@ async function sendWhatsAppViaNotifier(opts: {
       { target, numberPreview: number.slice(0, 6) + '***' },
       'Payment notification attempt'
     );
-    const res = await fetch(`${NOTIFIER_URL}/notify/send-direct`, {
+    const directRes = await fetch(`${NOTIFIER_URL}/notify/send-direct`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -511,10 +511,32 @@ async function sendWhatsAppViaNotifier(opts: {
         source: 'cresium-deposito',
       }),
     });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+
+    if (directRes.ok) {
+      fastify.log.info({ target }, 'Payment notification queued via notifier (send-direct)');
+      return;
     }
-    fastify.log.info({ target }, 'Payment notification queued via notifier');
+
+    // Compatibilidad con notifier viejo (sin /notify/send-direct).
+    if (directRes.status === 404) {
+      const legacyRes = await fetch(`${NOTIFIER_URL}/wa/test-send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number,
+          message,
+        }),
+      });
+      if (legacyRes.ok) {
+        fastify.log.info({ target }, 'Payment notification queued via notifier (wa/test-send fallback)');
+        return;
+      }
+      const legacyErr = await legacyRes.text().catch(() => '');
+      throw new Error(`legacy HTTP ${legacyRes.status}: ${legacyErr.slice(0, 300)}`);
+    }
+
+    const directErr = await directRes.text().catch(() => '');
+    throw new Error(`direct HTTP ${directRes.status}: ${directErr.slice(0, 300)}`);
   } catch (error: unknown) {
     // No cortar el webhook de cobro si falla WhatsApp.
     fastify.log.error(
