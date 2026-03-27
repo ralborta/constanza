@@ -557,6 +557,16 @@ async function sendPaymentNotifications(opts: {
   invoiceNumber: string | null;
   fastify: FastifyInstance;
 }): Promise<void> {
+  opts.fastify.log.info(
+    {
+      notifierConfigured: Boolean(NOTIFIER_URL),
+      receiverConfigured: Boolean(PAYMENT_RECEIVER_PHONE),
+      hasCustomerPhone: Boolean(opts.customerPhone),
+      hasInvoiceNumber: Boolean(opts.invoiceNumber),
+      tenantName: opts.tenantName,
+    },
+    'Payment notification flow started'
+  );
   const amount = formatArsFromCents(opts.amountCents);
   const fromCustomer = opts.customerName ?? 'Cliente no identificado';
   const invoiceText = opts.invoiceNumber ?? 'Sin imputar';
@@ -990,7 +1000,7 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
           },
         });
         await syncInvoiceEstadoFromApplications(prisma, matched.id);
-        void sendPaymentNotifications({
+        await sendPaymentNotifications({
           amountCents,
           tenantName: PAYMENT_COMPANY_NAME || tenant?.name || 'Tu empresa',
           customerName: invoiceForNotification?.customer?.razonSocial ?? null,
@@ -1025,7 +1035,7 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
         { paymentId: payment.id, externalRef: extRef, amountCents },
         'Cresium deposit stored without invoice match (pending imputation)'
       );
-      void sendPaymentNotifications({
+      await sendPaymentNotifications({
         amountCents,
         tenantName: PAYMENT_COMPANY_NAME || tenant?.name || 'Tu empresa',
         customerName: null,
