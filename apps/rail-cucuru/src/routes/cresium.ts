@@ -13,6 +13,8 @@ import {
 import { syncInvoiceEstadoFromApplications } from '../services/invoice-estado-sync.js';
 
 const prisma = new PrismaClient();
+const NOTIFIER_URL = process.env.NOTIFIER_URL?.replace(/\/+$/, '') ?? '';
+const PAYMENT_RECEIVER_PHONE = process.env.PAYMENT_RECEIVER_PHONE?.trim() ?? '';
 
 /** Ventana anti-replay: por defecto 15 min (reintentos de Cresium). Override: CRESIUM_REPLAY_WINDOW_MS */
 const REPLAY_WINDOW_MS = (() => {
@@ -465,6 +467,68 @@ function externalKey(body: Record<string, unknown>): string {
   return crypto.randomUUID();
 }
 
+function formatArsFromCents(cents: number): string {
+  return (cents / 100).toLocaleString('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+async function sendWhatsAppViaNotifier(number: string, message: string): Promise<void> {
+  if (!NOTIFIER_URL || !number || !message) return;
+  try {
+    const res = await fetch(`${NOTIFIER_URL}/wa/test-send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        number,
+        message,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+  } catch {
+    // No cortar el webhook de cobro si falla WhatsApp.
+  }
+}
+
+async function sendPaymentNotifications(opts: {
+  amountCents: number;
+  tenantName: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  invoiceNumber: string | null;
+}): Promise<void> {
+  const amount = formatArsFromCents(opts.amountCents);
+  const fromCustomer = opts.customerName ?? 'Cliente no identificado';
+  const invoiceText = opts.invoiceNumber ?? 'Sin imputar';
+
+  if (PAYMENT_RECEIVER_PHONE) {
+    const receiverMsg = [
+      '✅ *Recibiste un pago*',
+      `🏢 *De:* ${fromCustomer}`,
+      `🧾 *Factura:* ${invoiceText}`,
+      `💵 *Monto:* ${amount}`,
+    ].join('\n');
+    await sendWhatsAppViaNotifier(PAYMENT_RECEIVER_PHONE, receiverMsg);
+  }
+
+  if (opts.customerPhone && opts.invoiceNumber) {
+    const payerMsg = [
+      '✅ *Tu pago fue imputado correctamente*',
+      `🧾 *Factura:* ${opts.invoiceNumber}`,
+      `🏢 *Empresa:* ${opts.tenantName}`,
+      `💵 *Monto:* ${amount}`,
+      '',
+      'Gracias por tu pago.',
+    ].join('\n');
+    await sendWhatsAppViaNotifier(opts.customerPhone, payerMsg);
+  }
+}
+
 function cvuStrictMismatch(tenantCvu: string | null | undefined, body: unknown): boolean {
   if (tenantCvu == null || String(tenantCvu).trim() === '') return false;
   const exp = cvuNormalized(String(tenantCvu));
@@ -757,7 +821,7 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
 
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { cresiumCvuCobro: true },
+      select: { name: true, cresiumCvuCobro: true },
     });
 
     if (process.env.CRESIUM_REJECT_CVU_MISMATCH === 'true' && cvuStrictMismatch(tenant?.cresiumCvuCobro, body)) {
@@ -814,6 +878,19 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
 
     try {
       if (matched) {
+        const invoiceForNotification = await prisma.invoice.findUnique({
+          where: { id: matched.id },
+          select: {
+            numero: true,
+            customer: {
+              select: {
+                razonSocial: true,
+                telefono: true,
+              },
+            },
+          },
+        });
+
         const payment = await prisma.payment.create({
           data: {
             tenantId,
@@ -838,6 +915,13 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
           },
         });
         await syncInvoiceEstadoFromApplications(prisma, matched.id);
+        void sendPaymentNotifications({
+          amountCents,
+          tenantName: tenant?.name ?? 'Tu empresa',
+          customerName: invoiceForNotification?.customer?.razonSocial ?? null,
+          customerPhone: invoiceForNotification?.customer?.telefono ?? null,
+          invoiceNumber: invoiceForNotification?.numero ?? matched.numero,
+        });
         fastify.log.info(
           { paymentId: payment.id, invoiceId: matched.id, reason: matched.reason, externalRef: extRef, amountCents },
           'Cresium deposit applied to invoice'
@@ -865,6 +949,13 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
         { paymentId: payment.id, externalRef: extRef, amountCents },
         'Cresium deposit stored without invoice match (pending imputation)'
       );
+      void sendPaymentNotifications({
+        amountCents,
+        tenantName: tenant?.name ?? 'Tu empresa',
+        customerName: null,
+        customerPhone: null,
+        invoiceNumber: null,
+      });
       return reply.status(200).send({
         status: 'ok',
         matchedInvoice: null,
