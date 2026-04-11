@@ -71,6 +71,8 @@ model Customer {
   email            String
   passwordHash     String?        @map("password_hash")
   telefono         String?
+  /// Solo dígitos; sincronizado con `telefono` para búsqueda indexada.
+  telefonoNormalizado String?     @map("telefono_normalizado") @db.VarChar(32)
   activo           Boolean        @default(true)
   accesoHabilitado Boolean        @default(false) @map("acceso_habilitado")
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -87,6 +89,7 @@ model Customer {
   @@unique([tenantId, email])
   @@unique([tenantId, externalRef])
   @@index([tenantId, externalRef])
+  @@index([telefonoNormalizado])
   @@map("customers")
   @@schema("core")
 }

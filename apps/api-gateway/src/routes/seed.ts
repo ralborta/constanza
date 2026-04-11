@@ -1,3 +1,4 @@
+import { telefonoDigits } from '@constanza/phone-digits';
 import { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
@@ -106,6 +107,7 @@ export async function seedRoutes(fastify: FastifyInstance) {
           email: 'cliente@acme.com',
           passwordHash: customerPassword,
           telefono: '+5491123456789',
+          telefonoNormalizado: telefonoDigits('+5491123456789'),
           activo: true,
           accesoHabilitado: true,
         },

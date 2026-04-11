@@ -1,3 +1,4 @@
+import { telefonoDigits } from '@constanza/phone-digits';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
@@ -120,6 +121,7 @@ export async function integrationRoutes(fastify: FastifyInstance) {
                   razonSocial: c.razonSocial.trim(),
                   email,
                   telefono: c.telefono?.trim(),
+                  telefonoNormalizado: telefonoDigits(c.telefono?.trim()),
                   codigoVenta: c.codigoVenta?.trim() || existing.codigoVenta,
                   externalRef: c.externalRef?.trim() || existing.externalRef,
                 },
@@ -160,6 +162,7 @@ export async function integrationRoutes(fastify: FastifyInstance) {
                   razonSocial: c.razonSocial.trim(),
                   email,
                   telefono: c.telefono?.trim(),
+                  telefonoNormalizado: telefonoDigits(c.telefono?.trim()),
                   customerCuits: c.cuit?.trim()
                     ? {
                         create: {

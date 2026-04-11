@@ -11,6 +11,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@constanza/phone-digits": "workspace:*",
     "@prisma/client": "5.22.0",
     "prisma": "5.22.0",
     "axios": "^1.7.2",

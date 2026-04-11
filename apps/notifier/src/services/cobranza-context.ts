@@ -1,3 +1,4 @@
+import { telefonoDigits, telefonoLookupVariants } from '@constanza/phone-digits';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -36,24 +37,26 @@ export interface ContextoCobranza {
   existe_cliente: boolean;
 }
 
-function normalizeDigits(s: string | null): string {
-  return (s || '').replace(/\D/g, '');
-}
-
 /**
  * Obtiene contexto de cobranza para un número de teléfono (Constanza: Customer, Invoice, Promise, ContactEvent).
  */
 export async function obtenerContextoCliente(numero: string): Promise<ContextoCobranza> {
-  const want = normalizeDigits(numero);
-
-  const customers = await prisma.customer.findMany({
-    where: { activo: true, telefono: { not: null } },
+  const want = telefonoDigits(numero);
+  if (!want) {
+    return {
+      cliente: null,
+      deudas: [],
+      total_deuda: 0,
+      ultimo_acuerdo: null,
+      historial_reciente: [],
+      existe_cliente: false,
+    };
+  }
+  const variants = telefonoLookupVariants(want);
+  const customerFound = await prisma.customer.findFirst({
+    where: { activo: true, telefonoNormalizado: { in: variants } },
     include: { customerCuits: { where: { isPrimary: true }, take: 1 } },
   });
-  const customerFound =
-    customers.find((c) => normalizeDigits(c.telefono) === want) ??
-    customers.find((c) => c.telefono?.includes(want)) ??
-    null;
 
   if (!customerFound) {
     return {

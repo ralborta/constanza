@@ -1,3 +1,4 @@
+import { telefonoDigits, telefonoLookupVariants } from '@constanza/phone-digits';
 import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
@@ -337,28 +338,21 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         'Received WhatsApp webhook'
       );
 
-      // Buscar cliente por teléfono
-      // El formato puede ser "5491123456789" o "+5491123456789"
-      const phoneNumber = data.from.replace(/^\+/, ''); // Remover + si existe
-      const phoneVariations = [
-        phoneNumber,
-        `+${phoneNumber}`,
-        phoneNumber.replace(/^54/, '549'), // Si empieza con 54, agregar 9
-      ];
+      const want = telefonoDigits(data.from);
+      const variants = want ? telefonoLookupVariants(want) : [];
 
-      const customer = await prisma.customer.findFirst({
-        where: {
-          OR: phoneVariations.map((phone) => ({
-            telefono: {
-              contains: phone,
+      const customer =
+        variants.length > 0 ?
+          await prisma.customer.findFirst({
+            where: {
+              activo: true,
+              telefonoNormalizado: { in: variants },
             },
-          })),
-          activo: true,
-        },
-        include: {
-          tenant: true,
-        },
-      });
+            include: {
+              tenant: true,
+            },
+          })
+        : null;
 
       if (!customer) {
         fastify.log.warn({ from: data.from }, 'Customer not found for phone number');

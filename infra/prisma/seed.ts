@@ -1,3 +1,4 @@
+import { telefonoDigits } from '@constanza/phone-digits';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -95,6 +96,7 @@ async function main() {
       email: 'cliente@acme.com',
       passwordHash: customerPassword,
       telefono: '+5491123456789',
+      telefonoNormalizado: telefonoDigits('+5491123456789'),
       activo: true,
       accesoHabilitado: true,
     },

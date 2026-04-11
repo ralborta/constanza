@@ -1,3 +1,4 @@
+import { telefonoDigits, telefonoLookupVariants } from '@constanza/phone-digits';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { z } from 'zod';
@@ -252,10 +253,6 @@ function buildSummaryForAgent(
   return lines.join(' ');
 }
 
-function normalizeDigits(s: string | null | undefined): string {
-  return (s || '').replace(/\D/g, '');
-}
-
 async function findCustomerByEmailOrPhone(input: { email?: string; phone?: string }) {
   if (input.email) {
     return prisma.customer.findFirst({
@@ -266,18 +263,18 @@ async function findCustomerByEmailOrPhone(input: { email?: string; phone?: strin
     });
   }
   if (input.phone) {
-    const want = normalizeDigits(input.phone);
-    const candidates = await prisma.customer.findMany({
-      where: { activo: true, telefono: { not: null } },
+    const want = telefonoDigits(input.phone);
+    if (!want) return null;
+    const variants = telefonoLookupVariants(want);
+    return prisma.customer.findFirst({
+      where: {
+        activo: true,
+        telefonoNormalizado: { in: variants },
+      },
       include: {
         customerCuits: { where: { isPrimary: true }, take: 1 },
       },
     });
-    return (
-      candidates.find((c) => normalizeDigits(c.telefono) === want) ??
-      candidates.find((c) => normalizeDigits(c.telefono).endsWith(want) || want.endsWith(normalizeDigits(c.telefono))) ??
-      null
-    );
   }
   return null;
 }

@@ -1,3 +1,4 @@
+import { telefonoDigits, telefonoLookupVariants } from '@constanza/phone-digits';
 import axios from 'axios';
 import { PrismaClient } from '@prisma/client';
 
@@ -64,27 +65,21 @@ export async function fetchIncomingMessages(
  * Procesa un mensaje entrante y lo registra en la base de datos
  */
 export async function processIncomingMessage(message: BuilderbotMessage) {
-  // Buscar cliente por teléfono
-  const phoneNumber = message.from.replace(/^\+/, '');
-  const phoneVariations = [
-    phoneNumber,
-    `+${phoneNumber}`,
-    phoneNumber.replace(/^54/, '549'),
-  ];
+  const want = telefonoDigits(message.from);
+  const variants = want ? telefonoLookupVariants(want) : [];
 
-  const customer = await prisma.customer.findFirst({
-    where: {
-      OR: phoneVariations.map((phone) => ({
-        telefono: {
-          contains: phone,
+  const customer =
+    variants.length > 0 ?
+      await prisma.customer.findFirst({
+        where: {
+          activo: true,
+          telefonoNormalizado: { in: variants },
         },
-      })),
-      activo: true,
-    },
-    include: {
-      tenant: true,
-    },
-  });
+        include: {
+          tenant: true,
+        },
+      })
+    : null;
 
   if (!customer) {
     // Log pero no fallar - podría ser un número no registrado
