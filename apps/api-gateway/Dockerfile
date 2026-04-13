@@ -47,6 +47,8 @@ COPY --from=build /repo/pnpm-workspace.yaml ./
 COPY --from=build /repo/pnpm-lock.yaml ./
 COPY --from=build /repo/apps/api-gateway/package.json ./apps/api-gateway/package.json
 COPY --from=build /repo/apps/notifier/package.json ./apps/notifier/package.json
+# Workspace packages (pnpm link:../../packages/phone-digits) — sin esto: ERR_MODULE_NOT_FOUND @constanza/phone-digits
+COPY --from=build /repo/packages ./packages
 COPY --from=build /repo/infra ./infra
 
 # Instalar SOLO las dependencias de producción de ambos servicios

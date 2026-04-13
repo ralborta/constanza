@@ -40,6 +40,7 @@ COPY --from=build /repo/package.json ./
 COPY --from=build /repo/pnpm-workspace.yaml ./
 COPY --from=build /repo/pnpm-lock.yaml ./
 COPY --from=build /repo/apps/notifier/package.json ./apps/notifier/package.json
+COPY --from=build /repo/packages ./packages
 COPY --from=build /repo/infra ./infra
 
 # Instalar SOLO las dependencias de producción del servicio específico

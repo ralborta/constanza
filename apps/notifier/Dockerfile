@@ -31,6 +31,7 @@ COPY --from=build /repo/package.json ./
 COPY --from=build /repo/pnpm-workspace.yaml ./
 COPY --from=build /repo/pnpm-lock.yaml ./
 COPY --from=build /repo/apps/notifier/package.json ./apps/notifier/package.json
+COPY --from=build /repo/packages ./packages
 COPY --from=build /repo/infra ./infra
 
 # Instalar solo prod deps del servicio específico dentro del propio workspace del servicio
