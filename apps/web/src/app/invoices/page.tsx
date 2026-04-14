@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { MagnifyingGlass, Eye, ClockCounterClockwise, DotsThreeVertical } from '@phosphor-icons/react';
+import { MagnifyingGlass, Eye, ClockCounterClockwise, DotsThreeVertical, WarningCircle } from '@phosphor-icons/react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,7 @@ import { UploadInvoiceButton } from '@/components/invoices/upload-invoice-button
 import { CreateInvoiceManualButton } from '@/components/invoices/create-invoice-manual-button';
 import { InvoiceHistorialDrawer } from '@/components/invoices/invoice-historial-drawer';
 import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface Invoice {
   id: string;
@@ -68,7 +69,7 @@ export default function InvoicesPage() {
   const [historialInvoiceId, setHistorialInvoiceId] = useState<string | null>(null);
   const [historialOpen, setHistorialOpen] = useState(false);
 
-  const { data, isLoading } = useQuery<{ invoices: Invoice[] }>({
+  const { data, isLoading, isError, error } = useQuery<{ invoices: Invoice[] }>({
     queryKey: ['invoices'],
     queryFn: async () => {
       const response = await api.get('/v1/invoices');
@@ -89,6 +90,18 @@ export default function InvoicesPage() {
             <UploadInvoiceButton />
           </div>
         </div>
+
+        {isError && (
+          <Alert variant="destructive" className="mb-6">
+            <WarningCircle className="h-4 w-4" />
+            <AlertDescription>
+              {(error as { response?: { data?: { error?: string } }; message?: string })?.response?.data
+                ?.error ||
+                (error as Error)?.message ||
+                'No se pudieron cargar las facturas. Verificá NEXT_PUBLIC_API_URL y que la API esté en línea.'}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Card className="border border-border shadow-sm">
           <CardHeader className="border-b border-border pb-4">
@@ -135,6 +148,12 @@ export default function InvoicesPage() {
                   {isLoading ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">Cargando...</TableCell>
+                    </TableRow>
+                  ) : isError ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-sm text-destructive py-8">
+                        Error al cargar facturas (ver mensaje arriba).
+                      </TableCell>
                     </TableRow>
                   ) : data?.invoices.length === 0 ? (
                     <TableRow>

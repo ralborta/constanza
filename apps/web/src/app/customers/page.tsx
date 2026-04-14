@@ -70,7 +70,7 @@ export default function CustomersPage() {
     externalRef: '',
   });
 
-  const { data, isLoading } = useQuery<{ customers: Customer[] }>({
+  const { data, isLoading, isError, error } = useQuery<{ customers: Customer[] }>({
     queryKey: ['customers'],
     queryFn: async () => {
       const response = await api.get('/v1/customers');
@@ -178,7 +178,7 @@ export default function CustomersPage() {
     }
   };
 
-  const filteredCustomers = data?.customers.filter((customer) => {
+  const filteredCustomers = (data?.customers ?? []).filter((customer) => {
     const search = searchTerm.toLowerCase();
     return (
       customer.razonSocial.toLowerCase().includes(search) ||
@@ -373,6 +373,26 @@ export default function CustomersPage() {
           </div>
         </div>
 
+        {isError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {(error as { response?: { status?: number; data?: { error?: string } } })?.response?.status ===
+              403 ? (
+                <>
+                  Esta página solo está disponible para administradores u operadores. Los usuarios con perfil
+                  cliente no pueden ver el listado de clientes.
+                </>
+              ) : (
+                (error as { response?: { data?: { error?: string } }; message?: string })?.response?.data
+                  ?.error ||
+                (error as Error)?.message ||
+                'No se pudieron cargar los clientes. Revisá la consola del navegador y que NEXT_PUBLIC_API_URL apunte al API Gateway.'
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card className="border-0 shadow-lg bg-white">
           <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 border-b">
             <div className="flex items-center justify-between">
@@ -408,6 +428,12 @@ export default function CustomersPage() {
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-gray-500">
                         Cargando...
+                      </TableCell>
+                    </TableRow>
+                  ) : isError ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-destructive text-sm">
+                        No se pudo cargar la lista (ver mensaje arriba).
                       </TableCell>
                     </TableRow>
                   ) : filteredCustomers?.length === 0 ? (
