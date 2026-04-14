@@ -118,10 +118,17 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
         }
       }
 
-      return withTenantRls(user, async (tx) => {
-        const invoices = await tx.invoice.findMany({
+      try {
+        // Evitar RLS por sesión + includes amplios: traemos solo columnas mínimas.
+        const invoices = await prisma.invoice.findMany({
           where,
-          include: {
+          select: {
+            id: true,
+            externalRef: true,
+            numero: true,
+            monto: true,
+            fechaVto: true,
+            estado: true,
             customer: {
               select: {
                 id: true,
@@ -129,12 +136,16 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
                 customerCuits: {
                   where: { isPrimary: true },
                   take: 1,
+                  select: { cuit: true },
                 },
               },
             },
             paymentApplications: {
-              include: {
-                payment: true,
+              select: {
+                id: true,
+                amount: true,
+                isAuthoritative: true,
+                appliedAt: true,
               },
             },
           },
@@ -165,7 +176,23 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
             })),
           })),
         };
-      });
+      } catch (error: any) {
+        fastify.log.error(
+          {
+            path: '/v1/invoices',
+            tenantId: user.tenant_id,
+            code: error?.code,
+            message: error?.message,
+            meta: error?.meta,
+          },
+          'Error listando facturas'
+        );
+        return reply.status(500).send({
+          error: 'Error obteniendo facturas',
+          code: error?.code ?? null,
+          detail: error?.message ?? null,
+        });
+      }
     }
   );
 
