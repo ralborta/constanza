@@ -123,7 +123,9 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
           where,
           include: {
             customer: {
-              include: {
+              select: {
+                id: true,
+                razonSocial: true,
                 customerCuits: {
                   where: { isPrimary: true },
                   take: 1,

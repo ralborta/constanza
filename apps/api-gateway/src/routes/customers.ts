@@ -107,6 +107,17 @@ export async function customerRoutes(fastify: FastifyInstance) {
           where: {
             tenantId: user.tenant_id,
           },
+          select: {
+            id: true,
+            codigoUnico: true,
+            codigoVenta: true,
+            externalRef: true,
+            razonSocial: true,
+            email: true,
+            telefono: true,
+            activo: true,
+            accesoHabilitado: true,
+          },
           orderBy: {
             razonSocial: 'asc',
           },
