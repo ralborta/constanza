@@ -100,11 +100,10 @@ export async function customerRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const user = request.user!;
-
-      return withTenantRls(user, async (tx) => {
-        // Sin include anidado: evita fallos raros de Prisma/RLS al resolver relaciones;
-        // los CUIT se cargan en un segundo query con el mismo tenant y transacción.
-        const customers = await tx.customer.findMany({
+      try {
+        // Importante: para este endpoint usamos filtro explícito por tenantId y evitamos
+        // contexto de sesión RLS (set_config), que puede romperse detrás de poolers.
+        const customers = await prisma.customer.findMany({
           where: {
             tenantId: user.tenant_id,
           },
@@ -117,7 +116,7 @@ export async function customerRoutes(fastify: FastifyInstance) {
         const cuitsRows =
           customerIds.length === 0
             ? []
-            : await tx.customerCuit.findMany({
+            : await prisma.customerCuit.findMany({
                 where: {
                   tenantId: user.tenant_id,
                   customerId: { in: customerIds },
@@ -145,7 +144,23 @@ export async function customerRoutes(fastify: FastifyInstance) {
             cuits: cuitsByCustomer.get(c.id) ?? [],
           })),
         };
-      });
+      } catch (error: any) {
+        fastify.log.error(
+          {
+            path: '/v1/customers',
+            tenantId: user.tenant_id,
+            code: error?.code,
+            message: error?.message,
+            meta: error?.meta,
+          },
+          'Error listando clientes'
+        );
+        return reply.status(500).send({
+          error: 'Error obteniendo clientes',
+          code: error?.code ?? null,
+          detail: error?.message ?? null,
+        });
+      }
     }
   );
 
