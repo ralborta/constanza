@@ -7,10 +7,27 @@ import { Prisma } from '@prisma/client';
 import { prisma } from './prisma.js';
 import type { JWTPayload } from '../middleware/auth.js';
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function assertValidSessionForRls(user: JWTPayload): void {
+  if (!UUID_RE.test(user.tenant_id)) {
+    const e = new Error('Sesión inválida: tenant_id no es un UUID válido');
+    (e as Error & { statusCode?: number }).statusCode = 400;
+    throw e;
+  }
+  if (user.customer_id && !UUID_RE.test(user.customer_id)) {
+    const e = new Error('Sesión inválida: customer_id no es un UUID válido');
+    (e as Error & { statusCode?: number }).statusCode = 400;
+    throw e;
+  }
+}
+
 export async function withTenantRls<T>(
   user: JWTPayload,
   fn: (tx: Prisma.TransactionClient) => Promise<T>
 ): Promise<T> {
+  assertValidSessionForRls(user);
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw(Prisma.sql`SELECT set_config('app.tenant_id', ${user.tenant_id}, true)`);
     await tx.$executeRaw(Prisma.sql`SELECT set_config('app.perfil', ${user.perfil}, true)`);

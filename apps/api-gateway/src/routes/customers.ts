@@ -102,17 +102,34 @@ export async function customerRoutes(fastify: FastifyInstance) {
       const user = request.user!;
 
       return withTenantRls(user, async (tx) => {
+        // Sin include anidado: evita fallos raros de Prisma/RLS al resolver relaciones;
+        // los CUIT se cargan en un segundo query con el mismo tenant y transacción.
         const customers = await tx.customer.findMany({
           where: {
             tenantId: user.tenant_id,
-          },
-          include: {
-            customerCuits: true,
           },
           orderBy: {
             razonSocial: 'asc',
           },
         });
+
+        const customerIds = customers.map((c) => c.id);
+        const cuitsRows =
+          customerIds.length === 0
+            ? []
+            : await tx.customerCuit.findMany({
+                where: {
+                  tenantId: user.tenant_id,
+                  customerId: { in: customerIds },
+                },
+              });
+
+        const cuitsByCustomer = new Map<string, typeof cuitsRows>();
+        for (const row of cuitsRows) {
+          const list = cuitsByCustomer.get(row.customerId) ?? [];
+          list.push(row);
+          cuitsByCustomer.set(row.customerId, list);
+        }
 
         return {
           customers: customers.map((c) => ({
@@ -125,7 +142,7 @@ export async function customerRoutes(fastify: FastifyInstance) {
             telefono: c.telefono,
             activo: c.activo,
             accesoHabilitado: c.accesoHabilitado,
-            cuits: c.customerCuits,
+            cuits: cuitsByCustomer.get(c.id) ?? [],
           })),
         };
       });
