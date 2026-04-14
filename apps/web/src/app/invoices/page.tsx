@@ -52,6 +52,18 @@ interface Invoice {
   estado: string;
 }
 
+function safeMoney(cents: number | null | undefined): string {
+  const value = typeof cents === 'number' && Number.isFinite(cents) ? cents : 0;
+  return `$${(value / 100).toLocaleString('es-AR')}`;
+}
+
+function safeDate(value: string | null | undefined): string {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return format(parsed, 'dd/MM/yyyy');
+}
+
 function getStatusBadge(estado: string) {
   const map: Record<string, { label: string; className: string }> = {
     ABIERTA:    { label: 'Por vencer', className: 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-50' },
@@ -179,12 +191,12 @@ export default function InvoicesPage() {
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-sm font-semibold text-foreground">
-                          ${(invoice.monto / 100).toLocaleString('es-AR')}
+                          {safeMoney(invoice.monto)}
                         </TableCell>
                         <TableCell className="font-mono text-sm font-medium text-emerald-600">
-                          ${(invoice.montoAplicado / 100).toLocaleString('es-AR')}
+                          {safeMoney(invoice.montoAplicado)}
                         </TableCell>
-                        <TableCell className="text-sm text-foreground">{format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell className="text-sm text-foreground">{safeDate(invoice.fechaVto)}</TableCell>
                         <TableCell>
                           {getStatusBadge(
                             resolveInvoiceEstadoForDisplay(invoice.estado, invoice.monto, invoice.montoAplicado)
