@@ -108,6 +108,10 @@ server.setErrorHandler((error, request, reply) => {
           'Error de esquema en base de datos (¿falta aplicar migraciones en el servidor?)',
       });
     }
+    return reply.status(500).send({
+      error: error.message,
+      code: error.code,
+    });
   }
   logger.error(error);
   reply.status(error.statusCode || 500).send({
