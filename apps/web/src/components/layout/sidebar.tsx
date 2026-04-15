@@ -25,6 +25,7 @@ import {
   Timer,
   Buildings,
   UserGear,
+  Receipt,
 } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { getEffectivePerfil, removeToken } from '@/lib/auth';
@@ -40,6 +41,7 @@ const navigation = [
   { name: 'Facturas', href: '/invoices', icon: FileText },
   { name: 'Clientes', href: '/customers', icon: Users },
   { name: 'Ingresos (Cresium)', href: '/payments/transfers', icon: Wallet },
+  { name: 'E-cheques', href: '/payments/echeqs', icon: Receipt },
   { name: 'Eventos', href: '#', icon: Bell },
   { name: 'Jobs', href: '/jobs', icon: ChartBar },
 ];
@@ -58,6 +60,7 @@ const callsSubmenu = [
 
 const paymentsSubmenu = [
   { name: 'Transferencias Bancarias', href: '/payments/transfers', icon: ArrowsLeftRight },
+  { name: 'E-cheques', href: '/payments/echeqs', icon: Receipt },
   { name: 'Conciliación de Pagos', href: '/payments/reconciliation', icon: CheckCircle },
 ];
 

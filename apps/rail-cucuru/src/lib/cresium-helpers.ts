@@ -114,6 +114,25 @@ export function pickSingleExactPendingInvoice(
   return { id: m.id, numero: m.numero, customerId: m.customerId, monto: m.monto, appliedSum: m.appliedSum };
 }
 
+/** ID numérico de transacción Cresium (API v3) si viene en el webhook; sirve para GET /v3/transaction/{id}. */
+export function extractCresiumNumericTransactionId(body: Record<string, unknown>): number | null {
+  const data = body.data as Record<string, unknown> | undefined;
+  const tx = data?.transaction as Record<string, unknown> | undefined;
+  const candidates: unknown[] = [
+    tx?.id,
+    tx?.transactionId,
+    data?.transactionId,
+    data?.id,
+    body.id,
+    (body as Record<string, unknown>).transactionId,
+  ];
+  for (const raw of candidates) {
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (typeof raw === 'string' && /^\d+$/.test(raw.trim())) return parseInt(raw.trim(), 10);
+  }
+  return null;
+}
+
 export function buildCresiumPaymentMetadata(body: Record<string, unknown>, extra: Record<string, unknown> = {}) {
   return {
     source: 'cresium-webhook',

@@ -23,6 +23,7 @@ import { agentContextRoutes } from './routes/agent-context.js';
 import { cobranzaRoutes } from './routes/cobranza.js';
 import { userRoutes } from './routes/users.js';
 import { tenantsListRoutes } from './routes/tenants.js';
+import { cresiumPartnerRoutes } from './routes/cresium-partner.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const server: FastifyInstance = Fastify({
@@ -85,6 +86,7 @@ await server.register(agentContextRoutes, { prefix: '/v1' });
 await server.register(cobranzaRoutes, { prefix: '/v1' });
 await server.register(userRoutes, { prefix: '/v1' });
 await server.register(tenantsListRoutes, { prefix: '/v1' });
+await server.register(cresiumPartnerRoutes, { prefix: '/v1' });
 // chatRoutes ahora está integrado en invoiceRoutes para evitar conflictos de rutas
 await server.register(seedRoutes, { prefix: '/seed' });
 

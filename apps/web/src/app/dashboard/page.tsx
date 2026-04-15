@@ -41,6 +41,7 @@ import {
   Warning,
   CheckCircle,
   ArrowsLeftRight,
+  Receipt,
 } from '@phosphor-icons/react';
 
 interface KPISummary {
@@ -51,6 +52,7 @@ interface KPISummary {
   promisesBroken: number;
   autoAppliedPct: number;
   cresiumPendingLiquidation: number;
+  echeqPendingLiquidation: number;
   totalCollected?: number;
   totalPending?: number;
   efficiency?: number;
@@ -208,6 +210,23 @@ export default function DashboardPage() {
             icon={<ArrowsLeftRight size={20} weight="duotone" className="text-amber-600" />}
             accentColor="bg-amber-100"
           />
+        </div>
+
+        <div className="mb-8 max-w-sm">
+          <Link
+            href="/payments/echeqs"
+            className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <KpiCard
+              title="E-cheques pendientes de liquidación"
+              value={kpisLoading ? '—' : String(kpis?.echeqPendingLiquidation ?? 0)}
+              icon={<Receipt size={20} weight="duotone" className="text-violet-600" />}
+              accentColor="bg-violet-100"
+            />
+          </Link>
+          <p className="mt-2 text-xs text-muted-foreground px-1">
+            Vista dedicada a e-cheques (Cresium); no incluye transferencias CVU.
+          </p>
         </div>
 
         {/* Métricas Operativas */}

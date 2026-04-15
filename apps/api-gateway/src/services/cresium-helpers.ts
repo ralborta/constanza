@@ -221,3 +221,13 @@ export function extractPayerCuitFromMetadata(metadata: unknown): string | null {
 
   return null;
 }
+
+/** ID numérico de transacción Cresium persistido en metadata del webhook (rail-cucuru). */
+export function cresiumTransactionNumericIdFromMetadata(metadata: unknown): number | null {
+  if (metadata == null || typeof metadata !== 'object') return null;
+  const m = metadata as Record<string, unknown>;
+  const v = m.cresiumTransactionNumericId;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && /^\d+$/.test(v.trim())) return parseInt(v.trim(), 10);
+  return null;
+}

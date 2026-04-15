@@ -112,6 +112,14 @@ export async function kpiRoutes(fastify: FastifyInstance) {
         },
       });
 
+      const echeqPendingLiquidation = await prisma.payment.count({
+        where: {
+          tenantId,
+          method: 'ECHEQ',
+          status: 'PEND_LIQ',
+        },
+      });
+
       return {
         dso: Math.round(dso * 100) / 100,
         cashIn7d: cashIn7d / 100, // Convertir centavos a pesos
@@ -120,6 +128,7 @@ export async function kpiRoutes(fastify: FastifyInstance) {
         promisesBroken,
         autoAppliedPct: Math.round(autoAppliedPct * 10000) / 100, // Porcentaje con 2 decimales
         cresiumPendingLiquidation,
+        echeqPendingLiquidation,
         channelHealth: {
           whatsapp: {
             deliveryRate: 0.95, // TODO: Calcular desde contact.events

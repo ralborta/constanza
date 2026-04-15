@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 import {
   buildCresiumPaymentMetadata,
+  extractCresiumNumericTransactionId,
   cvuNormalized,
   extractCvuDigitsFromPayload,
   extractTaxIdsFromPayload,
@@ -448,6 +449,26 @@ function depositSuccess(body: Record<string, unknown>): boolean {
   const s = String(body.status ?? body.state ?? data?.status ?? data?.state ?? '').toUpperCase().trim();
   if (!s) return true;
   return DEPOSIT_SUCCESS_STATUSES.has(s);
+}
+
+/** Transferencia CVU vs e-cheque según tipo de transacción Cresium (p. ej. ECHEQ_DEPOSIT). */
+function cresiumDepositMethod(body: Record<string, unknown>): 'ECHEQ' | 'TRANSFERENCIA' {
+  const data = body.data as Record<string, unknown> | undefined;
+  const tx = data?.transaction as Record<string, unknown> | undefined;
+  const candidates: unknown[] = [
+    body.type,
+    (body as Record<string, unknown>).transactionType,
+    data?.type,
+    data?.transactionType,
+    tx?.type,
+    tx?.transactionType,
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.toUpperCase().includes('ECHEQ')) {
+      return 'ECHEQ';
+    }
+  }
+  return 'TRANSFERENCIA';
 }
 
 function externalKey(body: Record<string, unknown>): string {
@@ -957,6 +978,7 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
       }
     }
 
+    const payMethod = cresiumDepositMethod(body);
     const metadata = {
       ...buildCresiumPaymentMetadata(body, {
         tenantCvuConfigured: Boolean(tenant?.cresiumCvuCobro),
@@ -964,6 +986,8 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
           process.env.CRESIUM_REJECT_CVU_MISMATCH !== 'true' && cvuStrictMismatch(tenant?.cresiumCvuCobro, body),
         autoMatchReason: matched?.reason ?? null,
         matchedInvoiceId: matched?.id ?? null,
+        cresiumDepositMethod: payMethod,
+        cresiumTransactionNumericId: extractCresiumNumericTransactionId(body),
       }),
     };
 
@@ -986,7 +1010,7 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
           data: {
             tenantId,
             sourceSystem: 'CRESIUM',
-            method: 'TRANSFERENCIA',
+            method: payMethod,
             status: 'LIQUIDADO',
             externalRef: extRef,
             settledAt: new Date(),
@@ -1030,7 +1054,7 @@ export async function cresiumDepositPlugin(fastify: FastifyInstance) {
         data: {
           tenantId,
           sourceSystem: 'CRESIUM',
-          method: 'TRANSFERENCIA',
+          method: payMethod,
           status: 'PEND_LIQ',
           externalRef: extRef,
           totalAmountCents: amountCents,

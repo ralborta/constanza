@@ -11,6 +11,7 @@ import {
   extractPayerCuitFromMetadata,
   extractPayerDisplayNameFromMetadata,
   extractPayerCvuFromMetadata,
+  cresiumTransactionNumericIdFromMetadata,
 } from '../services/cresium-helpers.js';
 import { syncInvoiceEstadoFromApplications } from '../services/invoice-estado-sync.js';
 
@@ -140,6 +141,133 @@ export async function paymentRoutes(fastify: FastifyInstance) {
               appliedAt: app.appliedAt,
             })),
           };
+          }),
+          total,
+          totalAmount,
+          limit: take,
+          offset: skip,
+        };
+      });
+    }
+  );
+
+  // GET /payments/echeqs — Ingresos por e-cheque (Cresium u otro origen con method ECHEQ)
+  fastify.get(
+    '/payments/echeqs',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1', 'OPERADOR_2'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const { status, sourceSystem, dateFrom, dateTo, limit = '50', offset = '0' } = request.query as {
+        status?: string;
+        sourceSystem?: string;
+        dateFrom?: string;
+        dateTo?: string;
+        limit?: string;
+        offset?: string;
+      };
+      const take = Math.min(500, Math.max(1, parseInt(String(limit), 10) || 50));
+      const skip = Math.max(0, parseInt(String(offset), 10) || 0);
+
+      const where: any = {
+        tenantId: user.tenant_id,
+        method: 'ECHEQ',
+      };
+
+      if (status) {
+        where.status = status;
+      }
+
+      if (sourceSystem) {
+        where.sourceSystem = sourceSystem;
+      }
+
+      if (dateFrom || dateTo) {
+        where.createdAt = {};
+        if (dateFrom) {
+          where.createdAt.gte = new Date(dateFrom);
+        }
+        if (dateTo) {
+          where.createdAt.lte = new Date(dateTo);
+        }
+      }
+
+      return withTenantRls(user, async (tx) => {
+        const payments = await tx.payment.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          take,
+          skip,
+          include: {
+            applications: {
+              include: {
+                invoice: {
+                  include: {
+                    customer: {
+                      select: {
+                        razonSocial: true,
+                        codigoUnico: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const total = await tx.payment.count({ where });
+
+        const totalAmount = payments.reduce((sum, payment) => sum + transferTotalCents(payment), 0);
+
+        return {
+          echeqs: payments.map((payment) => {
+            const firstCustomer = payment.applications[0]?.invoice?.customer;
+            const payerFromWebhook =
+              payment.sourceSystem === 'CRESIUM'
+                ? extractPayerDisplayNameFromMetadata(payment.metadata)
+                : null;
+            const payerCvu =
+              payment.sourceSystem === 'CRESIUM'
+                ? extractPayerCvuFromMetadata(payment.metadata)
+                : null;
+            const payerCuit =
+              payment.sourceSystem === 'CRESIUM'
+                ? extractPayerCuitFromMetadata(payment.metadata)
+                : null;
+            return {
+              id: payment.id,
+              sourceSystem: payment.sourceSystem,
+              status: payment.status,
+              externalRef: payment.externalRef,
+              createdAt: payment.createdAt,
+              settledAt: payment.settledAt,
+              totalAmount: transferTotalCents(payment),
+              /** ID en API Cresium v3 (GET /v3/transaction/{id}) si el webhook lo envió. */
+              cresiumTransactionNumericId:
+                payment.sourceSystem === 'CRESIUM'
+                  ? cresiumTransactionNumericIdFromMetadata(payment.metadata)
+                  : null,
+              payerDisplayName: payerFromWebhook,
+              payerCvu,
+              payerCuit,
+              imputedCustomerName: firstCustomer?.razonSocial ?? null,
+              applications: payment.applications.map((app) => ({
+                id: app.id,
+                invoice: {
+                  id: app.invoice.id,
+                  numero: app.invoice.numero,
+                  customer: {
+                    razonSocial: app.invoice.customer.razonSocial,
+                    codigoUnico: app.invoice.customer.codigoUnico,
+                  },
+                },
+                amount: app.amount,
+                isAuthoritative: app.isAuthoritative,
+                appliedAt: app.appliedAt,
+              })),
+            };
           }),
           total,
           totalAmount,
