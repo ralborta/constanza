@@ -1,17 +1,29 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -73,6 +85,7 @@ function invoiceEstadoBadge(estado: string) {
 export default function PaymentDetailPage() {
   const params = useParams();
   const id = typeof params.id === 'string' ? params.id : '';
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, error } = useQuery<PaymentDetailResponse>({
     queryKey: ['payment-detail', id],
@@ -84,6 +97,24 @@ export default function PaymentDetailPage() {
   });
 
   const applications = Array.isArray(data?.payment?.applications) ? data.payment.applications : [];
+  const canLiquidate = data?.payment?.status === 'PEND_LIQ' && applications.length > 0;
+  const requiresImputation = data?.payment?.status === 'PEND_LIQ' && applications.length === 0;
+
+  const reconcileMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/v1/payments/reconcile', {
+        paymentId: id,
+        action: 'LIQUIDATE',
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['payments-reconciliation'] });
+      queryClient.invalidateQueries({ queryKey: ['payments-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['payments-echeqs'] });
+    },
+  });
 
   return (
     <MainLayout>
@@ -161,6 +192,79 @@ export default function PaymentDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            {(canLiquidate || requiresImputation) && (
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="text-base">Acciones de conciliación</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {canLiquidate && (
+                    <div className="flex items-center gap-3">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+                            disabled={reconcileMutation.isPending}
+                          >
+                            {reconcileMutation.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                            )}
+                            Aprobar y liquidar pago
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar aprobación</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción marca el pago como liquidado. Luego dejará de figurar como pendiente.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => reconcileMutation.mutate()}
+                              className="bg-gradient-to-r from-green-500 to-emerald-600"
+                            >
+                              Confirmar liquidación
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
+
+                  {requiresImputation && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-amber-800">
+                        Este pago aún no tiene factura imputada. Primero necesitás imputarlo para poder aprobarlo.
+                      </p>
+                      <Link href="/payments/reconciliation">
+                        <Button variant="outline">Ir a Conciliación de Pagos</Button>
+                      </Link>
+                    </div>
+                  )}
+
+                  {reconcileMutation.isSuccess && (
+                    <Alert>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <AlertDescription>Pago liquidado exitosamente.</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {reconcileMutation.isError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>
+                        {(reconcileMutation.error as { response?: { data?: { error?: string } } })?.response?.data
+                          ?.error || 'No se pudo liquidar el pago.'}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
