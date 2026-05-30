@@ -94,6 +94,18 @@ function toIso(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
 }
 
+async function safeOptionalQuery<T>(query: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await query();
+  } catch (error: any) {
+    // P2021 = tabla no existe en el entorno (migración pendiente)
+    if (error?.code === 'P2021') {
+      return fallback;
+    }
+    throw error;
+  }
+}
+
 export async function customerRoutes(fastify: FastifyInstance) {
   // Log para verificar que las rutas se registran
   fastify.log.info('Registering customer routes including /customers/upload');
@@ -239,30 +251,38 @@ export async function customerRoutes(fastify: FastifyInstance) {
           orderBy: { ts: 'desc' },
           take: 150,
         }),
-        prisma.echeq.findMany({
-          where: {
-            tenantId: user.tenant_id,
-            customerId: customer.id,
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 50,
-        }),
-        prisma.scheduledCallback.findMany({
-          where: {
-            tenantId: user.tenant_id,
-            customerId: customer.id,
-          },
-          include: {
-            invoice: {
-              select: {
-                id: true,
-                numero: true,
+        safeOptionalQuery(
+          () =>
+            prisma.echeq.findMany({
+              where: {
+                tenantId: user.tenant_id,
+                customerId: customer.id,
               },
-            },
-          },
-          orderBy: { scheduledAt: 'desc' },
-          take: 50,
-        }),
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+            }),
+          []
+        ),
+        safeOptionalQuery(
+          () =>
+            prisma.scheduledCallback.findMany({
+              where: {
+                tenantId: user.tenant_id,
+                customerId: customer.id,
+              },
+              include: {
+                invoice: {
+                  select: {
+                    id: true,
+                    numero: true,
+                  },
+                },
+              },
+              orderBy: { scheduledAt: 'desc' },
+              take: 50,
+            }),
+          []
+        ),
       ]);
 
       const invoicePayload = invoices.map((invoice) => {
