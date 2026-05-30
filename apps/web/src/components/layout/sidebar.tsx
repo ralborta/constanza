@@ -49,6 +49,7 @@ const navigation = [
 const notifySubmenu = [
   { name: 'Enviar Mensaje', href: '/notify', icon: PaperPlaneTilt },
   { name: 'Progreso de Mensajes', href: '/notify/batches', icon: ChartBar },
+  { name: 'Callbacks de Mensajes', href: '/notify/callbacks', icon: Timer },
 ];
 
 const callsSubmenu = [

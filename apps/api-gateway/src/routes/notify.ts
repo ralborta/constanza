@@ -28,6 +28,95 @@ const sendMessageSchema = z.object({
 type SendMessagePayload = z.infer<typeof sendMessageSchema>;
 
 export async function notifyRoutes(fastify: FastifyInstance) {
+  // GET /notify/callbacks - Callbacks y seguimientos creados desde mensajes inbound
+  fastify.get(
+    '/notify/callbacks',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1', 'OPERADOR_2'])],
+    },
+    async (request) => {
+      const user = request.user!;
+      const {
+        status = 'PENDING',
+        channel = 'WHATSAPP,EMAIL',
+        limit = '100',
+        offset = '0',
+      } = request.query as {
+        status?: string;
+        channel?: string;
+        limit?: string;
+        offset?: string;
+      };
+
+      const channels = channel
+        .split(',')
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean);
+
+      const where: any = {
+        tenantId: user.tenant_id,
+        sourceContactEvent: {
+          is: {
+            channel: { in: channels.length > 0 ? channels : ['WHATSAPP', 'EMAIL'] },
+            direction: 'INBOUND',
+          },
+        },
+      };
+
+      if (status && status !== 'ALL') {
+        where.status = status;
+      }
+
+      const take = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 200);
+      const skip = Math.max(parseInt(offset, 10) || 0, 0);
+
+      const [callbacks, total] = await Promise.all([
+        prisma.scheduledCallback.findMany({
+          where,
+          orderBy: { scheduledAt: 'asc' },
+          take,
+          skip,
+          include: {
+            customer: { select: { id: true, razonSocial: true, codigoUnico: true, telefono: true, email: true } },
+            invoice: { select: { id: true, numero: true, monto: true } },
+            sourceContactEvent: {
+              select: {
+                id: true,
+                channel: true,
+                direction: true,
+                messageText: true,
+                status: true,
+                ts: true,
+                externalMessageId: true,
+              },
+            },
+          },
+        }),
+        prisma.scheduledCallback.count({ where }),
+      ]);
+
+      return {
+        callbacks: callbacks.map((callback) => ({
+          id: callback.id,
+          customerId: callback.customerId,
+          customer: callback.customer,
+          invoiceId: callback.invoiceId,
+          invoice: callback.invoice,
+          sourceContactEventId: callback.sourceContactEventId,
+          sourceContactEvent: callback.sourceContactEvent,
+          scheduledAt: callback.scheduledAt,
+          type: callback.type,
+          reason: callback.reason,
+          status: callback.status,
+          createdAt: callback.createdAt,
+        })),
+        total,
+        limit: take,
+        offset: skip,
+      };
+    }
+  );
+
   // POST /notify/batch - Enviar mensajes a múltiples clientes
   fastify.post(
     '/notify/batch',
