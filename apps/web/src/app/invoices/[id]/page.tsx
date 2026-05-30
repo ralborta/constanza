@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle, Clock, XCircle, Envelope, ChatTeardrop, Phone, CurrencyDollar, Calendar, User, FileText, Sparkle, ArrowClockwise, TrendUp, ClockCounterClockwise, Robot, Warning } from '@phosphor-icons/react';
+import { ArrowLeft, CheckCircle, Clock, XCircle, Envelope, ChatTeardrop, Phone, CurrencyDollar, Calendar, User, FileText, Sparkle, ArrowClockwise, TrendUp, ClockCounterClockwise, Robot } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InvoiceChat } from '@/components/invoices/invoice-chat';
@@ -64,6 +64,18 @@ interface InvoiceDetail {
     }>;
     timeline: TimelineItem[];
   };
+}
+
+function safeMoney(cents: number | null | undefined): string {
+  const value = typeof cents === 'number' && Number.isFinite(cents) ? cents : 0;
+  return `$${(value / 100).toLocaleString('es-AR')}`;
+}
+
+function safeFormat(value: string | Date | null | undefined, pattern: string): string {
+  if (!value) return '-';
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return format(parsed, pattern);
 }
 
 function getStatusBadge(estado: string) {
@@ -212,7 +224,7 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  if (!data) {
+  if (!data || !data.invoice) {
     return (
       <MainLayout>
         <div className="flex h-screen items-center justify-center">
@@ -223,6 +235,11 @@ export default function InvoiceDetailPage() {
   }
 
   const { invoice } = data;
+  const customer = invoice.customer ?? { id: '', razonSocial: '-', cuits: [] };
+  const cuits = Array.isArray(customer.cuits) ? customer.cuits : [];
+  const primaryCuit = cuits.find((c) => c?.isPrimary)?.cuit ?? cuits[0]?.cuit ?? null;
+  const applications = Array.isArray(invoice.applications) ? invoice.applications : [];
+  const timeline = Array.isArray(invoice.timeline) ? invoice.timeline : [];
 
   return (
     <MainLayout>
@@ -238,8 +255,8 @@ export default function InvoiceDetailPage() {
           </Link>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-foreground font-mono">Factura {invoice.numero}</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">{invoice.customer.razonSocial}</p>
+              <h1 className="text-2xl font-bold text-foreground font-mono">Factura {invoice.numero ?? '-'}</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">{customer.razonSocial}</p>
             </div>
             <Button
               variant="outline"
@@ -272,9 +289,9 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Cliente</p>
-                  <p className="text-sm font-semibold text-foreground truncate">{invoice.customer.razonSocial}</p>
-                  {invoice.customer.cuits.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-0.5">CUIT: {invoice.customer.cuits.find((c) => c.isPrimary)?.cuit}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{customer.razonSocial}</p>
+                  {primaryCuit && (
+                    <p className="text-xs text-muted-foreground mt-0.5">CUIT: {primaryCuit}</p>
                   )}
                 </div>
               </div>
@@ -286,9 +303,9 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Monto Total</p>
-                  <p className="text-xl font-bold text-foreground font-mono">${(invoice.monto / 100).toLocaleString('es-AR')}</p>
+                  <p className="text-xl font-bold text-foreground font-mono">{safeMoney(invoice.monto)}</p>
                   <p className="text-xs text-emerald-600 font-medium mt-0.5">
-                    Aplicado: ${(invoice.montoAplicado / 100).toLocaleString('es-AR')}
+                    Aplicado: {safeMoney(invoice.montoAplicado)}
                   </p>
                 </div>
               </div>
@@ -300,7 +317,7 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Vencimiento</p>
-                  <p className="text-sm font-semibold text-foreground">{format(new Date(invoice.fechaVto), 'dd/MM/yyyy')}</p>
+                  <p className="text-sm font-semibold text-foreground">{safeFormat(invoice.fechaVto, 'dd/MM/yyyy')}</p>
                 </div>
               </div>
 
@@ -313,24 +330,24 @@ export default function InvoiceDetailPage() {
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Estado</p>
                   <div className="mt-1">
                     {getStatusBadge(
-                      resolveInvoiceEstadoForDisplay(invoice.estado, invoice.monto, invoice.montoAplicado)
+                      resolveInvoiceEstadoForDisplay(invoice.estado ?? 'ABIERTA', invoice.monto ?? 0, invoice.montoAplicado ?? 0)
                     )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {invoice.applications.length > 0 && (
+            {applications.length > 0 && (
               <div className="mt-5 pt-5 border-t border-border">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Aplicaciones de pago</p>
                 <div className="flex flex-wrap gap-2">
-                  {invoice.applications.map((app) => (
+                  {applications.map((app) => (
                     <span
                       key={app.id}
                       className={`inline-flex items-center rounded-md border px-3 py-1 text-xs font-medium ${app.isAuthoritative ? 'bg-primary/10 text-primary border-primary/20' : 'bg-muted text-muted-foreground border-border'}`}
                     >
-                      {app.isAuthoritative ? `Aplicado por ${app.payment.sourceSystem} — ` : 'Pend. acreditación — '}
-                      ${(app.amount / 100).toLocaleString('es-AR')}
+                      {app.isAuthoritative ? `Aplicado por ${app.payment?.sourceSystem ?? '-'} — ` : 'Pend. acreditación — '}
+                      {safeMoney(app.amount)}
                     </span>
                   ))}
                 </div>
@@ -351,7 +368,7 @@ export default function InvoiceDetailPage() {
                   <CardTitle className="text-base font-semibold text-foreground">Resumen Inteligente</CardTitle>
                   {summaryData?.generatedAt && (
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Generado: {format(new Date(summaryData.generatedAt), 'dd/MM/yyyy HH:mm')}
+                      Generado: {safeFormat(summaryData.generatedAt, 'dd/MM/yyyy HH:mm')}
                     </p>
                   )}
                 </div>
@@ -377,17 +394,21 @@ export default function InvoiceDetailPage() {
             ) : summaryData?.summary ? (
               <div className="space-y-5">
                 <div className="p-4 bg-primary/5 rounded-lg border-l-3 border-l-4 border-primary/40">
-                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{summaryData.summary.summary}</p>
+                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                    {typeof summaryData.summary === 'string'
+                      ? summaryData.summary
+                      : summaryData.summary?.summary ?? ''}
+                  </p>
                 </div>
 
-                {summaryData.summary.keyPoints?.length > 0 && (
+                {typeof summaryData.summary !== 'string' && (summaryData.summary?.keyPoints?.length ?? 0) > 0 && (
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
                       <TrendUp size={14} weight="duotone" className="text-primary" />
                       Puntos Clave
                     </h3>
                     <ul className="space-y-2">
-                      {summaryData.summary.keyPoints?.map((point, index) => (
+                      {(typeof summaryData.summary === 'string' ? [] : summaryData.summary?.keyPoints ?? []).map((point, index) => (
                         <li key={index} className="flex items-start gap-2 text-sm text-foreground">
                           <span className="text-primary font-bold mt-0.5 flex-shrink-0">•</span>
                           <span>{point}</span>
@@ -397,14 +418,14 @@ export default function InvoiceDetailPage() {
                   </div>
                 )}
 
-                {(summaryData.summary.nextSteps?.length ?? 0) > 0 && (
+                {typeof summaryData.summary !== 'string' && (summaryData.summary?.nextSteps?.length ?? 0) > 0 && (
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
                       <Clock size={14} weight="duotone" className="text-amber-600" />
                       Próximos Pasos Sugeridos
                     </h3>
                     <ul className="space-y-2">
-                      {summaryData.summary.nextSteps?.map((step, index) => (
+                      {(typeof summaryData.summary === 'string' ? [] : summaryData.summary?.nextSteps ?? []).map((step, index) => (
                         <li key={index} className="flex items-start gap-2 text-sm text-foreground">
                           <span className="text-amber-600 font-bold mt-0.5 flex-shrink-0">→</span>
                           <span>{step}</span>
@@ -414,7 +435,7 @@ export default function InvoiceDetailPage() {
                   </div>
                 )}
 
-                {summaryData.summary.sentiment && (
+                {typeof summaryData.summary !== 'string' && summaryData.summary?.sentiment && (
                   <div className="pt-4 border-t border-border">
                     <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
                       summaryData.summary.sentiment === 'positive'
@@ -459,7 +480,7 @@ export default function InvoiceDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="p-6 max-h-[600px] overflow-y-auto">
-              {invoice.timeline.length === 0 ? (
+              {timeline.length === 0 ? (
                 <div className="text-center py-12">
                   <Clock size={40} weight="duotone" className="text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-sm font-medium text-muted-foreground">No hay eventos en el timeline</p>
@@ -469,7 +490,7 @@ export default function InvoiceDetailPage() {
                 <div className="relative">
                   <div className="absolute left-[18px] top-0 bottom-0 w-px bg-border" />
                   <div className="space-y-5">
-                    {invoice.timeline.map((item, index) => (
+                    {timeline.map((item, index) => (
                       <div key={index} className="relative flex items-start gap-4">
                         <div className="relative z-10">{getTimelineIcon(item.type, item.channel, item.status)}</div>
                         <div className="flex-1 min-w-0 rounded-lg border border-border bg-card p-4 hover:shadow-sm transition-shadow">
@@ -488,7 +509,7 @@ export default function InvoiceDetailPage() {
                                   Promesa de pago
                                   {item.dueDate && (
                                     <span className="ml-2 text-xs text-muted-foreground font-normal">
-                                      Vence: {format(new Date(item.dueDate), 'dd/MM/yyyy')}
+                                      Vence: {safeFormat(item.dueDate, 'dd/MM/yyyy')}
                                     </span>
                                   )}
                                 </p>
@@ -505,7 +526,7 @@ export default function InvoiceDetailPage() {
                               )}
                             </div>
                             <p className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">
-                              {format(new Date(item.ts), 'dd/MM HH:mm')}
+                              {safeFormat(item.ts, 'dd/MM HH:mm')}
                             </p>
                           </div>
 
@@ -515,11 +536,11 @@ export default function InvoiceDetailPage() {
                             </div>
                           )}
 
-                          {item.amount && (
+                          {typeof item.amount === 'number' && (
                             <div className="mt-3 flex items-center gap-1.5">
                               <CurrencyDollar size={14} weight="duotone" className="text-emerald-600" />
                               <p className="text-sm font-semibold text-foreground font-mono">
-                                ${(item.amount / 100).toLocaleString('es-AR')}
+                                {safeMoney(item.amount)}
                               </p>
                             </div>
                           )}
@@ -528,12 +549,12 @@ export default function InvoiceDetailPage() {
                             <div className="mt-3 pt-3 border-t border-border space-y-1">
                               {item.appliedAt && (
                                 <p className="text-xs text-muted-foreground">
-                                  <span className="font-medium">Aplicado:</span> {format(new Date(item.appliedAt), 'dd/MM/yyyy HH:mm')}
+                                  <span className="font-medium">Aplicado:</span> {safeFormat(item.appliedAt, 'dd/MM/yyyy HH:mm')}
                                 </p>
                               )}
                               {item.settledAt && (
                                 <p className="text-xs text-muted-foreground">
-                                  <span className="font-medium">Liquidado:</span> {format(new Date(item.settledAt), 'dd/MM/yyyy HH:mm')}
+                                  <span className="font-medium">Liquidado:</span> {safeFormat(item.settledAt, 'dd/MM/yyyy HH:mm')}
                                 </p>
                               )}
                             </div>
