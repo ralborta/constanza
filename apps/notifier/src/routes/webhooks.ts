@@ -8,9 +8,80 @@ import { construirPromptDinamico } from '../services/prompt-builder.js';
 import { llamarOpenAICobranza } from '../services/openai-cobranza.js';
 import { getPoliticasCobranza } from '../services/cobranza-politicas.js';
 import { sendWhatsAppMessage } from '../lib/builderbot.js';
+import { applyMessageStatusUpdate, MessageChannel } from '../services/message-status.js';
 // SimpleLogger está disponible globalmente desde types.d.ts
 
 const prisma = new PrismaClient();
+
+function verifyWebhookSecret(request: any): boolean {
+  const expected = process.env.MESSAGING_WEBHOOK_SECRET?.trim();
+  if (!expected) return true;
+  const received =
+    request.headers?.['x-constanza-secret'] ||
+    request.headers?.['x-webhook-secret'] ||
+    request.headers?.authorization?.replace(/^Bearer\s+/i, '');
+  return received === expected;
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function extractMessageStatusPayload(body: any, channel: MessageChannel) {
+  const data = body?.data ?? body?.message ?? body?.event ?? body ?? {};
+  const externalMessageId = firstString(
+    body?.message_id,
+    body?.messageId,
+    body?.id,
+    data?.message_id,
+    data?.messageId,
+    data?.id,
+    data?.external_id,
+    data?.externalMessageId
+  );
+  const status = firstString(
+    body?.status,
+    body?.event,
+    body?.type,
+    data?.status,
+    data?.event,
+    data?.type,
+    data?.delivery_status
+  );
+  const occurredAt = firstString(
+    body?.timestamp,
+    body?.occurredAt,
+    body?.created_at,
+    data?.timestamp,
+    data?.occurredAt,
+    data?.created_at
+  );
+  const errorReason = firstString(
+    body?.error,
+    body?.errorReason,
+    body?.reason,
+    data?.error,
+    data?.errorReason,
+    data?.reason
+  );
+
+  if (!externalMessageId || !status) {
+    return null;
+  }
+
+  return {
+    channel,
+    externalMessageId,
+    status,
+    providerStatus: status,
+    occurredAt,
+    errorReason,
+    payload: body,
+  };
+}
 
 /**
  * Correlation Engine: Asocia mensajes inbound a facturas
@@ -188,6 +259,62 @@ const unifiedInboundSchema = z.object({
 });
 
 export async function webhookRoutes(fastify: FastifyInstance) {
+  // POST /wh/wa/status - Estados de entrega WhatsApp (sent/delivered/read/failed)
+  fastify.post('/wa/status', async (request, reply) => {
+    if (!verifyWebhookSecret(request)) {
+      return reply.status(401).send({ error: 'Invalid webhook secret' });
+    }
+
+    const update = extractMessageStatusPayload(request.body, 'WHATSAPP');
+    if (!update) {
+      return reply.status(400).send({ error: 'Missing message id or status' });
+    }
+
+    try {
+      const result = await applyMessageStatusUpdate(update);
+      fastify.log.info(
+        {
+          externalMessageId: update.externalMessageId,
+          status: result.status,
+          matched: result.matched,
+        },
+        'WhatsApp delivery status processed'
+      );
+      return reply.status(200).send({ status: 'ok', deliveryStatus: result.status, matched: result.matched });
+    } catch (error: any) {
+      fastify.log.error({ error: error.message }, 'Error processing WhatsApp delivery status');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /wh/email/status - Estados de entrega Email (delivered/open/bounce/failed)
+  fastify.post('/email/status', async (request, reply) => {
+    if (!verifyWebhookSecret(request)) {
+      return reply.status(401).send({ error: 'Invalid webhook secret' });
+    }
+
+    const update = extractMessageStatusPayload(request.body, 'EMAIL');
+    if (!update) {
+      return reply.status(400).send({ error: 'Missing message id or status' });
+    }
+
+    try {
+      const result = await applyMessageStatusUpdate(update);
+      fastify.log.info(
+        {
+          externalMessageId: update.externalMessageId,
+          status: result.status,
+          matched: result.matched,
+        },
+        'Email delivery status processed'
+      );
+      return reply.status(200).send({ status: 'ok', deliveryStatus: result.status, matched: result.matched });
+    } catch (error: any) {
+      fastify.log.error({ error: error.message }, 'Error processing email delivery status');
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // POST /wh/inbound - Endpoint unificado para todos los canales inbound
   fastify.post('/inbound', async (request, reply) => {
     const body = request.body as any;

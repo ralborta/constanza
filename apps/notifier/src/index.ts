@@ -9,6 +9,7 @@ import { renderEmailTemplate, replaceVariables, resolveVariablesFromDB } from '.
 import { webhookRoutes } from './routes/webhooks.js';
 import { whatsappTestRoutes } from './routes/whatsapp-test.js';
 import { WhatsAppPoller } from './polling/whatsapp-poller.js';
+import { CobranzaScheduler } from './scheduling/cobranza-scheduler.js';
 // SimpleLogger está disponible globalmente desde types.d.ts (incluido en tsconfig.json)
 
 const prisma = new PrismaClient();
@@ -427,6 +428,15 @@ const start = async () => {
       logger.info(`📱 WhatsApp polling enabled (interval: ${pollInterval}ms) - Backup method`);
     } else {
       logger.info('📱 WhatsApp polling disabled (using webhooks only)');
+    }
+
+    if (process.env.ENABLE_COBRANZA_SCHEDULER === 'true') {
+      const schedulerInterval = Number(process.env.COBRANZA_SCHEDULER_INTERVAL_MS) || 15 * 60 * 1000;
+      const scheduler = new CobranzaScheduler(schedulerInterval);
+      await scheduler.start();
+      logger.info(`⏱️ Cobranza scheduler enabled (interval: ${schedulerInterval}ms)`);
+    } else {
+      logger.info('⏱️ Cobranza scheduler disabled');
     }
   } catch (err) {
     logger.error(err);
