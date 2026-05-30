@@ -88,6 +88,12 @@ function normalizeExcelRow(row: ExcelRow): ExcelRow {
   return normalized;
 }
 
+const OPEN_INVOICE_STATES = ['ABIERTA', 'VENCIDA', 'PARCIAL'];
+
+function toIso(value: Date | null | undefined) {
+  return value ? value.toISOString() : null;
+}
+
 export async function customerRoutes(fastify: FastifyInstance) {
   // Log para verificar que las rutas se registran
   fastify.log.info('Registering customer routes including /customers/upload');
@@ -172,6 +178,265 @@ export async function customerRoutes(fastify: FastifyInstance) {
           detail: error?.message ?? null,
         });
       }
+    }
+  );
+
+  // GET /customers/:id/historial - Historia clínica 360° del cliente
+  fastify.get(
+    '/customers/:id/historial',
+    {
+      preHandler: [authenticate, requirePerfil(['ADM', 'OPERADOR_1', 'OPERADOR_2'])],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const { id } = request.params as { id: string };
+
+      const customer = await prisma.customer.findFirst({
+        where: {
+          id,
+          tenantId: user.tenant_id,
+        },
+        include: {
+          customerCuits: {
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          },
+        },
+      });
+
+      if (!customer) {
+        return reply.status(404).send({ error: 'Cliente no encontrado' });
+      }
+
+      const [invoices, contactEvents, echeqs, callbacks] = await Promise.all([
+        prisma.invoice.findMany({
+          where: {
+            tenantId: user.tenant_id,
+            customerId: customer.id,
+          },
+          include: {
+            paymentApplications: {
+              include: {
+                payment: true,
+              },
+            },
+            promises: true,
+          },
+          orderBy: [{ fechaVto: 'asc' }, { createdAt: 'desc' }],
+        }),
+        prisma.contactEvent.findMany({
+          where: {
+            tenantId: user.tenant_id,
+            customerId: customer.id,
+          },
+          include: {
+            invoice: {
+              select: {
+                id: true,
+                numero: true,
+              },
+            },
+          },
+          orderBy: { ts: 'desc' },
+          take: 150,
+        }),
+        prisma.echeq.findMany({
+          where: {
+            tenantId: user.tenant_id,
+            customerId: customer.id,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        }),
+        prisma.scheduledCallback.findMany({
+          where: {
+            tenantId: user.tenant_id,
+            customerId: customer.id,
+          },
+          include: {
+            invoice: {
+              select: {
+                id: true,
+                numero: true,
+              },
+            },
+          },
+          orderBy: { scheduledAt: 'desc' },
+          take: 50,
+        }),
+      ]);
+
+      const invoicePayload = invoices.map((invoice) => {
+        const montoAplicado = invoice.paymentApplications.reduce((sum, app) => sum + app.amount, 0);
+        const saldo = Math.max(invoice.monto - montoAplicado, 0);
+        return {
+          id: invoice.id,
+          numero: invoice.numero,
+          externalRef: invoice.externalRef,
+          monto: invoice.monto,
+          montoAplicado,
+          saldo,
+          fechaVto: invoice.fechaVto,
+          estado: invoice.estado,
+          promises: invoice.promises.map((promise) => ({
+            id: promise.id,
+            amount: promise.amount,
+            dueDate: promise.dueDate,
+            channel: promise.channel,
+            status: promise.status,
+            reason: promise.reason,
+            createdAt: promise.createdAt,
+          })),
+          applications: invoice.paymentApplications.map((app) => ({
+            id: app.id,
+            amount: app.amount,
+            isAuthoritative: app.isAuthoritative,
+            appliedAt: app.appliedAt,
+            payment: {
+              id: app.payment.id,
+              sourceSystem: app.payment.sourceSystem,
+              method: app.payment.method,
+              status: app.payment.status,
+              settledAt: app.payment.settledAt,
+              externalRef: app.payment.externalRef,
+            },
+          })),
+        };
+      });
+
+      const totalFacturado = invoices.reduce((sum, invoice) => sum + invoice.monto, 0);
+      const totalAplicado = invoices.reduce(
+        (sum, invoice) => sum + invoice.paymentApplications.reduce((appSum, app) => appSum + app.amount, 0),
+        0
+      );
+      const saldoPendiente = invoicePayload
+        .filter((invoice) => OPEN_INVOICE_STATES.includes(invoice.estado))
+        .reduce((sum, invoice) => sum + invoice.saldo, 0);
+      const facturasVencidas = invoicePayload.filter(
+        (invoice) => invoice.estado === 'VENCIDA' || (invoice.saldo > 0 && new Date(invoice.fechaVto) < new Date())
+      ).length;
+      const allPromises = invoicePayload.flatMap((invoice) => invoice.promises);
+      const fulfilledPromises = allPromises.filter((promise) =>
+        ['CUMPLIDA', 'FULFILLED', 'DONE', 'PAGADA'].includes(promise.status)
+      ).length;
+      const brokenPromises = allPromises.filter((promise) =>
+        ['ROTA', 'BROKEN', 'INCUMPLIDA', 'VENCIDA'].includes(promise.status)
+      ).length;
+      const lastContact = contactEvents[0] ?? null;
+      const lastPaymentApplication = invoices
+        .flatMap((invoice) => invoice.paymentApplications)
+        .sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime())[0];
+
+      const timeline = [
+        ...contactEvents.map((event) => ({
+          type: 'CONTACT',
+          id: event.id,
+          ts: event.ts,
+          invoiceId: event.invoiceId,
+          invoiceNumero: event.invoice?.numero ?? null,
+          channel: event.channel,
+          direction: event.direction,
+          status: event.status,
+          title: `${event.channel} ${event.direction}`,
+          message: event.callSummary || event.messageText || event.transcription || event.errorReason,
+          metadata: {
+            callDuration: event.callDuration,
+            mediaUrl: event.mediaUrl,
+          },
+        })),
+        ...invoicePayload.flatMap((invoice) =>
+          invoice.promises.map((promise) => ({
+            type: 'PROMISE',
+            id: promise.id,
+            ts: promise.createdAt,
+            invoiceId: invoice.id,
+            invoiceNumero: invoice.numero,
+            channel: promise.channel,
+            status: promise.status,
+            title: 'Promesa de pago',
+            message: promise.reason,
+            amount: promise.amount,
+            dueDate: promise.dueDate,
+          }))
+        ),
+        ...invoicePayload.flatMap((invoice) =>
+          invoice.applications.map((app) => ({
+            type: 'PAYMENT',
+            id: app.id,
+            ts: app.appliedAt,
+            invoiceId: invoice.id,
+            invoiceNumero: invoice.numero,
+            status: app.payment.status,
+            title: 'Pago aplicado',
+            message: `${app.payment.method} desde ${app.payment.sourceSystem}`,
+            amount: app.amount,
+            sourceSystem: app.payment.sourceSystem,
+            settledAt: app.payment.settledAt,
+          }))
+        ),
+        ...echeqs.map((echeq) => ({
+          type: 'ECHEQ',
+          id: echeq.id,
+          ts: echeq.createdAt,
+          invoiceId: null,
+          invoiceNumero: null,
+          status: echeq.statusLiquidacion,
+          title: `E-cheque ${echeq.number}`,
+          message: `Operativo: ${echeq.statusOperativo}`,
+          amount: echeq.amount,
+          settledAt: echeq.settledAt,
+        })),
+        ...callbacks.map((callback) => ({
+          type: 'CALLBACK',
+          id: callback.id,
+          ts: callback.scheduledAt,
+          invoiceId: callback.invoiceId,
+          invoiceNumero: callback.invoice?.numero ?? null,
+          status: callback.status,
+          title: callback.type,
+          message: callback.reason,
+        })),
+      ].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+
+      return {
+        customer: {
+          id: customer.id,
+          codigoUnico: customer.codigoUnico,
+          codigoVenta: customer.codigoVenta,
+          externalRef: customer.externalRef,
+          razonSocial: customer.razonSocial,
+          email: customer.email,
+          telefono: customer.telefono,
+          activo: customer.activo,
+          accesoHabilitado: customer.accesoHabilitado,
+          cuits: customer.customerCuits,
+        },
+        metrics: {
+          totalFacturado,
+          totalAplicado,
+          saldoPendiente,
+          facturasTotal: invoices.length,
+          facturasAbiertas: invoicePayload.filter((invoice) => OPEN_INVOICE_STATES.includes(invoice.estado)).length,
+          facturasVencidas,
+          contactosTotal: contactEvents.length,
+          promesasTotal: allPromises.length,
+          promesasCumplidas: fulfilledPromises,
+          promesasRotas: brokenPromises,
+          callbacksPendientes: callbacks.filter((callback) => callback.status === 'PENDING').length,
+          echeqsTotal: echeqs.length,
+          ultimoContactoAt: toIso(lastContact?.ts),
+          ultimoPagoAt: toIso(lastPaymentApplication?.appliedAt),
+          criticidad:
+            facturasVencidas >= 3 || saldoPendiente >= 50000000 || brokenPromises >= 2
+              ? 'ALTA'
+              : facturasVencidas > 0 || saldoPendiente > 0
+                ? 'MEDIA'
+                : 'BAJA',
+        },
+        invoices: invoicePayload,
+        echeqs,
+        callbacks,
+        timeline,
+      };
     }
   );
 

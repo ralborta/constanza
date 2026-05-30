@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import Link from 'next/link';
 import api, { getApiUrl } from '@/lib/api';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Upload, Download, Search, AlertCircle, CheckCircle2, UserPlus } from 'lucide-react';
+import { Upload, Download, Search, AlertCircle, CheckCircle2, UserPlus, Eye } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
@@ -421,24 +422,25 @@ export default function CustomersPage() {
                     <TableHead className="font-semibold text-gray-800">Teléfono</TableHead>
                     <TableHead className="font-semibold text-gray-800">CUIT</TableHead>
                     <TableHead className="font-semibold text-gray-800">Estado</TableHead>
+                    <TableHead className="font-semibold text-gray-800">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-gray-500">
+                      <TableCell colSpan={7} className="text-center text-gray-500">
                         Cargando...
                       </TableCell>
                     </TableRow>
                   ) : isError ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-destructive text-sm">
+                      <TableCell colSpan={7} className="text-center text-destructive text-sm">
                         No se pudo cargar la lista (ver mensaje arriba).
                       </TableCell>
                     </TableRow>
                   ) : filteredCustomers?.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-gray-500">
+                      <TableCell colSpan={7} className="text-center text-gray-500">
                         {searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}
                       </TableCell>
                     </TableRow>
@@ -458,6 +460,14 @@ export default function CustomersPage() {
                           ) : (
                             <span className="text-gray-400">Inactivo</span>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/customers/${customer.id}`}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Historia clínica
+                            </Link>
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
