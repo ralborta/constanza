@@ -12,6 +12,8 @@ const ELEVENLABS_API_URL = process.env.ELEVENLABS_API_URL || 'https://api.eleven
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
 const ELEVENLABS_PHONE_NUMBER_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID;
+const OPEN_INVOICE_STATES = ['ABIERTA', 'VENCIDA', 'PARCIAL'];
+const POST_CALL_WHATSAPP_ENABLED = process.env.POST_CALL_WHATSAPP_ENABLED !== 'false';
 
 /**
  * Formatea número de teléfono para ElevenLabs (formato E.164)
@@ -27,6 +29,176 @@ function formatPhoneNumber(phone: string): string {
     }
   }
   return cleaned;
+}
+
+function formatMoneyCents(value: number | null | undefined): string {
+  const cents = Number(value || 0);
+  return (cents / 100).toLocaleString('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatDate(value: Date | string | null | undefined): string {
+  if (!value) return '';
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+function stringifyDynamicVariables(variables: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(variables)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => [key, String(value)])
+  );
+}
+
+async function buildVoiceContextVariables(input: {
+  tenantId: string;
+  customerId: string;
+  invoiceId?: string | null;
+  baseVariables?: Record<string, string>;
+}) {
+  const customer = await prisma.customer.findFirst({
+    where: {
+      id: input.customerId,
+      tenantId: input.tenantId,
+      activo: true,
+    },
+    include: {
+      customerCuits: {
+        where: { isPrimary: true },
+        take: 1,
+      },
+    },
+  });
+
+  if (!customer) {
+    return input.baseVariables || {};
+  }
+
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      customerId: customer.id,
+      tenantId: input.tenantId,
+      estado: { in: OPEN_INVOICE_STATES },
+    },
+    include: {
+      paymentApplications: true,
+    },
+    orderBy: [{ fechaVto: 'asc' }, { createdAt: 'desc' }],
+    take: 20,
+  });
+
+  const targetInvoice =
+    (input.invoiceId ? invoices.find((invoice) => invoice.id === input.invoiceId) : null) || invoices[0] || null;
+
+  const enrichedInvoices = invoices.map((invoice) => {
+    const applied = invoice.paymentApplications.reduce((sum, application) => sum + application.amount, 0);
+    const balance = Math.max(invoice.monto - applied, 0);
+    return {
+      id: invoice.id,
+      numero: invoice.numero,
+      monto: invoice.monto,
+      applied,
+      balance,
+      fechaVto: invoice.fechaVto,
+      estado: invoice.estado,
+    };
+  });
+
+  const targetInvoiceData = targetInvoice ? enrichedInvoices.find((invoice) => invoice.id === targetInvoice.id) : null;
+  const totalOpenBalance = enrichedInvoices.reduce((sum, invoice) => sum + invoice.balance, 0);
+  const openInvoicesSummary = enrichedInvoices
+    .slice(0, 8)
+    .map(
+      (invoice) =>
+        `Factura ${invoice.numero}: saldo ${formatMoneyCents(invoice.balance)}, vence ${formatDate(invoice.fechaVto)}, estado ${invoice.estado}`
+    )
+    .join('; ');
+
+  return stringifyDynamicVariables({
+    ...(input.baseVariables || {}),
+    customer_id: customer.id,
+    customer_name: customer.razonSocial,
+    customer_code: customer.codigoUnico,
+    customer_email: customer.email,
+    customer_phone: customer.telefono || '',
+    customer_cuit: customer.customerCuits[0]?.cuit || '',
+    invoice_id: targetInvoiceData?.id || input.invoiceId || '',
+    invoice_number: targetInvoiceData?.numero || '',
+    invoice_amount: targetInvoiceData ? formatMoneyCents(targetInvoiceData.monto) : '',
+    invoice_balance: targetInvoiceData ? formatMoneyCents(targetInvoiceData.balance) : '',
+    invoice_due_date: targetInvoiceData ? formatDate(targetInvoiceData.fechaVto) : '',
+    invoice_status: targetInvoiceData?.estado || '',
+    open_invoices_count: enrichedInvoices.length,
+    total_open_balance: formatMoneyCents(totalOpenBalance),
+    open_invoices_summary: openInvoicesSummary || 'No registra facturas abiertas.',
+    agent_context_summary:
+      enrichedInvoices.length > 0
+        ? `Cliente ${customer.razonSocial}. Total pendiente ${formatMoneyCents(totalOpenBalance)}. ${openInvoicesSummary}`
+        : `Cliente ${customer.razonSocial}. No registra facturas abiertas.`,
+    post_call_whatsapp_policy:
+      'Si el cliente pide detalle de facturas, saldos o vencimientos adicionales, indicá que se enviará el detalle por WhatsApp al finalizar la llamada.',
+    post_call_whatsapp_allowed: 'true',
+  });
+}
+
+function extractDynamicVariables(body: any): Record<string, string> {
+  const candidates = [
+    body?.conversation_initiation_client_data?.dynamic_variables,
+    body?.conversation_initiation_client_data?.conversation_initiation_client_data?.dynamic_variables,
+    body?.metadata?.dynamic_variables,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'object') {
+      return candidate;
+    }
+  }
+
+  return {};
+}
+
+function shouldSendPostCallWhatsApp(input: {
+  summary?: string | null;
+  transcript?: string | null;
+  variables: Record<string, string>;
+}) {
+  if (!POST_CALL_WHATSAPP_ENABLED) return false;
+  if (input.variables.post_call_whatsapp_allowed === 'false') return false;
+  if (input.variables.send_post_call_whatsapp === 'true' || input.variables.post_call_whatsapp_requested === 'true') {
+    return true;
+  }
+
+  const text = `${input.summary || ''}\n${input.transcript || ''}`.toLowerCase();
+  const mentionsWhatsapp = /\b(whatsapp|wsp|mensaje)\b/.test(text);
+  const asksForBillingInfo = /(factura|facturas|saldo|saldos|vencimiento|vencimientos|detalle|deuda|informaci[oó]n)/.test(
+    text
+  );
+  const sendIntent = /(enviar|mandar|pasar|compartir|recibir|solicit[oó]|pid[ií]o|pide)/.test(text);
+
+  return mentionsWhatsapp && asksForBillingInfo && sendIntent;
+}
+
+async function buildPostCallWhatsAppMessage(input: {
+  tenantId: string;
+  customerId: string;
+  invoiceId?: string | null;
+}) {
+  const variables = await buildVoiceContextVariables(input);
+  const customerName = variables.customer_name || 'cliente';
+  const total = variables.total_open_balance || '$0';
+  const invoicesSummary = variables.open_invoices_summary || 'No registramos facturas abiertas.';
+
+  return [
+    `Hola ${customerName}, tal como conversamos con Constanza, te enviamos el detalle actualizado de tu cuenta.`,
+    '',
+    `Total pendiente: ${total}.`,
+    invoicesSummary,
+    '',
+    'Si ya realizaste el pago, podés responder este mensaje con el comprobante para imputarlo.',
+  ].join('\n');
 }
 
 const callRowSchema = z.object({
@@ -311,12 +483,53 @@ export async function callRoutes(fastify: FastifyInstance) {
           },
         });
 
+        // Crear registros antes de llamar a ElevenLabs para poder correlacionar el webhook de cierre.
+        const preparedRows = [];
+        for (const row of batchData.rows) {
+          const dynamicVariables = await buildVoiceContextVariables({
+            tenantId: user.tenant_id,
+            customerId: row.customerId,
+            invoiceId: row.invoiceId || null,
+            baseVariables: row.variables || {},
+          });
+
+          const contactEvent = await prisma.contactEvent.create({
+            data: {
+              tenantId: user.tenant_id,
+              batchId: batchJob.id,
+              customerId: row.customerId,
+              invoiceId: row.invoiceId || null,
+              channel: 'VOICE',
+              direction: 'OUTBOUND',
+              isManual: false,
+              messageText: row.script,
+              status: 'PENDING',
+              externalMessageId: null,
+              payload: {
+                dynamicVariables,
+                postCallWhatsApp: { enabled: POST_CALL_WHATSAPP_ENABLED, sent: false },
+              } as any,
+              ts: new Date(),
+            },
+          });
+
+          preparedRows.push({
+            ...row,
+            contactEventId: contactEvent.id,
+            dynamicVariables: {
+              ...dynamicVariables,
+              contact_event_id: contactEvent.id,
+              batch_id: batchJob.id,
+            },
+          });
+        }
+
         // Preparar contactos para ElevenLabs Batch Calling
-        const recipients = batchData.rows.map((row: any) => ({
+        const recipients = preparedRows.map((row: any) => ({
           phone_number: formatPhoneNumber(row.telefono),
           conversation_initiation_client_data: {
             type: 'conversation_initiation_client_data',
-            dynamic_variables: row.variables || {},
+            dynamic_variables: row.dynamicVariables,
           },
         }));
 
@@ -356,25 +569,6 @@ export async function callRoutes(fastify: FastifyInstance) {
               elevenLabsBatchId,
             } as any,
           },
-        });
-
-        // Crear registros de ContactEvent para cada llamada
-        const eventsToCreate = batchData.rows.map((row: any) => ({
-          tenantId: user.tenant_id,
-          batchId: batchJob.id,
-          customerId: row.customerId,
-          invoiceId: row.invoiceId || null,
-          channel: 'VOICE',
-          direction: 'OUTBOUND',
-          isManual: false,
-          messageText: row.script,
-          status: 'PENDING',
-          externalMessageId: null, // Se actualizará cuando llegue el webhook
-          ts: new Date(),
-        }));
-
-        await prisma.contactEvent.createMany({
-          data: eventsToCreate,
         });
 
         fastify.log.info(
@@ -671,32 +865,58 @@ export async function callRoutes(fastify: FastifyInstance) {
     '/calls/webhooks/elevenlabs',
     async (request, reply) => {
       try {
-        const body = request.body as any;
-        fastify.log.info({ body }, 'Webhook de ElevenLabs recibido');
+        const rawBody = request.body as any;
+        fastify.log.info({ body: rawBody }, 'Webhook de ElevenLabs recibido');
+
+        // ElevenLabs envía un envelope: { type, event_timestamp, data: {...} }
+        // El payload real está en `data`; mantenemos fallback al body plano por compatibilidad.
+        const eventType: string | undefined = rawBody?.type;
+        const data: any = rawBody?.data && typeof rawBody.data === 'object' ? rawBody.data : rawBody;
+
+        // Ignoramos eventos que no son de transcripción (audio, call_initiation_failure).
+        if (eventType && eventType !== 'post_call_transcription') {
+          fastify.log.info({ eventType }, 'Evento de ElevenLabs ignorado');
+          return reply.status(200).send({ received: true, ignored: true, eventType });
+        }
 
         const {
           conversation_id,
-          type,
           transcript,
           analysis,
           messages,
-          conversation_initiation_client_data,
-          audio_url,
-          summary,
-          phone_number,
-          status,
-          duration,
-        } = body;
+          status: rawStatus,
+        } = data;
+        const audio_url = data.audio_url || null;
+        const summary = data.summary;
+        const metadata = data.metadata || {};
+        const duration: number | null = metadata.call_duration_secs ?? data.duration ?? null;
+        const status: string | undefined = rawStatus;
+        const isCompleted = status === 'done' || status === 'completed' || status === 'success';
+        const isFailed = status === 'failed' || status === 'failure';
 
         if (!conversation_id) {
           return reply.status(400).send({ error: 'conversation_id es requerido' });
         }
 
-        // Extraer transcripción de múltiples fuentes posibles
-        let finalTranscript = transcript;
-        if (!finalTranscript && analysis?.transcript) {
-          finalTranscript = analysis.transcript;
-        } else if (!finalTranscript && messages && Array.isArray(messages)) {
+        // Extraer transcripción. En el shape oficial, `transcript` es un array de turns.
+        let finalTranscript: string | null = null;
+        if (Array.isArray(transcript)) {
+          finalTranscript = transcript
+            .filter((turn: any) => turn?.message || turn?.content)
+            .map((turn: any) => `${turn.role}: ${turn.message || turn.content || ''}`)
+            .join('\n');
+        } else if (typeof transcript === 'string') {
+          finalTranscript = transcript;
+        } else if (analysis?.transcript) {
+          finalTranscript =
+            typeof analysis.transcript === 'string'
+              ? analysis.transcript
+              : Array.isArray(analysis.transcript)
+                ? analysis.transcript
+                    .map((turn: any) => `${turn.role}: ${turn.message || turn.content || ''}`)
+                    .join('\n')
+                : null;
+        } else if (Array.isArray(messages)) {
           finalTranscript = messages
             .filter((msg: any) => msg.content || msg.message)
             .map((msg: any) => `${msg.role}: ${msg.content || msg.message || ''}`)
@@ -709,13 +929,21 @@ export async function callRoutes(fastify: FastifyInstance) {
           finalSummary = analysis.transcript_summary;
         }
 
-        // Buscar el ContactEvent por externalMessageId (conversation_id)
+        const dynamicVariables = extractDynamicVariables(data);
+        const contactEventId = dynamicVariables.contact_event_id;
+
+        // Buscar el ContactEvent por ID explícito de variables dinámicas o por conversation_id.
         const contactEvent = await prisma.contactEvent.findFirst({
-          where: {
-            externalMessageId: conversation_id,
-          },
+          where: contactEventId
+            ? {
+                id: contactEventId,
+              }
+            : {
+                externalMessageId: conversation_id,
+              },
           include: {
             batch: true,
+            customer: true,
           },
         });
 
@@ -724,15 +952,25 @@ export async function callRoutes(fastify: FastifyInstance) {
 
         if (contactEvent) {
           // Actualizar el evento existente
+          const previousPayload = (contactEvent.payload || {}) as any;
+
           await prisma.contactEvent.update({
             where: { id: contactEvent.id },
             data: {
               transcription: finalTranscript || null,
               callSummary: finalSummary || null,
               callDuration: duration || null,
-              status: status === 'completed' ? 'SENT' : status === 'failed' ? 'FAILED' : 'PENDING',
+              status: isCompleted ? 'SENT' : isFailed ? 'FAILED' : 'PENDING',
+              externalMessageId: conversation_id,
               mediaUrl: audio_url || null,
-              payload: body,
+              payload: {
+                ...data,
+                dynamicVariables,
+                postCallWhatsApp: previousPayload.postCallWhatsApp || {
+                  enabled: POST_CALL_WHATSAPP_ENABLED,
+                  sent: false,
+                },
+              },
             },
           });
 
@@ -742,7 +980,7 @@ export async function callRoutes(fastify: FastifyInstance) {
           );
 
           // A partir del resumen de la IA: crear callbacks y promesas de pago (cronograma)
-          if (finalSummary && status === 'completed') {
+          if (finalSummary && isCompleted) {
             try {
               const result = await processCallSummaryForCallbacks(finalSummary, {
                 tenantId: contactEvent.tenantId,
@@ -762,6 +1000,84 @@ export async function callRoutes(fastify: FastifyInstance) {
               fastify.log.warn(
                 { contactEventId: contactEvent.id, error: err?.message },
                 'Error creando callbacks/promesas desde resumen (no bloqueante)'
+              );
+            }
+          }
+
+          if (
+            isCompleted &&
+            contactEvent.customer?.telefono &&
+            !previousPayload.postCallWhatsApp?.sent &&
+            shouldSendPostCallWhatsApp({
+              summary: finalSummary,
+              transcript: finalTranscript,
+              variables: dynamicVariables,
+            })
+          ) {
+            try {
+              const NOTIFIER_URL = getNotifierBaseUrl();
+              const message = await buildPostCallWhatsAppMessage({
+                tenantId: contactEvent.tenantId,
+                customerId: contactEvent.customerId,
+                invoiceId: contactEvent.invoiceId,
+              });
+
+              const response = await axios.post(
+                `${NOTIFIER_URL}/notify/send-direct`,
+                {
+                  channel: 'WHATSAPP',
+                  to: contactEvent.customer.telefono,
+                  message,
+                  tenantId: contactEvent.tenantId,
+                  source: 'elevenlabs-post-call',
+                },
+                { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+              );
+
+              await prisma.contactEvent.create({
+                data: {
+                  tenantId: contactEvent.tenantId,
+                  customerId: contactEvent.customerId,
+                  invoiceId: contactEvent.invoiceId,
+                  batchId: contactEvent.batchId,
+                  channel: 'WHATSAPP',
+                  direction: 'OUTBOUND',
+                  isManual: false,
+                  messageText: message,
+                  status: 'SENT',
+                  externalMessageId: response.data?.messageId || null,
+                  payload: {
+                    source: 'elevenlabs-post-call',
+                    sourceContactEventId: contactEvent.id,
+                    response: response.data,
+                  } as any,
+                  ts: new Date(),
+                },
+              });
+
+              await prisma.contactEvent.update({
+                where: { id: contactEvent.id },
+                data: {
+                  payload: {
+                    ...data,
+                    dynamicVariables,
+                    postCallWhatsApp: {
+                      enabled: POST_CALL_WHATSAPP_ENABLED,
+                      sent: true,
+                      sentAt: new Date().toISOString(),
+                    },
+                  },
+                },
+              });
+
+              fastify.log.info(
+                { contactEventId: contactEvent.id, customerId: contactEvent.customerId },
+                'WhatsApp post-llamada enviado'
+              );
+            } catch (err: any) {
+              fastify.log.warn(
+                { contactEventId: contactEvent.id, error: err?.message },
+                'Error enviando WhatsApp post-llamada (no bloqueante)'
               );
             }
           }
