@@ -193,10 +193,10 @@ export default function ReconciliationPage() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-              Conciliación de Pagos
+              Conciliación de Cobros
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              Gestiona la liquidación y conciliación de pagos pendientes
+              Gestiona la liquidación y conciliación de cobros pendientes
             </p>
           </div>
           <Button
@@ -326,19 +326,19 @@ export default function ReconciliationPage() {
 
         <Card className="border-0 shadow-lg bg-white">
           <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 border-b">
-            <CardTitle className="text-gray-800">Pagos Pendientes de Liquidación</CardTitle>
+            <CardTitle className="text-gray-800">Cobros Pendientes de Liquidación</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="text-center py-8">
                 <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
-                <p className="mt-2 text-sm text-gray-500">Cargando pagos...</p>
+                <p className="mt-2 text-sm text-gray-500">Cargando cobros...</p>
               </div>
             ) : !data || data.pendingLiquidation.length === 0 ? (
               <div className="text-center py-8">
                 <CheckCircle2 className="mx-auto h-8 w-8 text-green-500" />
                 <p className="mt-2 text-sm text-gray-500">
-                  No hay pagos pendientes de liquidación
+                  No hay cobros pendientes de liquidación
                 </p>
               </div>
             ) : (
@@ -469,7 +469,7 @@ export default function ReconciliationPage() {
                                 }
                                 title={
                                   payment.applications.length === 0
-                                    ? 'Imputá primero el pago a una factura'
+                                    ? 'Imputá primero el cobro a una factura'
                                     : undefined
                                 }
                               >
@@ -487,8 +487,8 @@ export default function ReconciliationPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Confirmar Liquidación</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  ¿Estás seguro de que deseas liquidar este pago? Esta acción marcará
-                                  el pago como liquidado.
+                                  ¿Estás seguro de que deseas liquidar este cobro? Esta acción marcará
+                                  el cobro como liquidado.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -528,8 +528,8 @@ export default function ReconciliationPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Confirmar Rechazo</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  ¿Estás seguro de que deseas rechazar este pago? Esta acción
-                                  marcará el pago como rechazado.
+                                  ¿Estás seguro de que deseas rechazar este cobro? Esta acción
+                                  marcará el cobro como rechazado.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -555,7 +555,7 @@ export default function ReconciliationPage() {
               <Alert className="mt-4">
                 <CheckCircle2 className="h-4 w-4" />
                 <AlertDescription>
-                  Pago {reconcileAction === 'LIQUIDATE' ? 'liquidado' : 'rechazado'} exitosamente
+                  Cobro {reconcileAction === 'LIQUIDATE' ? 'liquidado' : 'rechazado'} exitosamente
                 </AlertDescription>
               </Alert>
             )}
@@ -565,7 +565,7 @@ export default function ReconciliationPage() {
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
                   {(reconcileMutation.error as any)?.response?.data?.error ||
-                    'Error al reconciliar el pago'}
+                    'Error al reconciliar el cobro'}
                 </AlertDescription>
               </Alert>
             )}

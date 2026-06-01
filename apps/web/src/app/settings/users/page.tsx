@@ -452,7 +452,7 @@ export default function SettingsUsersPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Asigná la empresa donde están las facturas y pagos del usuario.
+                  Asigná la empresa donde están las facturas y cobros del usuario.
                 </p>
               </div>
               <div className="grid gap-2">

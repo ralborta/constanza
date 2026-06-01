@@ -391,7 +391,7 @@ export function InvoiceHistorialView({ data }: InvoiceHistorialViewProps) {
                         )}
                         {item.type === 'PAYMENT' && (
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-gray-900">Pago aplicado</span>
+                            <span className="text-sm font-semibold text-gray-900">Cobro aplicado</span>
                             {item.isAuthoritative && (
                               <Badge variant="default" className="text-xs">
                                 {item.sourceSystem}

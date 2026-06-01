@@ -62,7 +62,7 @@ const callsSubmenu = [
 const paymentsSubmenu = [
   { name: 'Transferencias Bancarias', href: '/payments/transfers', icon: ArrowsLeftRight },
   { name: 'E-cheques', href: '/payments/echeqs', icon: Receipt },
-  { name: 'Conciliación de Pagos', href: '/payments/reconciliation', icon: CheckCircle },
+  { name: 'Conciliación de Cobros', href: '/payments/reconciliation', icon: CheckCircle },
 ];
 
 function NavItem({ href, icon: Icon, name, active }: { href: string; icon: any; name: string; active: boolean }) {
@@ -212,7 +212,7 @@ export function Sidebar() {
           )}>
             <div className="flex items-center gap-3">
               <Wallet size={18} weight={isPaymentsActive ? 'duotone' : 'regular'} className="flex-shrink-0" />
-              <span>Pagos</span>
+              <span>Cobros</span>
             </div>
             {paymentsOpen ? <CaretDown size={13} /> : <CaretRight size={13} />}
           </CollapsibleTrigger>

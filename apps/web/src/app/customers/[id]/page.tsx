@@ -165,7 +165,7 @@ export default function CustomerClinicalHistoryPage() {
               Volver a clientes
             </Link>
             <h1 className="mt-2 text-2xl font-bold text-gray-900">Historia clínica del cliente</h1>
-            <p className="text-sm text-gray-500">Vista 360° de facturas, gestiones, promesas y pagos.</p>
+            <p className="text-sm text-gray-500">Vista 360° de facturas, gestiones, promesas y cobros.</p>
           </div>
         </div>
 
@@ -232,7 +232,7 @@ export default function CustomerClinicalHistoryPage() {
                   <p className="mt-1 font-semibold">{money(data.metrics.totalFacturado)} / {money(data.metrics.totalAplicado)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase text-gray-500">Último pago</p>
+                  <p className="text-xs font-medium uppercase text-gray-500">Último cobro</p>
                   <p className="mt-1 font-semibold">{safeDate(data.metrics.ultimoPagoAt, true)}</p>
                 </div>
                 <div>

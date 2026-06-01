@@ -473,7 +473,7 @@ export default function DashboardPage() {
               <CardHeader className="border-b border-border pb-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-base font-semibold text-foreground">Pagos bancarios</CardTitle>
+                    <CardTitle className="text-base font-semibold text-foreground">Cobros bancarios</CardTitle>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Transferencias y conciliación
                     </p>

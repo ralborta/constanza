@@ -181,7 +181,7 @@ export default function TransfersPage() {
             Transferencias Bancarias
           </h1>
           <p className="mt-1 text-sm text-gray-600">
-            Pagos recibidos por transferencias bancarias
+            Cobros recibidos por transferencias bancarias
           </p>
         </div>
 
@@ -192,7 +192,7 @@ export default function TransfersPage() {
                 Diagnóstico — coincidencia de IDs
               </CardTitle>
               <p className="text-sm text-gray-700">
-                Tu usuario ({session.email ?? 'sesión'}) ve solo pagos del tenant del token. Los webhooks guardan con{' '}
+                Tu usuario ({session.email ?? 'sesión'}) ve solo cobros del tenant del token. Los webhooks guardan con{' '}
                 <code className="rounded bg-white px-1 py-0.5 text-xs">CRESIUM_TENANT_ID</code>. Para la prueba, ese
                 valor tiene que ser <strong>exactamente el mismo</strong> que abajo.
               </p>

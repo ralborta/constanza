@@ -131,14 +131,14 @@ export default function PaymentDetailPage() {
         {isLoading && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
-            Cargando pago…
+            Cargando cobro…
           </div>
         )}
 
         {isError && (
           <Card className="border-destructive/50">
             <CardContent className="pt-6 text-destructive text-sm">
-              {error instanceof Error ? error.message : 'No se pudo cargar el pago.'}
+              {error instanceof Error ? error.message : 'No se pudo cargar el cobro.'}
             </CardContent>
           </Card>
         )}
@@ -146,7 +146,7 @@ export default function PaymentDetailPage() {
         {!isLoading && data?.payment && (
           <>
             <div className="mb-6">
-              <h1 className="text-2xl font-bold text-foreground">Detalle del pago</h1>
+              <h1 className="text-2xl font-bold text-foreground">Detalle del cobro</h1>
               <p className="text-sm text-muted-foreground mt-1 font-mono break-all">{data.payment.id}</p>
             </div>
 
@@ -212,14 +212,14 @@ export default function PaymentDetailPage() {
                             ) : (
                               <CheckCircle2 className="mr-2 h-4 w-4" />
                             )}
-                            Aprobar y liquidar pago
+                            Aprobar y liquidar cobro
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Confirmar aprobación</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Esta acción marca el pago como liquidado. Luego dejará de figurar como pendiente.
+                              Esta acción marca el cobro como liquidado. Luego dejará de figurar como pendiente.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -239,10 +239,10 @@ export default function PaymentDetailPage() {
                   {requiresImputation && (
                     <div className="space-y-2">
                       <p className="text-sm text-amber-800">
-                        Este pago aún no tiene factura imputada. Primero necesitás imputarlo para poder aprobarlo.
+                        Este cobro aún no tiene factura imputada. Primero necesitás imputarlo para poder aprobarlo.
                       </p>
                       <Link href="/payments/reconciliation">
-                        <Button variant="outline">Ir a Conciliación de Pagos</Button>
+                        <Button variant="outline">Ir a Conciliación de Cobros</Button>
                       </Link>
                     </div>
                   )}
@@ -250,7 +250,7 @@ export default function PaymentDetailPage() {
                   {reconcileMutation.isSuccess && (
                     <Alert>
                       <CheckCircle2 className="h-4 w-4" />
-                      <AlertDescription>Pago liquidado exitosamente.</AlertDescription>
+                      <AlertDescription>Cobro liquidado exitosamente.</AlertDescription>
                     </Alert>
                   )}
 
@@ -258,7 +258,7 @@ export default function PaymentDetailPage() {
                     <Alert variant="destructive">
                       <AlertDescription>
                         {(reconcileMutation.error as { response?: { data?: { error?: string } } })?.response?.data
-                          ?.error || 'No se pudo liquidar el pago.'}
+                          ?.error || 'No se pudo liquidar el cobro.'}
                       </AlertDescription>
                     </Alert>
                   )}

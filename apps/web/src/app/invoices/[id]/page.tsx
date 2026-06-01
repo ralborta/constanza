@@ -339,7 +339,7 @@ export default function InvoiceDetailPage() {
 
             {applications.length > 0 && (
               <div className="mt-5 pt-5 border-t border-border">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Aplicaciones de pago</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Cobros aplicados</p>
                 <div className="flex flex-wrap gap-2">
                   {applications.map((app) => (
                     <span
@@ -516,7 +516,7 @@ export default function InvoiceDetailPage() {
                               )}
                               {item.type === 'PAYMENT' && (
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="text-sm font-semibold text-foreground">Pago aplicado</p>
+                                  <p className="text-sm font-semibold text-foreground">Cobro aplicado</p>
                                   {item.isAuthoritative && (
                                     <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-700 border-emerald-200">
                                       {item.sourceSystem}
