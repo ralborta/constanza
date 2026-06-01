@@ -34,6 +34,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { asArray } from '@/lib/utils';
 
 interface Customer {
   id: string;
@@ -247,7 +248,9 @@ Gracias.`,
     });
   };
 
-  const filteredCustomers = customers?.customers.filter((customer) => {
+  const customerList = asArray<Customer>(customers?.customers);
+
+  const filteredCustomers = customerList.filter((customer) => {
     if (!customer.activo) return false;
     
     // Filtrar según canal
@@ -766,16 +769,18 @@ function CustomerInvoices({
     staleTime: 1000 * 60 * 5,
   });
 
+  const invoiceList = asArray<InvoiceSummary>(data?.invoices);
+
   useEffect(() => {
-    if (data?.invoices) {
+    if (invoiceList.length > 0) {
       onInvoicesLoaded(
         customerId,
-        data.invoices.filter((inv) => inv.estado !== 'SALDADA')
+        invoiceList.filter((inv) => inv.estado !== 'SALDADA')
       );
     }
-  }, [customerId, data, onInvoicesLoaded]);
+  }, [customerId, invoiceList, onInvoicesLoaded]);
 
-  const pendingInvoices = (data?.invoices || []).filter((inv) => inv.estado !== 'SALDADA');
+  const pendingInvoices = invoiceList.filter((inv) => inv.estado !== 'SALDADA');
 
   return (
     <div className="ml-6 border-l pl-4 pb-3">

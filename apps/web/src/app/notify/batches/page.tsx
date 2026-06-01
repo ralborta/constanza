@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { asArray } from '@/lib/utils';
 
 interface Batch {
   id: string;
@@ -64,6 +65,8 @@ function NotifyBatchesContent() {
     },
     refetchInterval: 5000, // Refrescar cada 5 segundos
   });
+
+  const batchList = asArray<Batch>(batchesData?.batches);
 
   const retryMutation = useMutation({
     mutationFn: async (batchId: string) => {
@@ -183,7 +186,7 @@ function NotifyBatchesContent() {
             <CardTitle className="text-xl">Progreso de Mensajes</CardTitle>
           </CardHeader>
           <CardContent>
-            {!batchesData || batchesData.batches.length === 0 ? (
+            {batchList.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">No hay batches de mensajes</p>
               </div>
@@ -204,7 +207,7 @@ function NotifyBatchesContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {batchesData.batches.map((batch) => (
+                  {batchList.map((batch) => (
                     <TableRow key={batch.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">

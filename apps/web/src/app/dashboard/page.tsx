@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
+import { asArray } from '@/lib/utils';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
@@ -151,6 +152,8 @@ export default function DashboardPage() {
       return response.data;
     },
   });
+
+  const invoiceList = asArray<Invoice>(invoices?.invoices);
 
   const { data: interactionMetrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['interaction-metrics'],
@@ -389,12 +392,12 @@ export default function DashboardPage() {
                         <TableRow>
                           <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">Cargando...</TableCell>
                         </TableRow>
-                      ) : invoices?.invoices.length === 0 ? (
+                      ) : invoiceList.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No hay facturas pendientes</TableCell>
                         </TableRow>
                       ) : (
-                        invoices?.invoices.map((invoice) => {
+                        invoiceList.map((invoice) => {
                           const daysSinceDue = getDaysSinceDue(invoice.fechaVto);
                           const displayEstado = resolveInvoiceEstadoForDisplay(
                             invoice.estado,

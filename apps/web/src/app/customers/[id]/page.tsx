@@ -20,6 +20,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import api from '@/lib/api';
+import { asArray } from '@/lib/utils';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -145,9 +146,13 @@ export default function CustomerClinicalHistoryPage() {
     enabled: !!customerId,
   });
 
+  const customerInvoices = asArray<CustomerHistoryResponse['invoices'][number]>(data?.invoices);
+  const customerTimeline = asArray<TimelineItem>(data?.timeline);
+  const customerCuits = asArray<CustomerHistoryResponse['customer']['cuits'][number]>(data?.customer?.cuits);
+
   const primaryCuit = useMemo(
-    () => data?.customer.cuits.find((cuit) => cuit.isPrimary)?.cuit || data?.customer.cuits[0]?.cuit || '-',
-    [data?.customer.cuits]
+    () => customerCuits.find((cuit) => cuit.isPrimary)?.cuit || customerCuits[0]?.cuit || '-',
+    [customerCuits]
   );
 
   return (
@@ -252,7 +257,7 @@ export default function CustomerClinicalHistoryPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.invoices.map((invoice) => (
+                    {customerInvoices.map((invoice) => (
                       <TableRow key={invoice.id}>
                         <TableCell>
                           <Link className="font-semibold text-blue-600 hover:underline" href={`/invoices/${invoice.id}`}>
@@ -266,7 +271,7 @@ export default function CustomerClinicalHistoryPage() {
                         <TableCell>{statusBadge(invoice.estado)}</TableCell>
                       </TableRow>
                     ))}
-                    {data.invoices.length === 0 && (
+                    {customerInvoices.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="py-8 text-center text-sm text-gray-500">Sin facturas cargadas.</TableCell>
                       </TableRow>
@@ -279,12 +284,12 @@ export default function CustomerClinicalHistoryPage() {
             <Card>
               <CardHeader className="border-b"><CardTitle className="text-base">Timeline clínico</CardTitle></CardHeader>
               <CardContent className="p-4">
-                {data.timeline.length === 0 ? (
+                {customerTimeline.length === 0 ? (
                   <p className="py-8 text-center text-sm text-gray-500">Sin eventos todavía.</p>
                 ) : (
                   <div className="relative space-y-4">
                     <div className="absolute bottom-0 left-4 top-0 w-px bg-gray-200" />
-                    {data.timeline.map((item) => (
+                    {customerTimeline.map((item) => (
                       <div key={`${item.type}-${item.id}-${item.ts}`} className="relative flex gap-4">
                         <div className="relative z-10">{timelineIcon(item)}</div>
                         <div className="min-w-0 flex-1 rounded-lg border bg-white p-3">

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { asArray } from '@/lib/utils';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -81,6 +82,8 @@ export default function CronogramaPage() {
     }
   };
 
+  const callbackList = asArray<ScheduledCallback>(data?.callbacks);
+
   const getTypeBadge = (type: string) => {
     if (type === 'FOLLOW_UP') {
       return (
@@ -123,7 +126,7 @@ export default function CronogramaPage() {
                 <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
                 <p className="mt-2 text-sm text-gray-500">Cargando cronograma...</p>
               </div>
-            ) : !data?.callbacks?.length ? (
+            ) : callbackList.length === 0 ? (
               <div className="text-center py-12">
                 <CalendarClock className="mx-auto h-12 w-12 text-gray-300" />
                 <p className="mt-3 text-gray-500">No hay callbacks programados</p>
@@ -145,7 +148,7 @@ export default function CronogramaPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.callbacks.map((cb) => (
+                  {callbackList.map((cb) => (
                     <TableRow key={cb.id}>
                       <TableCell className="font-medium whitespace-nowrap">
                         {format(new Date(cb.scheduledAt), "EEEE d MMM yyyy, HH:mm", { locale: es })}
@@ -188,7 +191,7 @@ export default function CronogramaPage() {
             )}
             {data && data.total > 0 && (
               <div className="mt-4 text-sm text-gray-500">
-                Mostrando {data.callbacks.length} de {data.total} callbacks
+                Mostrando {callbackList.length} de {data.total} callbacks
               </div>
             )}
           </CardContent>

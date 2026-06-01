@@ -37,6 +37,7 @@ import { CreateInvoiceManualButton } from '@/components/invoices/create-invoice-
 import { InvoiceHistorialDrawer } from '@/components/invoices/invoice-historial-drawer';
 import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { asArray } from '@/lib/utils';
 
 interface Invoice {
   id: string;
@@ -88,6 +89,8 @@ export default function InvoicesPage() {
       return response.data;
     },
   });
+
+  const invoiceList = asArray<Invoice>(data?.invoices);
 
   return (
     <MainLayout>
@@ -167,12 +170,12 @@ export default function InvoicesPage() {
                         Error al cargar facturas (ver mensaje arriba).
                       </TableCell>
                     </TableRow>
-                  ) : data?.invoices.length === 0 ? (
+                  ) : invoiceList.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No hay facturas</TableCell>
                     </TableRow>
                   ) : (
-                    data?.invoices.map((invoice) => (
+                    invoiceList.map((invoice) => (
                       <TableRow key={invoice.id} className="hover:bg-muted/30">
                         <TableCell>
                           <Link

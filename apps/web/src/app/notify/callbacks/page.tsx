@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChatCircleText, Clock, Envelope, FileText, PaperPlaneTilt, User } from '@phosphor-icons/react';
 import api from '@/lib/api';
+import { asArray } from '@/lib/utils';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -126,14 +127,15 @@ export default function MessageCallbacksPage() {
     },
   });
 
+  const callbackList = asArray<MessageCallback>(data?.callbacks);
+
   const totals = useMemo(() => {
-    const callbacks = data?.callbacks ?? [];
     return {
-      total: data?.total ?? 0,
-      whatsapp: callbacks.filter((callback) => callback.sourceContactEvent?.channel === 'WHATSAPP').length,
-      email: callbacks.filter((callback) => callback.sourceContactEvent?.channel === 'EMAIL').length,
+      total: data?.total ?? callbackList.length,
+      whatsapp: callbackList.filter((callback) => callback.sourceContactEvent?.channel === 'WHATSAPP').length,
+      email: callbackList.filter((callback) => callback.sourceContactEvent?.channel === 'EMAIL').length,
     };
-  }, [data]);
+  }, [data?.total, callbackList]);
 
   return (
     <MainLayout>
@@ -219,7 +221,7 @@ export default function MessageCallbacksPage() {
               <div className="py-12 text-center text-sm text-muted-foreground">Cargando callbacks...</div>
             ) : isError ? (
               <div className="py-12 text-center text-sm text-destructive">No se pudieron cargar los callbacks.</div>
-            ) : !data?.callbacks.length ? (
+            ) : callbackList.length === 0 ? (
               <div className="py-12 text-center">
                 <Clock size={40} weight="duotone" className="mx-auto text-muted-foreground/40" />
                 <p className="mt-3 text-sm font-medium text-muted-foreground">No hay callbacks de mensajes con este filtro</p>
@@ -242,7 +244,7 @@ export default function MessageCallbacksPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.callbacks.map((callback) => (
+                    {callbackList.map((callback) => (
                       <TableRow key={callback.id}>
                         <TableCell className="whitespace-nowrap font-medium">
                           {safeDate(callback.scheduledAt, "d MMM yyyy, HH:mm")}

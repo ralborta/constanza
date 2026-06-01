@@ -96,7 +96,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
       ]);
 
       return {
-        callbacks: callbacks.map((callback) => ({
+        callbacks: (callbacks ?? []).map((callback) => ({
           id: callback.id,
           customerId: callback.customerId,
           customer: callback.customer,
