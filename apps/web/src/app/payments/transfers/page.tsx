@@ -33,7 +33,7 @@ interface Transfer {
   createdAt: string;
   settledAt: string | null;
   totalAmount: number;
-  /** Nombre del ordenante si vino en el webhook Cresium */
+  /** Nombre del ordenante si vino en el webhook bancario */
   payerDisplayName?: string | null;
   /** CVU detectado en el payload (extractedCvuDigits / escaneo) */
   payerCvu?: string | null;
@@ -145,7 +145,7 @@ export default function TransfersPage() {
   const getSourceSystemBadge = (sourceSystem: string) => {
     switch (sourceSystem) {
       case 'CRESIUM':
-        return <Badge className="bg-cyan-100 text-cyan-800">Cresium</Badge>;
+        return <Badge className="bg-cyan-100 text-cyan-800">Banco</Badge>;
       case 'MANUAL':
         return <Badge className="bg-gray-100 text-gray-700">Manual</Badge>;
       default:
@@ -189,7 +189,7 @@ export default function TransfersPage() {
           <Card className="mb-6 border border-cyan-200 bg-gradient-to-br from-cyan-50 to-teal-50/80 shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-cyan-900">
-                Prueba Cresium — coincidencia de IDs
+                Diagnóstico — coincidencia de IDs
               </CardTitle>
               <p className="text-sm text-gray-700">
                 Tu usuario ({session.email ?? 'sesión'}) ve solo pagos del tenant del token. Los webhooks guardan con{' '}
@@ -336,7 +336,7 @@ export default function TransfersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los orígenes</SelectItem>
-                    <SelectItem value="CRESIUM">Cresium</SelectItem>
+                    <SelectItem value="CRESIUM">Banco</SelectItem>
                     <SelectItem value="MANUAL">Manual</SelectItem>
                   </SelectContent>
                 </Select>

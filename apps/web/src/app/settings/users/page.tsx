@@ -208,7 +208,7 @@ export default function SettingsUsersPage() {
             <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
             <p className="text-sm text-gray-600">
               Cada usuario pertenece a una <strong>empresa</strong> en el sistema: ahí verá facturas, clientes e
-              ingresos (Cresium). Podés asignar o cambiar la empresa abajo.
+              ingresos. Podés asignar o cambiar la empresa abajo.
             </p>
           </div>
           <Button onClick={() => setCreateOpen(true)} className="gap-2">
@@ -239,7 +239,6 @@ export default function SettingsUsersPage() {
                 ID empresa (tenant): {me.tenantId}
               </p>
               <p className="text-xs pt-1">
-                Los pagos Cresium deben guardarse con el mismo ID en Railway (<code className="rounded bg-muted px-1">CRESIUM_TENANT_ID</code>).
                 Si cambiás de empresa a un usuario, que cierre sesión y vuelva a entrar.
               </p>
             </AlertDescription>
@@ -453,8 +452,7 @@ export default function SettingsUsersPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Elegí la misma empresa donde están los pagos Cresium (ej. la que coincide con{' '}
-                  <code className="rounded bg-muted px-0.5">CRESIUM_TENANT_ID</code> en Railway).
+                  Asigná la empresa donde están las facturas y pagos del usuario.
                 </p>
               </div>
               <div className="grid gap-2">

@@ -37,9 +37,9 @@ interface EcheqRow {
   createdAt: string;
   settledAt: string | null;
   totalAmount: number;
-  /** ID en API Cresium v3 si el webhook lo incluyó (GET /v3/transaction/{id}). */
+  /** ID en la API del partner bancario si el webhook lo incluyó (GET /v3/transaction/{id}). */
   cresiumTransactionNumericId?: number | null;
-  /** Nombre del ordenante si vino en el webhook Cresium */
+  /** Nombre del ordenante si vino en el webhook bancario */
   payerDisplayName?: string | null;
   /** CVU detectado en el payload (extractedCvuDigits / escaneo) */
   payerCvu?: string | null;
@@ -93,7 +93,7 @@ export default function EcheqsPage() {
           ? data.message
           : typeof data?.error === 'string'
             ? data.error
-            : ax.message ?? 'Error al consultar Cresium';
+            : ax.message ?? 'Error al consultar la transacción bancaria';
       setCresiumError(msg);
     } finally {
       setCresiumLoading(false);
@@ -157,7 +157,7 @@ export default function EcheqsPage() {
   const getSourceSystemBadge = (sourceSystem: string) => {
     switch (sourceSystem) {
       case 'CRESIUM':
-        return <Badge className="bg-cyan-100 text-cyan-800">Cresium</Badge>;
+        return <Badge className="bg-cyan-100 text-cyan-800">Banco</Badge>;
       case 'MANUAL':
         return <Badge className="bg-gray-100 text-gray-700">Manual</Badge>;
       default:
@@ -194,7 +194,7 @@ export default function EcheqsPage() {
             E-cheques
           </h1>
           <p className="mt-1 text-sm text-gray-600">
-            Ingresos por e-cheque (Cresium). No incluye transferencias CVU: usá{' '}
+            Ingresos por e-cheque. No incluye transferencias CVU: usá{' '}
             <Link href="/payments/transfers" className="text-violet-700 underline-offset-2 hover:underline">
               Transferencias bancarias
             </Link>
@@ -278,7 +278,7 @@ export default function EcheqsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los orígenes</SelectItem>
-                    <SelectItem value="CRESIUM">Cresium</SelectItem>
+                    <SelectItem value="CRESIUM">Banco</SelectItem>
                     <SelectItem value="MANUAL">Manual</SelectItem>
                   </SelectContent>
                 </Select>
@@ -299,7 +299,7 @@ export default function EcheqsPage() {
                 )}
                 {data && data.total === 0 && !searchTerm && statusFilter === 'all' && sourceSystemFilter === 'all' && (
                   <p className="text-xs text-gray-500 max-w-md mx-auto">
-                    Los depósitos Cresium con tipo de transacción e-cheque se guardan con método{' '}
+                    Los depósitos bancarios con tipo de transacción e-cheque se guardan con método{' '}
                     <code className="rounded bg-white px-1 border">ECHEQ</code> y aparecen aquí.
                   </p>
                 )}
@@ -420,7 +420,7 @@ export default function EcheqsPage() {
                               className="gap-2"
                               onClick={() => openCresiumTransaction(echeq.cresiumTransactionNumericId!)}
                             >
-                              Transacción Cresium
+                              Ver transacción bancaria
                             </Button>
                           ) : null}
                           <Link href={`/payments/${echeq.id}`}>
@@ -450,7 +450,7 @@ export default function EcheqsPage() {
                         <TableHead className="font-semibold text-gray-800 whitespace-nowrap">Estado</TableHead>
                         <TableHead className="font-semibold text-gray-800 min-w-[180px]">Facturas</TableHead>
                         <TableHead className="font-semibold text-gray-800 whitespace-nowrap w-[120px]">
-                          Cresium
+                          Transacción
                         </TableHead>
                         <TableHead className="font-semibold text-gray-800 whitespace-nowrap w-[90px]">
                           Acciones
@@ -594,10 +594,10 @@ export default function EcheqsPage() {
         <Dialog open={cresiumDialogOpen} onOpenChange={setCresiumDialogOpen}>
           <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Transacción Cresium (API v3)</DialogTitle>
+              <DialogTitle>Detalle de transacción bancaria</DialogTitle>
               <DialogDescription>
                 {cresiumQueryId != null ? (
-                  <>ID {cresiumQueryId} — respuesta de la API Partner (proxy seguro desde el backend).</>
+                  <>ID {cresiumQueryId} — respuesta del partner bancario (proxy seguro desde el backend).</>
                 ) : null}
               </DialogDescription>
             </DialogHeader>

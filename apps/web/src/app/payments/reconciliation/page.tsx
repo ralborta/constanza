@@ -173,7 +173,7 @@ export default function ReconciliationPage() {
   const getSourceSystemBadge = (sourceSystem: string) => {
     switch (sourceSystem) {
       case 'CRESIUM':
-        return <Badge className="bg-cyan-100 text-cyan-800">Cresium</Badge>;
+        return <Badge className="bg-cyan-100 text-cyan-800">Banco</Badge>;
       case 'MANUAL':
         return <Badge className="bg-gray-100 text-gray-700">Manual</Badge>;
       default:
@@ -212,9 +212,9 @@ export default function ReconciliationPage() {
 
         <Card className="mb-6 border-amber-200 bg-amber-50/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-gray-800">CVU de cobro (Cresium)</CardTitle>
+            <CardTitle className="text-base text-gray-800">CVU de cobro</CardTitle>
             <p className="text-xs text-gray-600">
-              Debe coincidir con el CVU de la empresa en Cresium. Solo administradores pueden guardar.
+              Debe coincidir con el CVU de cobro de la empresa. Solo administradores pueden guardar.
             </p>
           </CardHeader>
           <CardContent className="flex flex-wrap items-end gap-3">
@@ -352,7 +352,7 @@ export default function ReconciliationPage() {
                     <TableHead className="font-semibold text-gray-800">Monto</TableHead>
                     <TableHead className="font-semibold text-gray-800">Estado</TableHead>
                     <TableHead className="font-semibold text-gray-800">Facturas</TableHead>
-                    <TableHead className="font-semibold text-gray-800 min-w-[240px]">Imputar (Cresium)</TableHead>
+                    <TableHead className="font-semibold text-gray-800 min-w-[240px]">Imputar</TableHead>
                     <TableHead className="font-semibold text-gray-800">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>

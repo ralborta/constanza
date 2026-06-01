@@ -40,7 +40,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: SquaresFour },
   { name: 'Facturas', href: '/invoices', icon: FileText },
   { name: 'Clientes', href: '/customers', icon: Users },
-  { name: 'Ingresos (Cresium)', href: '/payments/transfers', icon: Wallet },
+  { name: 'Ingresos', href: '/payments/transfers', icon: Wallet },
   { name: 'E-cheques', href: '/payments/echeqs', icon: Receipt },
   { name: 'Eventos', href: '#', icon: Bell },
   { name: 'Jobs', href: '/jobs', icon: ChartBar },

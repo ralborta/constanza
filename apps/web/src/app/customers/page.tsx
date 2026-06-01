@@ -211,14 +211,14 @@ export default function CustomersPage() {
                 <DialogHeader>
                   <DialogTitle>Alta manual de cliente</DialogTitle>
                   <DialogDescription>
-                    El <strong>CVU</strong> es la llave del cliente para conciliar transferencias Cresium (mismo valor que en
+                    El <strong>CVU</strong> es la llave del cliente para conciliar transferencias bancarias (mismo valor que en
                     el banco). Para un ERP podés usar &quot;ID en ERP&quot;. API:{' '}
                     <code className="text-xs bg-muted px-1 rounded">POST /v1/integrations/ingest</code>.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">CVU (clave cliente / Cresium) *</Label>
+                    <Label className="text-xs">CVU (clave del cliente) *</Label>
                     <Input
                       value={manualForm.codigoUnico}
                       onChange={(e) => setManualForm((f) => ({ ...f, codigoUnico: e.target.value }))}

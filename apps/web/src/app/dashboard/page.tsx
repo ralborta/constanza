@@ -205,7 +205,7 @@ export default function DashboardPage() {
             accentColor="bg-blue-100"
           />
           <KpiCard
-            title="Depósitos Cresium pendientes"
+            title="Depósitos pendientes"
             value={kpisLoading ? '—' : String(kpis?.cresiumPendingLiquidation ?? 0)}
             icon={<ArrowsLeftRight size={20} weight="duotone" className="text-amber-600" />}
             accentColor="bg-amber-100"
@@ -225,7 +225,7 @@ export default function DashboardPage() {
             />
           </Link>
           <p className="mt-2 text-xs text-muted-foreground px-1">
-            Vista dedicada a e-cheques (Cresium); no incluye transferencias CVU.
+            Vista dedicada a e-cheques; no incluye transferencias CVU.
           </p>
         </div>
 
@@ -465,14 +465,14 @@ export default function DashboardPage() {
 
           {/* Columna derecha */}
           <div className="space-y-6">
-            {/* Ingresos Cresium */}
+            {/* Ingresos bancarios */}
             <Card className="border border-border shadow-sm">
               <CardHeader className="border-b border-border pb-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-base font-semibold text-foreground">Pagos vía Cresium</CardTitle>
+                    <CardTitle className="text-base font-semibold text-foreground">Pagos bancarios</CardTitle>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Transferencias y conciliación (sin otros proveedores)
+                      Transferencias y conciliación
                     </p>
                   </div>
                   <Link
@@ -485,7 +485,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="p-6">
                 <p className="text-sm text-muted-foreground mb-4">
-                  Los depósitos informados por Cresium aparecen en{' '}
+                  Los depósitos bancarios aparecen en{' '}
                   <Link href="/payments/transfers" className="text-primary font-medium hover:underline">
                     Transferencias
                   </Link>
