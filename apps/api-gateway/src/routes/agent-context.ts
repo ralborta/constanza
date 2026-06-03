@@ -83,19 +83,21 @@ export async function agentContextRoutes(fastify: FastifyInstance) {
         take: scope === 'all' ? 200 : 100,
       });
 
-      const invoicesPayload = invoices.map((inv) => {
-        const montoAplicado = inv.paymentApplications.reduce((s, a) => s + a.amount, 0);
-        const saldo = inv.monto - montoAplicado;
-        return {
-          id: inv.id,
-          numero: inv.numero,
-          monto: inv.monto,
-          montoAplicado,
-          saldo,
-          fechaVto: inv.fechaVto,
-          estado: inv.estado,
-        };
-      });
+      const invoicesPayload = invoices
+        .map((inv) => {
+          const montoAplicado = inv.paymentApplications.reduce((s, a) => s + a.amount, 0);
+          const saldo = Math.max(inv.monto - montoAplicado, 0);
+          return {
+            id: inv.id,
+            numero: inv.numero,
+            monto: inv.monto,
+            montoAplicado,
+            saldo,
+            fechaVto: inv.fechaVto,
+            estado: inv.estado,
+          };
+        })
+        .filter((inv) => scope !== 'open' || inv.saldo > 0);
 
       const totalPendiente = invoicesPayload
         .filter((i) => OPEN_INVOICE_STATES.includes(i.estado as (typeof OPEN_INVOICE_STATES)[number]))
