@@ -37,7 +37,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
     async (request) => {
       const user = request.user!;
       const {
-        status = 'PENDING',
+        status = 'ALL',
         channel = 'WHATSAPP,EMAIL,VOICE',
         limit = '100',
         offset = '0',
@@ -52,15 +52,29 @@ export async function notifyRoutes(fastify: FastifyInstance) {
         .split(',')
         .map((item) => item.trim().toUpperCase())
         .filter(Boolean);
+      const effectiveChannels = channels.length > 0 ? channels : ['WHATSAPP', 'EMAIL', 'VOICE'];
+      const includesAllChannels = ['WHATSAPP', 'EMAIL', 'VOICE'].every((c) =>
+        effectiveChannels.includes(c)
+      );
 
       const where: any = {
         tenantId: user.tenant_id,
-        sourceContactEvent: {
-          is: {
-            channel: { in: channels.length > 0 ? channels : ['WHATSAPP', 'EMAIL', 'VOICE'] },
-          },
-        },
       };
+
+      if (!includesAllChannels) {
+        // Si el usuario filtra por canal específico, filtrar por canal del evento origen
+        // pero sin romper para callbacks antiguos que podrían no tener sourceContactEvent.
+        where.OR = [
+          {
+            sourceContactEvent: {
+              is: {
+                channel: { in: effectiveChannels },
+              },
+            },
+          },
+          { sourceContactEvent: { is: null } },
+        ];
+      }
 
       if (status && status !== 'ALL') {
         where.status = status;

@@ -53,6 +53,36 @@ interface Invoice {
   estado: string;
 }
 
+function normalizeInvoice(raw: any): Invoice | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = typeof raw.id === 'string' ? raw.id : '';
+  if (!id) return null;
+
+  const customerRaw = raw.customer;
+  const customer =
+    customerRaw && typeof customerRaw === 'object'
+      ? {
+          id: typeof customerRaw.id === 'string' ? customerRaw.id : '',
+          razonSocial:
+            typeof customerRaw.razonSocial === 'string' && customerRaw.razonSocial.trim().length > 0
+              ? customerRaw.razonSocial
+              : 'Cliente sin datos',
+          cuit: typeof customerRaw.cuit === 'string' ? customerRaw.cuit : undefined,
+        }
+      : null;
+
+  return {
+    id,
+    customer,
+    numero: typeof raw.numero === 'string' && raw.numero.trim().length > 0 ? raw.numero : 'SIN-NUMERO',
+    monto: typeof raw.monto === 'number' && Number.isFinite(raw.monto) ? raw.monto : 0,
+    montoAplicado:
+      typeof raw.montoAplicado === 'number' && Number.isFinite(raw.montoAplicado) ? raw.montoAplicado : 0,
+    fechaVto: typeof raw.fechaVto === 'string' ? raw.fechaVto : '',
+    estado: typeof raw.estado === 'string' && raw.estado.trim().length > 0 ? raw.estado : 'ABIERTA',
+  };
+}
+
 function safeMoney(cents: number | null | undefined): string {
   const value = typeof cents === 'number' && Number.isFinite(cents) ? cents : 0;
   return `$${(value / 100).toLocaleString('es-AR')}`;
@@ -90,7 +120,9 @@ export default function InvoicesPage() {
     },
   });
 
-  const invoiceList = asArray<Invoice>(data?.invoices);
+  const invoiceList = asArray<any>(data?.invoices)
+    .map((item) => normalizeInvoice(item))
+    .filter((item): item is Invoice => item !== null);
 
   return (
     <MainLayout>

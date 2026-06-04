@@ -119,7 +119,7 @@ function channelBadge(channel?: string | null) {
 }
 
 export default function MessageCallbacksPage() {
-  const [status, setStatus] = useState('PENDING');
+  const [status, setStatus] = useState('ALL');
   const [channel, setChannel] = useState('WHATSAPP,EMAIL,VOICE');
   const [refreshNonce, setRefreshNonce] = useState(0);
 
@@ -234,10 +234,10 @@ export default function MessageCallbacksPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="ALL">Todos</SelectItem>
                     <SelectItem value="PENDING">Pendientes</SelectItem>
                     <SelectItem value="DONE">Realizados</SelectItem>
                     <SelectItem value="CANCELLED">Cancelados</SelectItem>
-                    <SelectItem value="ALL">Todos</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
