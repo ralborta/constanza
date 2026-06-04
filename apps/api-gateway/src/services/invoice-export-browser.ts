@@ -146,9 +146,8 @@ function buildInvoiceHtml(payload: InvoiceExportPayload, templateDataUrl: string
         color: #2f3541;
         font-size: 18px;
         line-height: 1;
-        background: rgba(255,255,255,0.92);
-        padding: 1px 3px;
-        border-radius: 2px;
+        background: transparent;
+        padding: 0;
         white-space: nowrap;
       }
       .small { font-size: 14px; }
@@ -168,28 +167,29 @@ function buildInvoiceHtml(payload: InvoiceExportPayload, templateDataUrl: string
       <div class="sheet">
         <img class="bg" src="${templateDataUrl}" alt="Plantilla factura" />
 
-        <div class="v" style="left:170px; top:113px;">${tenantName}</div>
-        <div class="v small" style="left:507px; top:147px;">00003</div>
-        <div class="v small" style="left:507px; top:183px;">${invoiceNumber}</div>
-        <div class="v small" style="left:507px; top:219px;">${issuedAt}</div>
-        <div class="v small" style="left:507px; top:255px;">${dueDate}</div>
+        <div class="v small wrap" style="left:182px; top:165px; max-width:200px;">${tenantName}</div>
+        <div class="v small" style="left:504px; top:166px;">00003</div>
+        <div class="v small" style="left:504px; top:200px;">${invoiceNumber}</div>
+        <div class="v small" style="left:504px; top:234px;">${issuedAt}</div>
+        <div class="v small" style="left:504px; top:268px;">${dueDate}</div>
 
-        <div class="v small" style="left:74px; top:328px;">${customerName}</div>
-        <div class="v small" style="left:74px; top:364px;">${customerCuit}</div>
-        <div class="v small wrap" style="left:420px; top:364px; max-width:220px;">${customerCode}</div>
+        <div class="v small wrap" style="left:200px; top:336px; max-width:410px;">${customerName}</div>
+        <div class="v small" style="left:196px; top:370px;">${customerCuit}</div>
+        <div class="v small wrap" style="left:505px; top:370px; max-width:145px;">${customerCode}</div>
 
-        <div class="v small wrap" style="left:145px; top:488px; max-width:255px;">Servicios profesionales facturados</div>
-        <div class="v small" style="left:501px; top:488px;">1,00</div>
-        <div class="v small" style="left:584px; top:488px;">${total}</div>
+        <div class="v small wrap" style="left:144px; top:486px; max-width:260px;">Servicios profesionales facturados</div>
+        <div class="v small" style="left:432px; top:486px;">1,00</div>
+        <div class="v small" style="left:510px; top:486px;">${total}</div>
+        <div class="v small" style="left:593px; top:486px;">${total}</div>
 
-        <div class="v small" style="left:421px; top:817px;">${total}</div>
-        <div class="v small" style="left:421px; top:849px;">${mode === 'fiscal' ? '' : '0,00'}</div>
-        <div class="v small" style="left:421px; top:881px;">${mode === 'fiscal' ? '' : '0,00'}</div>
-        <div class="v money" style="left:416px; top:912px;">${total}</div>
+        <div class="v small" style="left:492px; top:817px;">${total}</div>
+        <div class="v small" style="left:492px; top:849px;">${mode === 'fiscal' ? '' : '0,00'}</div>
+        <div class="v small" style="left:492px; top:881px;">${mode === 'fiscal' ? '' : '0,00'}</div>
+        <div class="v money" style="left:492px; top:910px;">${total}</div>
 
-        ${showInternalRef ? `<div class="v small hide-fiscal" style="left:72px; top:958px;">Ref. interna: ${invoiceId}</div>` : ''}
-        <div class="v status" style="left:316px; top:958px;">Estado: ${status}</div>
-        <div class="v status hide-fiscal" style="left:542px; top:958px;">Vista previa</div>
+        ${showInternalRef ? `<div class="v small hide-fiscal" style="left:72px; top:959px;">${invoiceId}</div>` : ''}
+        <div class="v status" style="left:322px; top:959px;">${status}</div>
+        <div class="v status hide-fiscal" style="left:566px; top:959px;">Vista previa</div>
       </div>
     </div>
   </body>
