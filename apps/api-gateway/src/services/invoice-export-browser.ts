@@ -1,4 +1,6 @@
 import puppeteer from 'puppeteer-core';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 export type InvoiceExportFormat = 'pdf' | 'png' | 'jpg';
 export type InvoiceExportMode = 'preview' | 'fiscal';
@@ -25,8 +27,11 @@ type InvoiceExportResult = {
   templateSource: string;
 };
 
+const TEMPLATE_IMG_WIDTH = 724;
+const TEMPLATE_IMG_HEIGHT = 1024;
 const A4_WIDTH_PX = 794;
 const A4_HEIGHT_PX = 1123;
+const LOCAL_TEMPLATE_PATH = '/Users/ralborta/Constanza/apps/api-gateway/src/assets/factura-template.png';
 
 function safeDate(value: Date): string {
   if (Number.isNaN(value.getTime())) return '';
@@ -53,6 +58,32 @@ function escapeHtml(input: string): string {
     .replaceAll("'", '&#39;');
 }
 
+function templateCandidates(): string[] {
+  const cwd = process.cwd();
+  return [
+    process.env.INVOICE_TEMPLATE_IMAGE_PATH || '',
+    LOCAL_TEMPLATE_PATH,
+    join(cwd, 'apps/api-gateway/src/assets/factura-template.png'),
+    join(cwd, 'src/assets/factura-template.png'),
+  ].filter((p) => p.length > 0);
+}
+
+async function loadTemplateDataUrl(): Promise<{ dataUrl: string; source: string }> {
+  for (const candidate of templateCandidates()) {
+    try {
+      const raw = await readFile(candidate);
+      const b64 = raw.toString('base64');
+      return {
+        dataUrl: `data:image/png;base64,${b64}`,
+        source: candidate,
+      };
+    } catch {
+      // try next
+    }
+  }
+  throw new Error('No se encontro factura-template.png en rutas conocidas');
+}
+
 function browserExecutablePath(): string | undefined {
   return (
     process.env.PUPPETEER_EXECUTABLE_PATH ||
@@ -61,7 +92,7 @@ function browserExecutablePath(): string | undefined {
   );
 }
 
-function buildInvoiceHtml(payload: InvoiceExportPayload): string {
+function buildInvoiceHtml(payload: InvoiceExportPayload, templateDataUrl: string): string {
   const issuedAt = safeDate(payload.issuedAt);
   const dueDate = safeDate(payload.dueDate);
   const total = safeMoney(payload.amountCents);
@@ -90,99 +121,76 @@ function buildInvoiceHtml(payload: InvoiceExportPayload): string {
         background: #ffffff;
         font-family: Arial, sans-serif;
       }
-      .sheet {
-        box-sizing: border-box;
+      .page {
         width: ${A4_WIDTH_PX}px;
         height: ${A4_HEIGHT_PX}px;
-        padding: 24px;
-        border: 1px solid #d1d5db;
-      }
-      .title {
-        text-align: center;
-        font-size: 48px;
-        font-weight: 700;
-        margin: 0 0 16px;
-      }
-      .block {
-        border: 1px solid #d1d5db;
-        padding: 14px;
-        margin-bottom: 14px;
-      }
-      .label { color: #4b5563; font-size: 20px; margin: 0 0 6px; }
-      .value { color: #111827; font-size: 36px; margin: 0 0 10px; font-weight: 700; }
-      .line { color: #374151; font-size: 30px; margin: 6px 0; }
-      .grid {
-        display: grid;
-        grid-template-columns: 2.2fr 1fr;
-        border: 1px solid #d1d5db;
-      }
-      .cell { padding: 12px 16px; min-height: 150px; }
-      .cell + .cell { border-left: 1px solid #d1d5db; }
-      .head {
-        background: #f3f4f6;
-        border-bottom: 1px solid #d1d5db;
-        font-size: 28px;
-        font-weight: 700;
-      }
-      .big-total {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 18px 16px;
-        border: 1px solid #d1d5db;
-        margin-top: 16px;
+        justify-content: center;
+        align-items: flex-start;
+        padding-top: 12px;
+        box-sizing: border-box;
       }
-      .big-total .t { font-size: 40px; font-weight: 700; color: #111827; }
-      .big-total .v { font-size: 52px; font-weight: 700; color: #111827; }
-      .foot {
-        margin-top: 20px;
-        font-size: 20px;
-        color: #6b7280;
-        text-align: center;
+      .sheet {
+        width: ${TEMPLATE_IMG_WIDTH}px;
+        height: ${TEMPLATE_IMG_HEIGHT}px;
+        position: relative;
       }
-      .mode {
-        margin-top: 10px;
-        font-size: 20px;
-        color: #9ca3af;
-        text-align: center;
+      .bg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
       }
+      .v {
+        position: absolute;
+        color: #2f3541;
+        font-size: 18px;
+        line-height: 1;
+        background: rgba(255,255,255,0.92);
+        padding: 1px 3px;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+      .small { font-size: 14px; }
+      .money { font-size: 28px; font-weight: 700; letter-spacing: 0.3px; }
+      .status { font-size: 13px; color: #596273; }
+      .wrap {
+        max-width: 250px;
+        white-space: normal;
+        line-height: 1.15;
+      }
+      .hide-preview { display: ${mode === 'preview' ? 'none' : 'block'}; }
+      .hide-fiscal { display: ${mode === 'fiscal' ? 'none' : 'block'}; }
     </style>
   </head>
   <body>
-    <div class="sheet">
-      <h1 class="title">FACTURA</h1>
-      <div class="block">
-        <p class="label">Emisor</p>
-        <p class="value">${tenantName}</p>
-        <p class="line">Fecha emision: ${issuedAt}</p>
-        <p class="line">Factura Nro: ${invoiceNumber}</p>
-        ${showInternalRef ? `<p class="line">ID interno: ${invoiceId}</p>` : ''}
+    <div class="page">
+      <div class="sheet">
+        <img class="bg" src="${templateDataUrl}" alt="Plantilla factura" />
+
+        <div class="v" style="left:170px; top:113px;">${tenantName}</div>
+        <div class="v small" style="left:507px; top:147px;">00003</div>
+        <div class="v small" style="left:507px; top:183px;">${invoiceNumber}</div>
+        <div class="v small" style="left:507px; top:219px;">${issuedAt}</div>
+        <div class="v small" style="left:507px; top:255px;">${dueDate}</div>
+
+        <div class="v small" style="left:74px; top:328px;">${customerName}</div>
+        <div class="v small" style="left:74px; top:364px;">${customerCuit}</div>
+        <div class="v small wrap" style="left:420px; top:364px; max-width:220px;">${customerCode}</div>
+
+        <div class="v small wrap" style="left:145px; top:488px; max-width:255px;">Servicios profesionales facturados</div>
+        <div class="v small" style="left:501px; top:488px;">1,00</div>
+        <div class="v small" style="left:584px; top:488px;">${total}</div>
+
+        <div class="v small" style="left:421px; top:817px;">${total}</div>
+        <div class="v small" style="left:421px; top:849px;">${mode === 'fiscal' ? '' : '0,00'}</div>
+        <div class="v small" style="left:421px; top:881px;">${mode === 'fiscal' ? '' : '0,00'}</div>
+        <div class="v money" style="left:416px; top:912px;">${total}</div>
+
+        ${showInternalRef ? `<div class="v small hide-fiscal" style="left:72px; top:958px;">Ref. interna: ${invoiceId}</div>` : ''}
+        <div class="v status" style="left:316px; top:958px;">Estado: ${status}</div>
+        <div class="v status hide-fiscal" style="left:542px; top:958px;">Vista previa</div>
       </div>
-      <div class="block">
-        <p class="value" style="font-size: 42px; margin-bottom: 8px;">Cliente</p>
-        <p class="line">${customerName}</p>
-        <p class="line">CUIT: ${customerCuit}</p>
-        <p class="line">Codigo: ${customerCode}</p>
-      </div>
-      <div class="grid">
-        <div class="head cell">Descripcion</div>
-        <div class="head cell">Importe</div>
-        <div class="cell">
-          <p class="line">Servicios profesionales facturados</p>
-          <p class="line" style="margin-top: 36px;">Vencimiento: ${dueDate}</p>
-          <p class="line">Estado: ${status}</p>
-        </div>
-        <div class="cell"><p class="line">$ ${total}</p></div>
-      </div>
-      <div class="big-total">
-        <div>
-          <div class="t">Total</div>
-          <div class="label">Comprobante generado por Constanza</div>
-        </div>
-        <div class="v">$ ${total}</div>
-      </div>
-      <div class="mode">${mode === 'preview' ? 'Documento no fiscal - vista previa' : ''}</div>
-      <div class="foot">Este documento puede exportarse como PDF, PNG o JPG.</div>
     </div>
   </body>
 </html>`;
@@ -206,7 +214,8 @@ async function withPage<T>(fn: (page: import('puppeteer-core').Page) => Promise<
 }
 
 async function renderImage(payload: InvoiceExportPayload, format: 'png' | 'jpg'): Promise<Buffer> {
-  const html = buildInvoiceHtml(payload);
+  const template = await loadTemplateDataUrl();
+  const html = buildInvoiceHtml(payload, template.dataUrl);
   return withPage(async (page) => {
     await page.setContent(html, { waitUntil: 'load' });
     const image = await page.screenshot({
@@ -219,7 +228,8 @@ async function renderImage(payload: InvoiceExportPayload, format: 'png' | 'jpg')
 }
 
 async function renderPdf(payload: InvoiceExportPayload): Promise<Buffer> {
-  const html = buildInvoiceHtml(payload);
+  const template = await loadTemplateDataUrl();
+  const html = buildInvoiceHtml(payload, template.dataUrl);
   return withPage(async (page) => {
     await page.setContent(html, { waitUntil: 'load' });
     const pdf = await page.pdf({
@@ -235,7 +245,8 @@ export async function exportInvoiceFile(
   payload: InvoiceExportPayload,
   format: InvoiceExportFormat
 ): Promise<InvoiceExportResult> {
-  const templateSource = 'html-playwright';
+  const template = await loadTemplateDataUrl();
+  const templateSource = template.source;
   if (format === 'pdf') {
     const buffer = await renderPdf(payload);
     return { buffer, contentType: 'application/pdf', extension: 'pdf', templateSource };
