@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import sharp from 'sharp';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 
 export type InvoiceExportFormat = 'pdf' | 'png' | 'jpg';
 export type InvoiceExportMode = 'preview' | 'fiscal';
@@ -30,6 +31,7 @@ const TEMPLATE_WIDTH = 1240;
 const TEMPLATE_HEIGHT = 1754;
 
 const DEFAULT_TEMPLATE_PATH = new URL('../assets/factura-template.png', import.meta.url);
+const CURSOR_CHAT_ASSETS_PATH = '/Users/ralborta/.cursor/projects/Users-ralborta-Constanza/assets';
 
 function safeDate(value: Date): string {
   if (Number.isNaN(value.getTime())) return '';
@@ -289,7 +291,31 @@ async function loadTemplateImage(): Promise<Buffer | null> {
   try {
     return await readFile(DEFAULT_TEMPLATE_PATH);
   } catch {
-    return null;
+    // Fallback local: usar la ultima captura/plantilla enviada en el chat de Cursor.
+    try {
+      const files = await readdir(CURSOR_CHAT_ASSETS_PATH);
+      const candidates = files.filter((file) => /\.(png|jpg|jpeg|webp)$/i.test(file));
+      if (candidates.length === 0) return null;
+
+      const withStats = await Promise.all(
+        candidates.map(async (file) => {
+          const fullPath = join(CURSOR_CHAT_ASSETS_PATH, file);
+          const fileStat = await stat(fullPath);
+          return { file, fullPath, mtimeMs: fileStat.mtimeMs };
+        })
+      );
+
+      const ranked = withStats.sort((a, b) => {
+        const aTemplateScore = /template|captura|factura/i.test(a.file) ? 1 : 0;
+        const bTemplateScore = /template|captura|factura/i.test(b.file) ? 1 : 0;
+        if (aTemplateScore !== bTemplateScore) return bTemplateScore - aTemplateScore;
+        return b.mtimeMs - a.mtimeMs;
+      });
+
+      return await readFile(ranked[0].fullPath);
+    } catch {
+      return null;
+    }
   }
 }
 
