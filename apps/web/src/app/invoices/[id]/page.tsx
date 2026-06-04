@@ -9,7 +9,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, CheckCircle, Clock, XCircle, Envelope, ChatTeardrop, Phone, CurrencyDollar, Calendar, User, FileText, Sparkle, ArrowClockwise, TrendUp, ClockCounterClockwise, Robot } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InvoiceChat } from '@/components/invoices/invoice-chat';
 import { InvoiceHistorialDrawer } from '@/components/invoices/invoice-historial-drawer';
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 interface TimelineItem {
   type: 'CONTACT' | 'PROMISE' | 'PAYMENT';
@@ -187,6 +188,10 @@ export default function InvoiceDetailPage() {
   const [historialOpen, setHistorialOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'png' | 'jpg'>('pdf');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<InvoiceDetail>({
     queryKey: ['invoice', invoiceId],
@@ -255,6 +260,42 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const handlePreviewInvoiceImage = async () => {
+    if (!invoiceId) return;
+    setPreviewOpen(true);
+    setIsPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      // La vista previa siempre es imagen; si está en PDF, usamos PNG para preview.
+      const previewFormat: 'png' | 'jpg' = exportFormat === 'jpg' ? 'jpg' : 'png';
+      const response = await api.get(`/v1/invoices/${invoiceId}/export`, {
+        params: { format: previewFormat },
+        responseType: 'blob',
+      });
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      setPreviewUrl((prev) => {
+        if (prev) window.URL.revokeObjectURL(prev);
+        return blobUrl;
+      });
+    } catch (error: any) {
+      console.error('Error generando vista previa:', error);
+      setPreviewError(
+        error?.response?.data?.error || 'No se pudo generar la imagen de la factura.'
+      );
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        window.URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   if (isLoading) {
     return (
       <MainLayout>
@@ -318,6 +359,15 @@ export default function InvoiceDetailPage() {
                 className="gap-2 text-sm"
               >
                 {isDownloading ? 'Descargando...' : 'Descargar factura'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreviewInvoiceImage}
+                disabled={isPreviewLoading}
+                className="gap-2 text-sm"
+              >
+                {isPreviewLoading ? 'Generando imagen...' : 'Ver imagen'}
               </Button>
               <Button
                 variant="outline"
@@ -641,6 +691,34 @@ export default function InvoiceDetailPage() {
           open={historialOpen}
           onOpenChange={setHistorialOpen}
         />
+        <Dialog
+          open={previewOpen}
+          onOpenChange={(open) => {
+            setPreviewOpen(open);
+            if (!open) {
+              setPreviewError(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-5xl p-2">
+            <DialogTitle className="sr-only">Vista previa de factura</DialogTitle>
+            <div className="min-h-[220px] flex items-center justify-center bg-muted/30 rounded-md">
+              {isPreviewLoading ? (
+                <p className="text-sm text-muted-foreground">Generando imagen...</p>
+              ) : previewError ? (
+                <p className="text-sm text-destructive">{previewError}</p>
+              ) : previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt={`Vista previa factura ${invoice.numero ?? ''}`}
+                  className="w-full h-auto object-contain rounded-sm"
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin imagen disponible</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

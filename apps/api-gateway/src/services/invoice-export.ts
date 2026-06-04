@@ -23,6 +23,7 @@ type InvoiceExportResult = {
 };
 
 function safeDate(value: Date): string {
+  if (Number.isNaN(value.getTime())) return '';
   return new Intl.DateTimeFormat('es-AR', {
     day: '2-digit',
     month: '2-digit',
@@ -32,9 +33,8 @@ function safeDate(value: Date): string {
 
 function safeMoney(cents: number): string {
   return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(cents / 100);
 }
 
@@ -47,47 +47,169 @@ function escapeXml(input: string): string {
     .replaceAll("'", '&apos;');
 }
 
+function notEmpty(value?: string | null): string {
+  return value?.trim() ?? '';
+}
+
+function svgTextLines(lines: string[], startX: number, startY: number, fontSize: number, lineHeight = 1.2): string {
+  if (lines.length === 0) return '';
+  const tspans = lines
+    .map(
+      (line, idx) =>
+        `<tspan x="${startX}" dy="${idx === 0 ? 0 : Math.round(fontSize * lineHeight)}">${escapeXml(line)}</tspan>`
+    )
+    .join('');
+  return `<text x="${startX}" y="${startY}" font-size="${fontSize}" font-family="Arial" fill="#111111">${tspans}</text>`;
+}
+
+function breakLine(value: string, maxChars: number): string[] {
+  const text = value.trim();
+  if (!text) return [];
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 function buildInvoiceSvg(payload: InvoiceExportPayload): string {
-  const dueDate = safeDate(payload.dueDate);
   const issuedAt = safeDate(payload.issuedAt);
+  const dueDate = safeDate(payload.dueDate);
   const total = safeMoney(payload.amountCents);
-  const cuit = payload.customerCuit ?? 'Sin CUIT';
+  const customerName = notEmpty(payload.customerName);
+  const tenantName = notEmpty(payload.tenantName);
+  const customerCuit = notEmpty(payload.customerCuit);
+  const customerCode = notEmpty(payload.customerCode);
+  const invoiceNumber = notEmpty(payload.invoiceNumber);
+  const status = notEmpty(payload.status);
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1900" viewBox="0 0 1400 1900">
-  <rect width="1400" height="1900" fill="#ffffff"/>
-  <rect x="40" y="40" width="1320" height="1820" fill="none" stroke="#1f2937" stroke-width="2"/>
-  <text x="700" y="110" text-anchor="middle" font-size="48" font-family="Arial" font-weight="700" fill="#111827">FACTURA</text>
-  <text x="80" y="170" font-size="28" font-family="Arial" fill="#4b5563">Emisor</text>
-  <text x="80" y="220" font-size="36" font-family="Arial" font-weight="700" fill="#111827">${escapeXml(payload.tenantName)}</text>
-  <text x="80" y="275" font-size="26" font-family="Arial" fill="#374151">Fecha emision: ${escapeXml(issuedAt)}</text>
-  <text x="80" y="320" font-size="26" font-family="Arial" fill="#374151">Factura Nro: ${escapeXml(payload.invoiceNumber)}</text>
-  <text x="80" y="365" font-size="26" font-family="Arial" fill="#374151">ID interno: ${escapeXml(payload.invoiceId)}</text>
+  const productLines = breakLine('', 70);
+  const issuerLines = breakLine(tenantName, 34);
+  const customerLines = breakLine(customerName, 38);
 
-  <rect x="60" y="430" width="1280" height="260" fill="#f9fafb" stroke="#d1d5db" stroke-width="2"/>
-  <text x="80" y="490" font-size="30" font-family="Arial" font-weight="700" fill="#111827">Cliente</text>
-  <text x="80" y="540" font-size="30" font-family="Arial" fill="#111827">${escapeXml(payload.customerName)}</text>
-  <text x="80" y="585" font-size="24" font-family="Arial" fill="#374151">CUIT: ${escapeXml(cuit)}</text>
-  <text x="80" y="625" font-size="24" font-family="Arial" fill="#374151">Codigo: ${escapeXml(payload.customerCode)}</text>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1754" viewBox="0 0 1240 1754">
+  <rect width="1240" height="1754" fill="#ffffff"/>
+  <rect x="20" y="20" width="1200" height="1714" fill="none" stroke="#202020" stroke-width="1.5"/>
+  <rect x="20" y="20" width="1200" height="45" fill="#f0f0f0" stroke="#202020" stroke-width="1"/>
+  <text x="620" y="50" text-anchor="middle" font-size="33" font-family="Arial" font-weight="700">ORIGINAL</text>
 
-  <rect x="60" y="760" width="1280" height="420" fill="#ffffff" stroke="#d1d5db" stroke-width="2"/>
-  <rect x="60" y="760" width="1280" height="70" fill="#f3f4f6"/>
-  <text x="90" y="806" font-size="24" font-family="Arial" font-weight="700" fill="#111827">Descripcion</text>
-  <text x="980" y="806" font-size="24" font-family="Arial" font-weight="700" fill="#111827">Importe</text>
-  <line x1="940" y1="760" x2="940" y2="1180" stroke="#d1d5db" stroke-width="2"/>
-  <text x="90" y="900" font-size="28" font-family="Arial" fill="#111827">Servicios profesionales facturados</text>
-  <text x="980" y="900" font-size="28" font-family="Arial" fill="#111827">${escapeXml(total)}</text>
-  <line x1="60" y1="960" x2="1340" y2="960" stroke="#e5e7eb" stroke-width="2"/>
-  <text x="90" y="1030" font-size="24" font-family="Arial" fill="#374151">Vencimiento: ${escapeXml(dueDate)}</text>
-  <text x="90" y="1080" font-size="24" font-family="Arial" fill="#374151">Estado: ${escapeXml(payload.status)}</text>
+  <line x1="620" y1="65" x2="620" y2="305" stroke="#202020" stroke-width="1"/>
+  <line x1="544" y1="65" x2="544" y2="200" stroke="#202020" stroke-width="1"/>
+  <line x1="656" y1="65" x2="656" y2="200" stroke="#202020" stroke-width="1"/>
 
-  <rect x="60" y="1260" width="1280" height="220" fill="#f9fafb" stroke="#d1d5db" stroke-width="2"/>
-  <text x="90" y="1335" font-size="28" font-family="Arial" font-weight="700" fill="#111827">Total</text>
-  <text x="980" y="1335" font-size="40" font-family="Arial" font-weight="700" fill="#111827">${escapeXml(total)}</text>
-  <text x="90" y="1390" font-size="22" font-family="Arial" fill="#4b5563">Comprobante generado por Constanza</text>
+  ${svgTextLines(issuerLines.length > 0 ? issuerLines : [''], 52, 110, 34)}
+  <rect x="544" y="65" width="112" height="135" fill="#ffffff" stroke="#202020" stroke-width="1"/>
+  <text x="600" y="120" text-anchor="middle" font-size="58" font-family="Arial" font-weight="700">A</text>
+  <text x="600" y="162" text-anchor="middle" font-size="24" font-family="Arial" font-weight="700">COD. 01</text>
+  <text x="700" y="112" font-size="50" font-family="Arial" font-weight="700">FACTURA</text>
 
-  <text x="700" y="1810" text-anchor="middle" font-size="22" font-family="Arial" fill="#6b7280">
-    Este documento puede exportarse como PDF, PNG o JPG.
-  </text>
+  <text x="52" y="214" font-size="34" font-family="Arial" font-weight="700">Razon Social:</text>
+  <text x="200" y="214" font-size="34" font-family="Arial">${escapeXml(tenantName)}</text>
+  <text x="52" y="262" font-size="34" font-family="Arial" font-weight="700">Domicilio Comercial:</text>
+  <text x="290" y="262" font-size="34" font-family="Arial"></text>
+  <text x="52" y="295" font-size="34" font-family="Arial" font-weight="700">Condicion frente al IVA:</text>
+  <text x="360" y="295" font-size="34" font-family="Arial" font-weight="700"></text>
+
+  <text x="700" y="160" font-size="30" font-family="Arial" font-weight="700">Punto de Venta:</text>
+  <text x="930" y="160" font-size="30" font-family="Arial"></text>
+  <text x="1020" y="160" font-size="30" font-family="Arial" font-weight="700">Comp. Nro:</text>
+  <text x="1170" y="160" font-size="30" font-family="Arial">${escapeXml(invoiceNumber)}</text>
+  <text x="700" y="205" font-size="30" font-family="Arial" font-weight="700">Fecha de Emision:</text>
+  <text x="940" y="205" font-size="30" font-family="Arial">${escapeXml(issuedAt)}</text>
+  <text x="700" y="258" font-size="30" font-family="Arial" font-weight="700">CUIT:</text>
+  <text x="780" y="258" font-size="30" font-family="Arial"></text>
+  <text x="700" y="291" font-size="30" font-family="Arial" font-weight="700">Ingresos Brutos:</text>
+  <text x="920" y="291" font-size="30" font-family="Arial"></text>
+  <text x="700" y="324" font-size="30" font-family="Arial" font-weight="700">Fecha de Inicio de Actividades:</text>
+  <text x="1120" y="324" font-size="30" font-family="Arial"></text>
+
+  <line x1="20" y1="305" x2="1220" y2="305" stroke="#202020" stroke-width="1"/>
+  <rect x="20" y="305" width="1200" height="48" fill="#f0f0f0" stroke="#202020" stroke-width="1"/>
+  <text x="40" y="338" font-size="33" font-family="Arial" font-weight="700">Periodo Facturado Desde:</text>
+  <text x="330" y="338" font-size="33" font-family="Arial">${escapeXml(issuedAt)}</text>
+  <text x="480" y="338" font-size="33" font-family="Arial" font-weight="700">Hasta:</text>
+  <text x="585" y="338" font-size="33" font-family="Arial">${escapeXml(issuedAt)}</text>
+  <text x="760" y="338" font-size="33" font-family="Arial" font-weight="700">Fecha de Vto. para el pago:</text>
+  <text x="1088" y="338" font-size="33" font-family="Arial">${escapeXml(dueDate)}</text>
+
+  <rect x="20" y="353" width="1200" height="110" fill="#ffffff" stroke="#202020" stroke-width="1"/>
+  <text x="40" y="392" font-size="28" font-family="Arial">CUIT:</text>
+  <text x="105" y="392" font-size="28" font-family="Arial">${escapeXml(customerCuit)}</text>
+  <text x="450" y="392" font-size="28" font-family="Arial" font-weight="700">Apellido y Nombre / Razon Social:</text>
+  ${svgTextLines(customerLines.length > 0 ? customerLines : [''], 860, 392, 28, 1.05)}
+  <text x="40" y="432" font-size="28" font-family="Arial" font-weight="700">Condicion frente al IVA:</text>
+  <text x="270" y="432" font-size="28" font-family="Arial"></text>
+  <text x="555" y="432" font-size="28" font-family="Arial" font-weight="700">Domicilio Comercial:</text>
+  <text x="730" y="432" font-size="28" font-family="Arial"></text>
+
+  <rect x="20" y="518" width="1200" height="39" fill="#d9d9d9" stroke="#202020" stroke-width="1"/>
+  <rect x="20" y="557" width="1200" height="510" fill="#ffffff" stroke="#202020" stroke-width="1"/>
+  <line x1="104" y1="518" x2="104" y2="1067" stroke="#202020" stroke-width="1"/>
+  <line x1="420" y1="518" x2="420" y2="1067" stroke="#202020" stroke-width="1"/>
+  <line x1="530" y1="518" x2="530" y2="1067" stroke="#202020" stroke-width="1"/>
+  <line x1="610" y1="518" x2="610" y2="1067" stroke="#202020" stroke-width="1"/>
+  <line x1="740" y1="518" x2="740" y2="1067" stroke="#202020" stroke-width="1"/>
+  <line x1="810" y1="518" x2="810" y2="1067" stroke="#202020" stroke-width="1"/>
+  <line x1="950" y1="518" x2="950" y2="1067" stroke="#202020" stroke-width="1"/>
+  <line x1="1020" y1="518" x2="1020" y2="1067" stroke="#202020" stroke-width="1"/>
+  <line x1="1110" y1="518" x2="1110" y2="1067" stroke="#202020" stroke-width="1"/>
+
+  <text x="32" y="545" font-size="24" font-family="Arial" font-weight="700">Codigo</text>
+  <text x="115" y="545" font-size="24" font-family="Arial" font-weight="700">Producto / Servicio</text>
+  <text x="442" y="545" font-size="24" font-family="Arial" font-weight="700">Cantidad</text>
+  <text x="537" y="545" font-size="24" font-family="Arial" font-weight="700">U. medida</text>
+  <text x="632" y="545" font-size="24" font-family="Arial" font-weight="700">Precio Unit.</text>
+  <text x="751" y="545" font-size="24" font-family="Arial" font-weight="700">% Bonif</text>
+  <text x="846" y="545" font-size="24" font-family="Arial" font-weight="700">Subtotal</text>
+  <text x="970" y="545" font-size="24" font-family="Arial" font-weight="700">Alicuota</text>
+  <text x="1120" y="545" font-size="24" font-family="Arial" font-weight="700">Subtotal c/IVA</text>
+
+  ${svgTextLines(productLines.length > 0 ? productLines : [''], 112, 590, 29, 1.12)}
+  <text x="455" y="590" font-size="29" font-family="Arial"></text>
+  <text x="537" y="590" font-size="29" font-family="Arial"></text>
+  <text x="665" y="590" font-size="29" font-family="Arial"></text>
+  <text x="757" y="590" font-size="29" font-family="Arial"></text>
+  <text x="860" y="590" font-size="29" font-family="Arial">${escapeXml(total)}</text>
+  <text x="980" y="590" font-size="29" font-family="Arial"></text>
+  <text x="1125" y="590" font-size="29" font-family="Arial">${escapeXml(total)}</text>
+
+  <rect x="20" y="1067" width="1200" height="280" fill="#ffffff" stroke="#202020" stroke-width="1"/>
+  <text x="390" y="1128" font-size="31" font-family="Arial">Importe Otros Tributos: $</text>
+  <text x="690" y="1128" font-size="31" font-family="Arial"></text>
+  <text x="790" y="1128" font-size="32" font-family="Arial" font-weight="700">Importe Neto No Gravado: $</text>
+  <text x="1130" y="1128" font-size="32" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
+  <text x="815" y="1170" font-size="32" font-family="Arial" font-weight="700">Importe Neto Gravado: $</text>
+  <text x="1130" y="1170" font-size="32" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
+  <text x="943" y="1212" font-size="32" font-family="Arial" font-weight="700">IVA 21%: $</text>
+  <text x="1130" y="1212" font-size="32" font-family="Arial" font-weight="700"></text>
+  <text x="943" y="1254" font-size="40" font-family="Arial" font-weight="700">Importe Total: $</text>
+  <text x="1130" y="1254" font-size="40" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
+
+  <rect x="20" y="1347" width="1200" height="52" fill="#ffffff" stroke="#202020" stroke-width="1"/>
+  <text x="40" y="1382" font-size="31" font-family="Arial" font-style="italic">Documento no fiscal - vista previa</text>
+
+  <rect x="20" y="1399" width="1200" height="160" fill="#ffffff" stroke="#202020" stroke-width="1"/>
+  <rect x="40" y="1420" width="135" height="130" fill="#ffffff" stroke="#202020" stroke-width="1"/>
+  <text x="110" y="1490" text-anchor="middle" font-size="20" font-family="Arial">QR</text>
+  <text x="220" y="1462" font-size="28" font-family="Arial" font-weight="700">ARCA</text>
+  <text x="220" y="1510" font-size="30" font-family="Arial" font-style="italic" font-weight="700">Comprobante Autorizado</text>
+  <text x="560" y="1450" font-size="31" font-family="Arial" font-weight="700">Pag. 1/1</text>
+  <text x="775" y="1462" font-size="32" font-family="Arial" font-weight="700">CAE N°:</text>
+  <text x="930" y="1462" font-size="32" font-family="Arial"></text>
+  <text x="775" y="1510" font-size="32" font-family="Arial" font-weight="700">Fecha de Vto. de CAE:</text>
+  <text x="1068" y="1510" font-size="32" font-family="Arial"></text>
+  <text x="40" y="1605" font-size="22" font-family="Arial" fill="#444444">Ref. interna: ${escapeXml(payload.invoiceId)}</text>
+  <text x="40" y="1640" font-size="22" font-family="Arial" fill="#444444">Estado: ${escapeXml(status)}</text>
+  <text x="40" y="1675" font-size="22" font-family="Arial" fill="#444444">Codigo cliente: ${escapeXml(customerCode)}</text>
 </svg>`;
 }
 
@@ -102,8 +224,9 @@ async function renderImage(payload: InvoiceExportPayload, format: 'png' | 'jpg')
 
 async function renderPdf(payload: InvoiceExportPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    const imagePromise = renderImage(payload, 'png');
     const doc = new PDFDocument({
-      margin: 48,
+      margin: 18,
       size: 'A4',
       info: {
         Title: `Factura ${payload.invoiceNumber}`,
@@ -113,34 +236,18 @@ async function renderPdf(payload: InvoiceExportPayload): Promise<Buffer> {
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
-
-    doc.fontSize(24).text('FACTURA', { align: 'center' });
-    doc.moveDown(0.8);
-    doc.fontSize(11).fillColor('#4b5563').text(`Emisor: ${payload.tenantName}`);
-    doc.text(`Fecha emision: ${safeDate(payload.issuedAt)}`);
-    doc.text(`Numero: ${payload.invoiceNumber}`);
-    doc.text(`ID interno: ${payload.invoiceId}`);
-    doc.moveDown();
-
-    doc.fillColor('#111827').fontSize(14).text('Cliente');
-    doc.moveDown(0.3);
-    doc.fontSize(11).text(payload.customerName);
-    doc.text(`CUIT: ${payload.customerCuit ?? 'Sin CUIT'}`);
-    doc.text(`Codigo: ${payload.customerCode}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text('Detalle');
-    doc.moveDown(0.4);
-    doc.fontSize(11).text('Servicios profesionales facturados');
-    doc.moveDown(0.2);
-    doc.text(`Estado: ${payload.status}`);
-    doc.text(`Vencimiento: ${safeDate(payload.dueDate)}`);
-    doc.moveDown(1.2);
-
-    doc.fontSize(16).text(`Total: ${safeMoney(payload.amountCents)}`, { align: 'right' });
-    doc.moveDown(1.2);
-    doc.fontSize(9).fillColor('#6b7280').text('Documento generado por Constanza.');
-    doc.end();
+    imagePromise
+      .then((imageBuffer) =>
+        sharp(imageBuffer)
+          .resize({ width: 560 })
+          .png()
+          .toBuffer()
+      )
+      .then((pdfImage) => {
+        doc.image(pdfImage, 18, 18, { width: 560 });
+        doc.end();
+      })
+      .catch(reject);
   });
 }
 
