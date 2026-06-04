@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 export type InvoiceExportFormat = 'pdf' | 'png' | 'jpg';
 export type InvoiceExportMode = 'preview' | 'fiscal';
@@ -32,6 +33,18 @@ const TEMPLATE_HEIGHT = 1754;
 
 const DEFAULT_TEMPLATE_PATH = new URL('../assets/factura-template.png', import.meta.url);
 const PROJECT_TEMPLATE_PATH = '/Users/ralborta/Constanza/assets/factura-template.png';
+const REPO_TEMPLATE_PATH = '/Users/ralborta/Constanza/apps/api-gateway/src/assets/factura-template.png';
+
+function buildTemplateCandidates(): string[] {
+  const cwd = process.cwd();
+  return [
+    PROJECT_TEMPLATE_PATH,
+    REPO_TEMPLATE_PATH,
+    join(cwd, 'apps/api-gateway/src/assets/factura-template.png'),
+    join(cwd, 'src/assets/factura-template.png'),
+    join(cwd, 'assets/factura-template.png'),
+  ];
+}
 
 function safeDate(value: Date): string {
   if (Number.isNaN(value.getTime())) return '';
@@ -280,24 +293,25 @@ function buildTemplateOverlaySvg(payload: InvoiceExportPayload): string {
 }
 
 async function loadTemplateImage(): Promise<Buffer | null> {
-  // Prioridad 1: plantilla local fija del proyecto (evita usar rutas viejas en env).
-  try {
-    return await readFile(PROJECT_TEMPLATE_PATH);
-  } catch {
-    // continuar
-  }
-
-  // Prioridad 2: ruta explícita por variable de entorno.
   const customPath = process.env.INVOICE_TEMPLATE_IMAGE_PATH?.trim();
   if (customPath) {
     try {
       return await readFile(customPath);
     } catch {
-      return null;
+      // continuar con fallback de rutas conocidas
     }
   }
 
-  // Prioridad 3: fallback empaquetado dentro de src/assets.
+  // Rutas conocidas: local dev, monorepo y despliegue.
+  for (const candidate of buildTemplateCandidates()) {
+    try {
+      return await readFile(candidate);
+    } catch {
+      // probar siguiente
+    }
+  }
+
+  // Fallback URL relativa al archivo compilado (dist o src).
   try {
     return await readFile(DEFAULT_TEMPLATE_PATH);
   } catch {
@@ -360,7 +374,7 @@ export async function exportInvoiceFile(
   const customPath = process.env.INVOICE_TEMPLATE_IMAGE_PATH?.trim();
   const templateSource = customPath?.length
     ? customPath
-    : PROJECT_TEMPLATE_PATH;
+    : buildTemplateCandidates().join(' | ');
 
   if (format === 'pdf') {
     const buffer = await renderPdf(payload);
