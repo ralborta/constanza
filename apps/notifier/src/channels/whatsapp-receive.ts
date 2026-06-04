@@ -1,6 +1,7 @@
 import { telefonoDigits, telefonoLookupVariants } from '@constanza/phone-digits';
 import axios from 'axios';
 import { PrismaClient } from '@prisma/client';
+import { processMessageForCallbacks } from '../services/callbacks-from-message.js';
 
 const prisma = new PrismaClient();
 const BUILDERBOT_API_URL = process.env.BUILDERBOT_API_URL || 'https://api.builderbot.cloud';
@@ -131,6 +132,26 @@ export async function processIncomingMessage(message: BuilderbotMessage) {
       ts: new Date(message.timestamp || Date.now()),
     },
   });
+
+  // Si el ingreso viene por polling (sin webhook), igual debemos extraer callbacks/promesas
+  // para que frases tipo "contactame mañana/lunes" creen scheduled_callbacks.
+  if (messageText && messageText.trim().length >= 10) {
+    try {
+      await processMessageForCallbacks(
+        messageText,
+        {
+          tenantId: customer.tenantId,
+          customerId: customer.id,
+          invoiceId: null,
+          sourceContactEventId: contactEvent.id,
+        },
+        'WHATSAPP'
+      );
+    } catch (error: any) {
+      console.warn(`Error extracting callbacks/promises for message ${message.id}: ${error?.message || error}`);
+      // no bloquea el ingreso del mensaje
+    }
+  }
 
   return contactEvent;
 }
