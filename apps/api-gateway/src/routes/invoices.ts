@@ -516,27 +516,36 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Factura no encontrada' });
       }
 
-      const exported = await exportInvoiceFile(
-        {
-          tenantName: invoice.tenant.name,
-          invoiceNumber: invoice.numero,
-          invoiceId: invoice.id,
-          customerName: invoice.customer.razonSocial,
-          customerCuit: invoice.customer.customerCuits[0]?.cuit ?? null,
-          customerCode: invoice.customer.codigoUnico,
-          amountCents: invoice.monto,
-          dueDate: invoice.fechaVto,
-          issuedAt: invoice.createdAt,
-          status: invoice.estado,
-          mode,
-          showInternalRef: mode !== 'fiscal',
-        },
-        format
-      );
+      let exported;
+      try {
+        exported = await exportInvoiceFile(
+          {
+            tenantName: invoice.tenant.name,
+            invoiceNumber: invoice.numero,
+            invoiceId: invoice.id,
+            customerName: invoice.customer.razonSocial,
+            customerCuit: invoice.customer.customerCuits[0]?.cuit ?? null,
+            customerCode: invoice.customer.codigoUnico,
+            amountCents: invoice.monto,
+            dueDate: invoice.fechaVto,
+            issuedAt: invoice.createdAt,
+            status: invoice.estado,
+            mode,
+            showInternalRef: mode !== 'fiscal',
+          },
+          format
+        );
+      } catch (error: any) {
+        return reply.status(500).send({
+          error: 'No se pudo generar la factura con plantilla',
+          detail: error?.message ?? 'Plantilla no encontrada',
+        });
+      }
 
       const safeNumber = invoice.numero.replace(/[^\w.-]/g, '_');
       reply
         .header('Content-Type', exported.contentType)
+        .header('X-Invoice-Template-Source', exported.templateSource)
         .header('Content-Disposition', `attachment; filename="factura-${safeNumber}.${exported.extension}"`)
         .send(exported.buffer);
     }

@@ -24,6 +24,7 @@ type InvoiceExportResult = {
   buffer: Buffer;
   contentType: string;
   extension: InvoiceExportFormat;
+  templateSource: string;
 };
 
 const TEMPLATE_WIDTH = 1240;
@@ -306,14 +307,16 @@ async function loadTemplateImage(): Promise<Buffer | null> {
 
 async function renderImage(payload: InvoiceExportPayload, format: 'png' | 'jpg'): Promise<Buffer> {
   const templateBuffer = await loadTemplateImage();
-  const overlaySvg = templateBuffer ? buildTemplateOverlaySvg(payload) : buildFallbackInvoiceSvg(payload);
-
-  const pipeline = templateBuffer
-    ? sharp(templateBuffer)
-        .resize(TEMPLATE_WIDTH, TEMPLATE_HEIGHT, { fit: 'fill' })
-        .composite([{ input: Buffer.from(overlaySvg, 'utf-8'), top: 0, left: 0 }])
-        .flatten({ background: '#ffffff' })
-    : sharp(Buffer.from(overlaySvg, 'utf-8')).flatten({ background: '#ffffff' });
+  if (!templateBuffer) {
+    throw new Error(
+      'No se encontro la plantilla de factura. Defini INVOICE_TEMPLATE_IMAGE_PATH o coloca factura-template.png en /Users/ralborta/Constanza/assets.'
+    );
+  }
+  const overlaySvg = buildTemplateOverlaySvg(payload);
+  const pipeline = sharp(templateBuffer)
+    .resize(TEMPLATE_WIDTH, TEMPLATE_HEIGHT, { fit: 'fill' })
+    .composite([{ input: Buffer.from(overlaySvg, 'utf-8'), top: 0, left: 0 }])
+    .flatten({ background: '#ffffff' });
 
   if (format === 'jpg') {
     return pipeline.jpeg({ quality: 92 }).toBuffer();
@@ -354,14 +357,19 @@ export async function exportInvoiceFile(
   payload: InvoiceExportPayload,
   format: InvoiceExportFormat
 ): Promise<InvoiceExportResult> {
+  const customPath = process.env.INVOICE_TEMPLATE_IMAGE_PATH?.trim();
+  const templateSource = customPath?.length
+    ? customPath
+    : PROJECT_TEMPLATE_PATH;
+
   if (format === 'pdf') {
     const buffer = await renderPdf(payload);
-    return { buffer, contentType: 'application/pdf', extension: 'pdf' };
+    return { buffer, contentType: 'application/pdf', extension: 'pdf', templateSource };
   }
   if (format === 'jpg') {
     const buffer = await renderImage(payload, 'jpg');
-    return { buffer, contentType: 'image/jpeg', extension: 'jpg' };
+    return { buffer, contentType: 'image/jpeg', extension: 'jpg', templateSource };
   }
   const buffer = await renderImage(payload, 'png');
-  return { buffer, contentType: 'image/png', extension: 'png' };
+  return { buffer, contentType: 'image/png', extension: 'png', templateSource };
 }
