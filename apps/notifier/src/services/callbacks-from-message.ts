@@ -111,6 +111,19 @@ function extractByRules(messageText: string): MessageExtraction {
   return { promises, callbacks };
 }
 
+function buildFollowUpsFromPromises(promises: ExtractedPromise[]): ExtractedCallback[] {
+  return promises
+    .filter((p) => p?.dueDate)
+    .map((p) => {
+      const scheduledAt = `${p.dueDate}T10:00:00.000Z`;
+      return {
+        scheduledAt,
+        reason: p.reason || 'Seguimiento de promesa de pago',
+        type: 'FOLLOW_UP' as const,
+      };
+    });
+}
+
 /**
  * Extrae del texto de un mensaje (WhatsApp/Email) del cliente:
  * - Promesas de pago (fecha, monto) → core.promises
@@ -120,7 +133,7 @@ export async function extractCallbacksAndPromisesFromMessage(
   messageText: string,
   channel: 'WHATSAPP' | 'EMAIL'
 ): Promise<MessageExtraction> {
-  if (!OPENAI_API_KEY || !messageText || messageText.length < 10) {
+  if (!OPENAI_API_KEY || !messageText || messageText.trim().length < 3) {
     return extractByRules(messageText || '');
   }
 
@@ -139,6 +152,11 @@ Reglas:
    - scheduledAt: fecha en formato YYYY-MM-DD o ISO. Para "en X días" suma X a hoy. Para "la próxima semana" usa el lunes siguiente.
    - reason: motivo breve
    - type: "CALLBACK" si pide que lo llamen, "FOLLOW_UP" si es seguimiento de pago/promesa
+
+3. INTENCIÓN IMPLÍCITA (muy importante):
+   - No dependas de palabras exactas. Si por contexto el cliente quiere postergar la conversación o recontacto, crea callback.
+   - Si promete pagar en una fecha, crea además FOLLOW_UP para verificar cumplimiento, aunque no lo pida explícitamente.
+   - Si no hay fecha/hora exacta para recontacto, usa por defecto el próximo día hábil a las 10:00.
 
 Responde ÚNICAMENTE con un JSON válido (sin markdown):
 {"promises":[{"dueDate":"YYYY-MM-DD","amount":null,"reason":""}],"callbacks":[{"scheduledAt":"YYYY-MM-DD","reason":"","type":"CALLBACK"}]}
@@ -192,7 +210,11 @@ Devuelve el JSON con promesas y callbacks extraídos.`;
     if (promises.length === 0 && callbacks.length === 0) {
       return extractByRules(messageText);
     }
-    return { promises, callbacks };
+
+    // Si hay promesas pero el modelo no devolvió callbacks, generamos follow-up automático.
+    const autoFollowUps =
+      callbacks.length === 0 && promises.length > 0 ? buildFollowUpsFromPromises(promises) : [];
+    return { promises, callbacks: [...callbacks, ...autoFollowUps] };
   } catch (err: any) {
     console.error('[callbacks-from-message] OpenAI extraction error:', err?.response?.data || err.message);
     return extractByRules(messageText);
@@ -279,7 +301,8 @@ export async function processMessageForCallbacks(
 ): Promise<{ promisesCreated: number; callbacksCreated: number }> {
   const skipPatterns = ['[Imagen]', '[Documento]', '[Mensaje de voz]', '[Voice note]'];
   const trimmed = messageText?.trim() || '';
-  if (trimmed.length < 10 || skipPatterns.some((p) => trimmed === p)) {
+  // Aceptar mensajes cortos tipo "mañana", "lunes", etc.
+  if (trimmed.length < 3 || skipPatterns.some((p) => trimmed === p)) {
     return { promisesCreated: 0, callbacksCreated: 0 };
   }
 

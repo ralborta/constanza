@@ -496,7 +496,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
 
       // Extraer promesas y callbacks desde mensajes inbound unificados (WhatsApp/Email).
       // VOICE se procesa por resumen de llamada en /calls webhook.
-      if (data.messageText && data.messageText.length >= 10 && (data.channel === 'WHATSAPP' || data.channel === 'EMAIL')) {
+      if (data.messageText && data.messageText.trim().length >= 3 && (data.channel === 'WHATSAPP' || data.channel === 'EMAIL')) {
         try {
           const result = await processMessageForCallbacks(
             data.messageText,
@@ -620,7 +620,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
       );
 
       // Extraer promesas y callbacks del mensaje (IA) y crear en BD
-      if (messageText && messageText.length >= 10) {
+      if (messageText && messageText.trim().length >= 3) {
         try {
           const result = await processMessageForCallbacks(
             messageText,
@@ -836,7 +836,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
 
       // Extraer promesas y callbacks del mensaje (IA) y crear en BD
       const emailBody = data.messageText || (data.summary as string) || '';
-      if (emailBody && emailBody.length >= 10) {
+      if (emailBody && emailBody.trim().length >= 3) {
         try {
           const result = await processMessageForCallbacks(
             emailBody,

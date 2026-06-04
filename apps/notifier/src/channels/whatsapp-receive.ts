@@ -135,7 +135,7 @@ export async function processIncomingMessage(message: BuilderbotMessage) {
 
   // Si el ingreso viene por polling (sin webhook), igual debemos extraer callbacks/promesas
   // para que frases tipo "contactame mañana/lunes" creen scheduled_callbacks.
-  if (messageText && messageText.trim().length >= 10) {
+  if (messageText && messageText.trim().length >= 3) {
     try {
       await processMessageForCallbacks(
         messageText,
