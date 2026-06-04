@@ -187,6 +187,7 @@ export default function InvoiceDetailPage() {
   const [isUpdatingSummary, setIsUpdatingSummary] = useState(false);
   const [historialOpen, setHistorialOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'png' | 'jpg'>('pdf');
+  const [exportMode, setExportMode] = useState<'preview' | 'fiscal'>('preview');
   const [isDownloading, setIsDownloading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -233,7 +234,7 @@ export default function InvoiceDetailPage() {
     setIsDownloading(true);
     try {
       const response = await api.get(`/v1/invoices/${invoiceId}/export`, {
-        params: { format: exportFormat },
+        params: { format: exportFormat, mode: exportMode },
         responseType: 'blob',
       });
 
@@ -269,7 +270,7 @@ export default function InvoiceDetailPage() {
       // La vista previa siempre es imagen; si está en PDF, usamos PNG para preview.
       const previewFormat: 'png' | 'jpg' = exportFormat === 'jpg' ? 'jpg' : 'png';
       const response = await api.get(`/v1/invoices/${invoiceId}/export`, {
-        params: { format: previewFormat },
+        params: { format: previewFormat, mode: exportMode },
         responseType: 'blob',
       });
 
@@ -349,6 +350,15 @@ export default function InvoiceDetailPage() {
                   <SelectItem value="pdf">PDF</SelectItem>
                   <SelectItem value="png">PNG</SelectItem>
                   <SelectItem value="jpg">JPG</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={exportMode} onValueChange={(value: 'preview' | 'fiscal') => setExportMode(value)}>
+                <SelectTrigger className="w-[150px] h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="preview">Vista previa</SelectItem>
+                  <SelectItem value="fiscal">Fiscal</SelectItem>
                 </SelectContent>
               </Select>
               <Button

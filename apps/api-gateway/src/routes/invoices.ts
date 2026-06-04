@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { withTenantRls } from '../lib/tenant-rls.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 import * as XLSX from 'xlsx';
-import { exportInvoiceFile, InvoiceExportFormat } from '../services/invoice-export.js';
+import { exportInvoiceFile, InvoiceExportFormat, InvoiceExportMode } from '../services/invoice-export.js';
 
 const querySchema = z.object({
   state: z.enum(['ABIERTA', 'PARCIAL', 'SALDADA']).optional(),
@@ -15,6 +15,7 @@ const querySchema = z.object({
 
 const exportInvoiceQuerySchema = z.object({
   format: z.enum(['pdf', 'png', 'jpg']).optional().default('pdf'),
+  mode: z.enum(['preview', 'fiscal']).optional().default('preview'),
 });
 
 // Función para normalizar nombres de columnas de facturas
@@ -484,6 +485,7 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const query = exportInvoiceQuerySchema.parse(request.query);
       const format = query.format as InvoiceExportFormat;
+      const mode = query.mode as InvoiceExportMode;
 
       const invoice = await prisma.invoice.findFirst({
         where: {
@@ -526,6 +528,8 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
           dueDate: invoice.fechaVto,
           issuedAt: invoice.createdAt,
           status: invoice.estado,
+          mode,
+          showInternalRef: mode !== 'fiscal',
         },
         format
       );

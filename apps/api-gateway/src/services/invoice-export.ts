@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
 
 export type InvoiceExportFormat = 'pdf' | 'png' | 'jpg';
+export type InvoiceExportMode = 'preview' | 'fiscal';
 
 type InvoiceExportPayload = {
   tenantName: string;
@@ -15,6 +16,8 @@ type InvoiceExportPayload = {
   dueDate: Date;
   issuedAt: Date;
   status: string;
+  mode?: InvoiceExportMode;
+  showInternalRef?: boolean;
 };
 
 type InvoiceExportResult = {
@@ -97,6 +100,8 @@ function buildFallbackInvoiceSvg(payload: InvoiceExportPayload): string {
   const customerCode = notEmpty(payload.customerCode);
   const invoiceNumber = notEmpty(payload.invoiceNumber);
   const status = notEmpty(payload.status);
+  const mode = payload.mode ?? 'preview';
+  const showInternalRef = payload.showInternalRef ?? mode === 'preview';
 
   const productLines = breakLine('', 70);
   const issuerLines = breakLine(tenantName, 34);
@@ -201,7 +206,7 @@ function buildFallbackInvoiceSvg(payload: InvoiceExportPayload): string {
   <text x="1130" y="1254" font-size="40" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
 
   <rect x="20" y="1347" width="1200" height="52" fill="#ffffff" stroke="#202020" stroke-width="1"/>
-  <text x="40" y="1382" font-size="31" font-family="Arial" font-style="italic">Documento no fiscal - vista previa</text>
+  <text x="40" y="1382" font-size="31" font-family="Arial" font-style="italic">${mode === 'preview' ? 'Documento no fiscal - vista previa' : ''}</text>
 
   <rect x="20" y="1399" width="1200" height="160" fill="#ffffff" stroke="#202020" stroke-width="1"/>
   <rect x="40" y="1420" width="135" height="130" fill="#ffffff" stroke="#202020" stroke-width="1"/>
@@ -213,7 +218,7 @@ function buildFallbackInvoiceSvg(payload: InvoiceExportPayload): string {
   <text x="930" y="1462" font-size="32" font-family="Arial"></text>
   <text x="775" y="1510" font-size="32" font-family="Arial" font-weight="700">Fecha de Vto. de CAE:</text>
   <text x="1068" y="1510" font-size="32" font-family="Arial"></text>
-  <text x="40" y="1605" font-size="22" font-family="Arial" fill="#444444">Ref. interna: ${escapeXml(payload.invoiceId)}</text>
+  <text x="40" y="1605" font-size="22" font-family="Arial" fill="#444444">${showInternalRef ? `Ref. interna: ${escapeXml(payload.invoiceId)}` : ''}</text>
   <text x="40" y="1640" font-size="22" font-family="Arial" fill="#444444">Estado: ${escapeXml(status)}</text>
   <text x="40" y="1675" font-size="22" font-family="Arial" fill="#444444">Codigo cliente: ${escapeXml(customerCode)}</text>
 </svg>`;
@@ -229,6 +234,8 @@ function buildTemplateOverlaySvg(payload: InvoiceExportPayload): string {
   const customerCuit = notEmpty(payload.customerCuit);
   const invoiceNumber = notEmpty(payload.invoiceNumber);
   const status = notEmpty(payload.status);
+  const mode = payload.mode ?? 'preview';
+  const showInternalRef = payload.showInternalRef ?? mode === 'preview';
 
   const productLines = breakLine('', 72);
 
@@ -266,7 +273,7 @@ function buildTemplateOverlaySvg(payload: InvoiceExportPayload): string {
     <text x="1102" y="1172" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
     <text x="1102" y="1256" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
 
-    <text x="42" y="1630" font-size="12" font-family="Arial" fill="#444444">Ref: ${escapeXml(payload.invoiceId)} - ${escapeXml(status)}</text>
+    <text x="42" y="1630" font-size="12" font-family="Arial" fill="#444444">${showInternalRef ? `Ref: ${escapeXml(payload.invoiceId)} - ${escapeXml(status)}` : `Estado: ${escapeXml(status)}`}</text>
   </svg>`;
 }
 
