@@ -38,7 +38,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
       const user = request.user!;
       const {
         status = 'PENDING',
-        channel = 'WHATSAPP,EMAIL',
+        channel = 'WHATSAPP,EMAIL,VOICE',
         limit = '100',
         offset = '0',
       } = request.query as {

@@ -102,6 +102,14 @@ function channelBadge(channel?: string | null) {
       </Badge>
     );
   }
+  if (channel === 'VOICE') {
+    return (
+      <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200">
+        <ChatCircleText size={13} weight="duotone" className="mr-1" />
+        Llamada
+      </Badge>
+    );
+  }
   return (
     <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
       <ChatCircleText size={13} weight="duotone" className="mr-1" />
@@ -112,7 +120,7 @@ function channelBadge(channel?: string | null) {
 
 export default function MessageCallbacksPage() {
   const [status, setStatus] = useState('PENDING');
-  const [channel, setChannel] = useState('WHATSAPP,EMAIL');
+  const [channel, setChannel] = useState('WHATSAPP,EMAIL,VOICE');
 
   const { data, isLoading, isError, refetch } = useQuery<{
     callbacks: MessageCallback[];
@@ -134,6 +142,7 @@ export default function MessageCallbacksPage() {
       total: data?.total ?? callbackList.length,
       whatsapp: callbackList.filter((callback) => callback.sourceContactEvent?.channel === 'WHATSAPP').length,
       email: callbackList.filter((callback) => callback.sourceContactEvent?.channel === 'EMAIL').length,
+      voice: callbackList.filter((callback) => callback.sourceContactEvent?.channel === 'VOICE').length,
     };
   }, [data?.total, callbackList]);
 
@@ -154,7 +163,7 @@ export default function MessageCallbacksPage() {
           </Button>
         </div>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
+        <div className="mb-6 grid gap-4 md:grid-cols-4">
           <Card>
             <CardContent className="flex items-center gap-3 p-5">
               <Clock size={24} weight="duotone" className="text-amber-600" />
@@ -182,6 +191,15 @@ export default function MessageCallbacksPage() {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="flex items-center gap-3 p-5">
+              <ChatCircleText size={24} weight="duotone" className="text-violet-600" />
+              <div>
+                <p className="text-xs uppercase text-muted-foreground">Llamadas</p>
+                <p className="text-2xl font-semibold">{totals.voice}</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Card className="border shadow-sm">
@@ -197,9 +215,10 @@ export default function MessageCallbacksPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="WHATSAPP,EMAIL">Todos</SelectItem>
+                    <SelectItem value="WHATSAPP,EMAIL,VOICE">Todos</SelectItem>
                     <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
                     <SelectItem value="EMAIL">Email</SelectItem>
+                    <SelectItem value="VOICE">Llamadas</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={status} onValueChange={setStatus}>

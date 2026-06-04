@@ -494,6 +494,34 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         'Inbound message registered via unified endpoint'
       );
 
+      // Extraer promesas y callbacks desde mensajes inbound unificados (WhatsApp/Email).
+      // VOICE se procesa por resumen de llamada en /calls webhook.
+      if (data.messageText && data.messageText.length >= 10 && (data.channel === 'WHATSAPP' || data.channel === 'EMAIL')) {
+        try {
+          const result = await processMessageForCallbacks(
+            data.messageText,
+            {
+              tenantId: customer.tenantId,
+              customerId: customer.id,
+              invoiceId: invoiceId ?? null,
+              sourceContactEventId: contactEvent.id,
+            },
+            data.channel
+          );
+          if (result.promisesCreated > 0 || result.callbacksCreated > 0) {
+            fastify.log.info(
+              { eventId: contactEvent.id, ...result },
+              'Promesas/callbacks creados desde inbound unificado'
+            );
+          }
+        } catch (err: any) {
+          fastify.log.warn(
+            { eventId: contactEvent.id, error: err?.message },
+            'Error extrayendo callbacks/promesas en inbound unificado (no bloqueante)'
+          );
+        }
+      }
+
       return reply.status(200).send({
         status: 'ok',
         eventId: contactEvent.id,
