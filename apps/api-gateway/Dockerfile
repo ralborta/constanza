@@ -34,8 +34,12 @@ RUN pnpm --filter "@constanza/notifier" run build
 # Imagen final
 FROM node:20 AS runner
 
-# postgresql-client para ejecutar SQL (Debian)
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
+# postgresql-client para ejecutar SQL (Debian) + Chromium para render de facturas HTML/PDF/imagen
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    chromium \
+    fonts-liberation \
+  && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 

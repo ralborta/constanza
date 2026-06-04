@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { withTenantRls } from '../lib/tenant-rls.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 import * as XLSX from 'xlsx';
-import { exportInvoiceFile, InvoiceExportFormat, InvoiceExportMode } from '../services/invoice-export.js';
+import { exportInvoiceFile, InvoiceExportFormat, InvoiceExportMode } from '../services/invoice-export-browser.js';
 
 const querySchema = z.object({
   state: z.enum(['ABIERTA', 'PARCIAL', 'SALDADA']).optional(),
