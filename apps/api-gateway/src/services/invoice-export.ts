@@ -31,6 +31,7 @@ const TEMPLATE_WIDTH = 1240;
 const TEMPLATE_HEIGHT = 1754;
 
 const DEFAULT_TEMPLATE_PATH = new URL('../assets/factura-template.png', import.meta.url);
+const PROJECT_TEMPLATE_PATH = '/Users/ralborta/Constanza/assets/factura-template.png';
 const CURSOR_CHAT_ASSETS_PATH = '/Users/ralborta/.cursor/projects/Users-ralborta-Constanza/assets';
 
 function safeDate(value: Date): string {
@@ -291,7 +292,12 @@ async function loadTemplateImage(): Promise<Buffer | null> {
   try {
     return await readFile(DEFAULT_TEMPLATE_PATH);
   } catch {
-    // Fallback local: usar la ultima captura/plantilla enviada en el chat de Cursor.
+    // Fallback local de proyecto
+    try {
+      return await readFile(PROJECT_TEMPLATE_PATH);
+    } catch {
+      // Fallback local: usar la ultima captura/plantilla enviada en el chat de Cursor.
+    }
     try {
       const files = await readdir(CURSOR_CHAT_ASSETS_PATH);
       const candidates = files.filter((file) => /\.(png|jpg|jpeg|webp)$/i.test(file));
