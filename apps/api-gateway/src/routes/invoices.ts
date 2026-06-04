@@ -4,12 +4,17 @@ import { prisma } from '../lib/prisma.js';
 import { withTenantRls } from '../lib/tenant-rls.js';
 import { authenticate, requirePerfil } from '../middleware/auth.js';
 import * as XLSX from 'xlsx';
+import { exportInvoiceFile, InvoiceExportFormat } from '../services/invoice-export.js';
 
 const querySchema = z.object({
   state: z.enum(['ABIERTA', 'PARCIAL', 'SALDADA']).optional(),
   customer_id: z.string().uuid().optional(),
   fecha_vto_from: z.string().date().optional(),
   fecha_vto_to: z.string().date().optional(),
+});
+
+const exportInvoiceQuerySchema = z.object({
+  format: z.enum(['pdf', 'png', 'jpg']).optional().default('pdf'),
 });
 
 // Función para normalizar nombres de columnas de facturas
@@ -465,6 +470,71 @@ export async function invoiceRoutes(fastify: FastifyInstance) {
           ].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()),
         },
       };
+    }
+  );
+
+  // GET /invoices/:id/export - Descargar factura en PDF/PNG/JPG
+  fastify.get(
+    '/invoices/:id/export',
+    {
+      preHandler: [authenticate],
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const { id } = request.params as { id: string };
+      const query = exportInvoiceQuerySchema.parse(request.query);
+      const format = query.format as InvoiceExportFormat;
+
+      const invoice = await prisma.invoice.findFirst({
+        where: {
+          id,
+          tenantId: user.tenant_id,
+        },
+        include: {
+          tenant: {
+            select: {
+              name: true,
+            },
+          },
+          customer: {
+            select: {
+              razonSocial: true,
+              codigoUnico: true,
+              customerCuits: {
+                where: { isPrimary: true },
+                take: 1,
+                select: { cuit: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (!invoice) {
+        return reply.status(404).send({ error: 'Factura no encontrada' });
+      }
+
+      const exported = await exportInvoiceFile(
+        {
+          tenantName: invoice.tenant.name,
+          invoiceNumber: invoice.numero,
+          invoiceId: invoice.id,
+          customerName: invoice.customer.razonSocial,
+          customerCuit: invoice.customer.customerCuits[0]?.cuit ?? null,
+          customerCode: invoice.customer.codigoUnico,
+          amountCents: invoice.monto,
+          dueDate: invoice.fechaVto,
+          issuedAt: invoice.createdAt,
+          status: invoice.estado,
+        },
+        format
+      );
+
+      const safeNumber = invoice.numero.replace(/[^\w.-]/g, '_');
+      reply
+        .header('Content-Type', exported.contentType)
+        .header('Content-Disposition', `attachment; filename="factura-${safeNumber}.${exported.extension}"`)
+        .send(exported.buffer);
     }
   );
 

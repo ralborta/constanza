@@ -14,6 +14,13 @@ import { Button } from '@/components/ui/button';
 import { InvoiceChat } from '@/components/invoices/invoice-chat';
 import { InvoiceHistorialDrawer } from '@/components/invoices/invoice-historial-drawer';
 import { resolveInvoiceEstadoForDisplay } from '@/lib/invoice-estado';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface TimelineItem {
   type: 'CONTACT' | 'PROMISE' | 'PAYMENT';
@@ -178,6 +185,8 @@ export default function InvoiceDetailPage() {
   const invoiceId = params.id as string;
   const [isUpdatingSummary, setIsUpdatingSummary] = useState(false);
   const [historialOpen, setHistorialOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'png' | 'jpg'>('pdf');
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const { data, isLoading } = useQuery<InvoiceDetail>({
     queryKey: ['invoice', invoiceId],
@@ -211,6 +220,38 @@ export default function InvoiceDetailPage() {
       alert(`Error al actualizar resumen: ${error.response?.data?.message || error.message || 'Error desconocido'}`);
     } finally {
       setIsUpdatingSummary(false);
+    }
+  };
+
+  const handleDownloadInvoice = async () => {
+    if (!invoiceId) return;
+    setIsDownloading(true);
+    try {
+      const response = await api.get(`/v1/invoices/${invoiceId}/export`, {
+        params: { format: exportFormat },
+        responseType: 'blob',
+      });
+
+      const contentDisposition = response.headers['content-disposition'] as string | undefined;
+      const matchedName = contentDisposition?.match(/filename="?([^"]+)"?$/i)?.[1];
+      const fileName = matchedName ?? `factura-${invoiceId}.${exportFormat}`;
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error: any) {
+      console.error('Error descargando factura:', error);
+      alert(
+        error?.response?.data?.error ||
+          'No se pudo descargar la factura en el formato seleccionado.'
+      );
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -258,15 +299,36 @@ export default function InvoiceDetailPage() {
               <h1 className="text-2xl font-bold text-foreground font-mono">Factura {invoice.numero ?? '-'}</h1>
               <p className="text-sm text-muted-foreground mt-0.5">{customer.razonSocial}</p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setHistorialOpen(true)}
-              className="gap-2 text-sm"
-            >
-              <ClockCounterClockwise size={16} weight="duotone" className="mr-2" />
-              Historial completo
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={exportFormat} onValueChange={(value: 'pdf' | 'png' | 'jpg') => setExportFormat(value)}>
+                <SelectTrigger className="w-[120px] h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="png">PNG</SelectItem>
+                  <SelectItem value="jpg">JPG</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadInvoice}
+                disabled={isDownloading}
+                className="gap-2 text-sm"
+              >
+                {isDownloading ? 'Descargando...' : 'Descargar factura'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHistorialOpen(true)}
+                className="gap-2 text-sm"
+              >
+                <ClockCounterClockwise size={16} weight="duotone" className="mr-2" />
+                Historial completo
+              </Button>
+            </div>
           </div>
         </div>
 
