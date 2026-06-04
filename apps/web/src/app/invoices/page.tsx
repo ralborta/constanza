@@ -45,7 +45,7 @@ interface Invoice {
     id: string;
     razonSocial: string;
     cuit?: string;
-  };
+  } | null;
   numero: string;
   monto: number;
   montoAplicado: number;
@@ -187,8 +187,8 @@ export default function InvoicesPage() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div className="text-sm font-medium text-foreground">{invoice.customer.razonSocial}</div>
-                            {invoice.customer.cuit && (
+                            <div className="text-sm font-medium text-foreground">{invoice.customer?.razonSocial ?? 'Cliente sin datos'}</div>
+                            {invoice.customer?.cuit && (
                               <div className="text-xs text-muted-foreground">CUIT: {invoice.customer.cuit}</div>
                             )}
                           </div>
