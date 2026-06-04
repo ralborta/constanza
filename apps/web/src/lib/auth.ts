@@ -102,7 +102,9 @@ export function setToken(token: string) {
 
 export function getToken(): string | null {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('token');
+    const token = localStorage.getItem('token');
+    if (!token || token === 'null' || token === 'undefined') return null;
+    return token;
   }
   return null;
 }
@@ -131,8 +133,9 @@ export function getSessionUser(): User | null {
 }
 
 function decodeJwtPayload(token: string): { perfil?: string } | null {
+  if (!token || typeof token !== 'string') return null;
   const parts = token.split('.');
-  if (parts.length < 2) return null;
+  if (parts.length < 2 || !parts[1]) return null;
   const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
   const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
   try {
