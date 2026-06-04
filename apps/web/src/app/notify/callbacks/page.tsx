@@ -121,15 +121,16 @@ function channelBadge(channel?: string | null) {
 export default function MessageCallbacksPage() {
   const [status, setStatus] = useState('PENDING');
   const [channel, setChannel] = useState('WHATSAPP,EMAIL,VOICE');
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
-  const { data, isLoading, isError, refetch } = useQuery<{
+  const { data, isLoading, isFetching, isError, dataUpdatedAt } = useQuery<{
     callbacks: MessageCallback[];
     total: number;
   }>({
-    queryKey: ['notify-callbacks', status, channel],
+    queryKey: ['notify-callbacks', status, channel, refreshNonce],
     queryFn: async () => {
       const response = await api.get('/v1/notify/callbacks', {
-        params: { status, channel, limit: 100 },
+        params: { status, channel, limit: 100, _ts: refreshNonce || Date.now() },
       });
       return response.data;
     },
@@ -157,9 +158,16 @@ export default function MessageCallbacksPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Seguimientos y promesas detectadas desde respuestas por WhatsApp o email.
             </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Última actualización: {dataUpdatedAt ? safeDate(new Date(dataUpdatedAt).toISOString(), "d MMM, HH:mm:ss") : '-'}
+            </p>
           </div>
-          <Button variant="outline" onClick={() => refetch()}>
-            Actualizar
+          <Button
+            variant="outline"
+            disabled={isFetching}
+            onClick={() => setRefreshNonce(Date.now())}
+          >
+            {isFetching ? 'Actualizando...' : 'Actualizar'}
           </Button>
         </div>
 

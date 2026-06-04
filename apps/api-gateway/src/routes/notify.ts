@@ -57,8 +57,7 @@ export async function notifyRoutes(fastify: FastifyInstance) {
         tenantId: user.tenant_id,
         sourceContactEvent: {
           is: {
-            channel: { in: channels.length > 0 ? channels : ['WHATSAPP', 'EMAIL'] },
-            direction: 'INBOUND',
+            channel: { in: channels.length > 0 ? channels : ['WHATSAPP', 'EMAIL', 'VOICE'] },
           },
         },
       };

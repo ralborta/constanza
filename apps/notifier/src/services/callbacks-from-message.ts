@@ -23,6 +23,94 @@ export interface MessageExtraction {
   callbacks: ExtractedCallback[];
 }
 
+function normalizeText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function nextDateAtHour(daysAhead: number, hour = 10): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + Math.max(daysAhead, 0));
+  d.setHours(hour, 0, 0, 0);
+  return d;
+}
+
+function parseScheduledAtFromText(messageText: string): string | null {
+  const text = normalizeText(messageText);
+
+  if (text.includes('pasado manana')) {
+    return nextDateAtHour(2).toISOString();
+  }
+  if (text.includes('manana')) {
+    return nextDateAtHour(1).toISOString();
+  }
+
+  const daysMatch = text.match(/en\s+(\d{1,2})\s+dias?/i);
+  if (daysMatch) {
+    const days = Number(daysMatch[1] || 0);
+    if (days > 0) return nextDateAtHour(days).toISOString();
+  }
+
+  if (text.includes('proxima semana') || text.includes('semana que viene')) {
+    const now = new Date();
+    const day = now.getDay(); // 0: domingo ... 6: sabado
+    const daysUntilMonday = ((1 - day + 7) % 7) || 7;
+    return nextDateAtHour(daysUntilMonday).toISOString();
+  }
+
+  const weekdayMap: Record<string, number> = {
+    domingo: 0,
+    lunes: 1,
+    martes: 2,
+    miercoles: 3,
+    jueves: 4,
+    viernes: 5,
+    sabado: 6,
+  };
+  const weekdayMatch = text.match(/\b(domingo|lunes|martes|miercoles|jueves|viernes|sabado)\b/i);
+  if (weekdayMatch) {
+    const target = weekdayMap[weekdayMatch[1].toLowerCase()];
+    const now = new Date();
+    const day = now.getDay();
+    const daysAhead = ((target - day + 7) % 7) || 7;
+    return nextDateAtHour(daysAhead).toISOString();
+  }
+
+  if (text.includes('mas tarde') || text.includes('despues') || text.includes('luego')) {
+    return nextDateAtHour(1).toISOString();
+  }
+
+  return null;
+}
+
+function extractByRules(messageText: string): MessageExtraction {
+  const text = normalizeText(messageText);
+  const hasCallbackIntent = /(llam|contact|hablamos|escrib|mensaje|avisame|avisenme|comunica)/i.test(text);
+  const hasPaymentIntent = /(pago|pagar|transfer|abono|deuda|factura|cancelo)/i.test(text);
+  const scheduledAt = parseScheduledAtFromText(messageText) ?? (hasCallbackIntent ? nextDateAtHour(1).toISOString() : null);
+
+  const callbacks: ExtractedCallback[] = [];
+  if (scheduledAt && (hasCallbackIntent || hasPaymentIntent)) {
+    callbacks.push({
+      scheduledAt,
+      reason: messageText.slice(0, 180),
+      type: hasCallbackIntent ? 'CALLBACK' : 'FOLLOW_UP',
+    });
+  }
+
+  const promises: ExtractedPromise[] = [];
+  if (scheduledAt && hasPaymentIntent) {
+    promises.push({
+      dueDate: scheduledAt.slice(0, 10),
+      reason: messageText.slice(0, 180),
+    });
+  }
+
+  return { promises, callbacks };
+}
+
 /**
  * Extrae del texto de un mensaje (WhatsApp/Email) del cliente:
  * - Promesas de pago (fecha, monto) → core.promises
@@ -33,7 +121,7 @@ export async function extractCallbacksAndPromisesFromMessage(
   channel: 'WHATSAPP' | 'EMAIL'
 ): Promise<MessageExtraction> {
   if (!OPENAI_API_KEY || !messageText || messageText.length < 10) {
-    return { promises: [], callbacks: [] };
+    return extractByRules(messageText || '');
   }
 
   const today = new Date().toISOString().slice(0, 10);
@@ -101,10 +189,13 @@ Devuelve el JSON con promesas y callbacks extraídos.`;
       ? parsed.callbacks.filter((c: any) => c && c.scheduledAt && c.reason)
       : [];
 
+    if (promises.length === 0 && callbacks.length === 0) {
+      return extractByRules(messageText);
+    }
     return { promises, callbacks };
   } catch (err: any) {
     console.error('[callbacks-from-message] OpenAI extraction error:', err?.response?.data || err.message);
-    return { promises: [], callbacks: [] };
+    return extractByRules(messageText);
   }
 }
 
