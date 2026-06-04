@@ -16,7 +16,8 @@ export interface PoliticasCobranza {
 export function construirPromptDinamico(
   contexto: ContextoCobranza,
   mensaje: string,
-  politicas: PoliticasCobranza
+  politicas: PoliticasCobranza,
+  historialConversacion?: string
 ): string {
   const pol = politicas;
   const medios = Array.isArray(pol.medios_pago_disponibles) ? pol.medios_pago_disponibles.join(', ') : 'transferencia, tarjeta';
@@ -94,17 +95,26 @@ ACUERDO PREVIO: Ninguno
 `;
   }
 
+  const bloqueHistorial =
+    historialConversacion && historialConversacion.trim().length > 0
+      ? `
+HISTORIAL DE LA CONVERSACIÓN (más reciente al final):
+${historialConversacion.trim()}
+`
+      : '';
+
   const mensajeActual = `
+${bloqueHistorial}
 MENSAJE DEL CLIENTE:
 "${mensaje}"
 
 INSTRUCCIONES PARA ESTA RESPUESTA:
-1. Reconoce el contexto previo (si existe acuerdo)
-2. Responde de manera natural y conversacional
-3. Si el cliente pregunta sobre pago: propón opciones realistas, menciona medios disponibles, sugiere fechas viables
-4. Si el cliente incumple acuerdo: sé empático pero firme, propón renegociación, documenta el cambio
-5. Si es cliente nuevo: presenta opciones de pago, solicita datos de contacto
-6. Siempre cierra con una pregunta o llamada a acción clara
+1. Usa el HISTORIAL y el contexto previo: NO vuelvas a preguntar ni a explicar lo que ya se dijo o ya se le envió al cliente (por ejemplo, los datos de la factura si ya se los enviaste).
+2. Responde de manera natural y conversacional, dando continuidad a la charla.
+3. Si el cliente pregunta sobre pago: propón opciones realistas, menciona medios disponibles, sugiere fechas viables.
+4. Si el cliente incumple acuerdo: sé empático pero firme, propón renegociación, documenta el cambio.
+5. Si es cliente nuevo: presenta opciones de pago, solicita datos de contacto.
+6. Siempre cierra con una pregunta o llamada a acción clara.
 
 FORMATO DE RESPUESTA:
 - Máximo 3 párrafos

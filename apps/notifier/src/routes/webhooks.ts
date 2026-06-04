@@ -30,6 +30,47 @@ function firstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
+/**
+ * Parsea un timestamp entrante de forma segura. Si no es una fecha válida
+ * (ej. BuilderBot manda {date} en formato local no-ISO), usa la fecha actual.
+ */
+function parseTimestampSafe(ts: unknown): Date {
+  if (typeof ts === 'string' && ts.trim()) {
+    const d = new Date(ts);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
+/**
+ * Normaliza el historial de conversación que envía BuilderBot ({history}),
+ * que puede llegar como string o como array de turnos, a un texto plano.
+ */
+function normalizarHistorial(history: unknown): string | undefined {
+  if (!history) return undefined;
+  if (typeof history === 'string') {
+    const trimmed = history.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (Array.isArray(history)) {
+    const lines = history
+      .map((turn) => {
+        if (typeof turn === 'string') return turn.trim();
+        if (turn && typeof turn === 'object') {
+          const t = turn as Record<string, unknown>;
+          const role = (t.role ?? t.from ?? t.direction ?? '') as string;
+          const text = (t.body ?? t.text ?? t.message ?? t.content ?? '') as string;
+          if (!text) return '';
+          return role ? `${role}: ${text}` : String(text);
+        }
+        return '';
+      })
+      .filter((l) => l.length > 0);
+    return lines.length > 0 ? lines.join('\n') : undefined;
+  }
+  return undefined;
+}
+
 function extractMessageStatusPayload(body: any, channel: MessageChannel) {
   const data = body?.data ?? body?.message ?? body?.event ?? body ?? {};
   const externalMessageId = firstString(
@@ -148,6 +189,24 @@ async function correlateInvoice(
     }
   }
 
+  // 3b. Detectar si el texto menciona el número real de alguna factura del cliente
+  //     (ej. "Fact-2026-008"). Cubre formatos arbitrarios que no matchean CONST_/#.
+  if (messageText && messageText.trim().length > 0) {
+    const normalizedMsg = messageText.toLowerCase();
+    const customerInvoices = await prisma.invoice.findMany({
+      where: { customerId, tenantId },
+      select: { id: true, numero: true },
+    });
+    // Ordenar por longitud de número desc para preferir el match más específico.
+    const mentioned = customerInvoices
+      .filter((inv) => inv.numero && inv.numero.trim().length >= 3)
+      .sort((a, b) => (b.numero?.length ?? 0) - (a.numero?.length ?? 0))
+      .find((inv) => normalizedMsg.includes(inv.numero!.toLowerCase()));
+    if (mentioned) {
+      return mentioned.id;
+    }
+  }
+
   // 4. Buscar por In-Reply-To (para emails)
   if (metadata?.inReplyTo) {
     // Buscar el evento original por externalMessageId
@@ -193,8 +252,9 @@ const builderbotWebhookSchema = z.object({
     media_url: z.string().url().optional(), // URL del audio/imagen/documento
     transcription: z.string().optional(), // Transcripción del audio (si está disponible)
   }),
-  timestamp: z.string(), // ISO datetime
+  timestamp: z.string().optional(), // ISO datetime (opcional; BuilderBot puede mandar formatos no-ISO)
   message_id: z.string().optional(), // ID del mensaje en builderbot
+  history: z.union([z.string(), z.array(z.any())]).optional(), // Historial de conversación ({history} de BuilderBot)
 });
 
 // Schema para validar webhook de OpenAI Agent Builder (email inbound)
@@ -420,7 +480,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
           callDuration: data.metadata?.duration || undefined,
           callSummary: data.summary || undefined,
           payload: payload,
-          ts: new Date(data.timestamp || Date.now()),
+          ts: parseTimestampSafe(data.timestamp),
         },
       });
 
@@ -522,7 +582,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
           status: 'DELIVERED',
           externalMessageId: data.message_id || undefined,
           mediaUrl: data.message.media_url || undefined,
-          ts: new Date(data.timestamp || Date.now()),
+          ts: parseTimestampSafe(data.timestamp),
         },
       });
 
@@ -564,7 +624,8 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         try {
           const contexto = await obtenerContextoCliente(data.from);
           const politicas = await getPoliticasCobranza(customer.tenantId);
-          const prompt = construirPromptDinamico(contexto, messageText, politicas as any);
+          const historialConversacion = normalizarHistorial(data.history);
+          const prompt = construirPromptDinamico(contexto, messageText, politicas as any, historialConversacion);
           const { respuesta, tokens_usados, modelo } = await llamarOpenAICobranza(prompt);
           const payloadActual = (contactEvent.payload as Record<string, unknown>) || {};
           await prisma.contactEvent.update({
@@ -736,7 +797,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
           status: 'DELIVERED',
           externalMessageId: data.messageId || undefined,
           payload: payload,
-          ts: new Date(data.timestamp || Date.now()),
+          ts: parseTimestampSafe(data.timestamp),
         },
       });
 
