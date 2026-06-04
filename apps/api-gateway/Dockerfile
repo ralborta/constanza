@@ -67,6 +67,7 @@ RUN for i in 1 2 3 4 5; do \
 
 # Copiar el código compilado
 COPY --from=build /repo/apps/api-gateway/dist ./apps/api-gateway/dist
+COPY --from=build /repo/apps/api-gateway/src/assets ./apps/api-gateway/src/assets
 COPY --from=build /repo/apps/notifier/dist ./apps/notifier/dist
 
 ENV NODE_ENV=production
