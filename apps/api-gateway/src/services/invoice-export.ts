@@ -279,6 +279,14 @@ function buildTemplateOverlaySvg(payload: InvoiceExportPayload): string {
 }
 
 async function loadTemplateImage(): Promise<Buffer | null> {
+  // Prioridad 1: plantilla local fija del proyecto (evita usar rutas viejas en env).
+  try {
+    return await readFile(PROJECT_TEMPLATE_PATH);
+  } catch {
+    // continuar
+  }
+
+  // Prioridad 2: ruta explícita por variable de entorno.
   const customPath = process.env.INVOICE_TEMPLATE_IMAGE_PATH?.trim();
   if (customPath) {
     try {
@@ -287,15 +295,12 @@ async function loadTemplateImage(): Promise<Buffer | null> {
       return null;
     }
   }
+
+  // Prioridad 3: fallback empaquetado dentro de src/assets.
   try {
-    return await readFile(PROJECT_TEMPLATE_PATH);
+    return await readFile(DEFAULT_TEMPLATE_PATH);
   } catch {
-    // Fallback empaquetado dentro de src/assets.
-    try {
-      return await readFile(DEFAULT_TEMPLATE_PATH);
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
 
