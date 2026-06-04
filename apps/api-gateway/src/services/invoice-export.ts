@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import sharp from 'sharp';
+import { readFile } from 'node:fs/promises';
 
 export type InvoiceExportFormat = 'pdf' | 'png' | 'jpg';
 
@@ -21,6 +22,11 @@ type InvoiceExportResult = {
   contentType: string;
   extension: InvoiceExportFormat;
 };
+
+const TEMPLATE_WIDTH = 1240;
+const TEMPLATE_HEIGHT = 1754;
+
+const DEFAULT_TEMPLATE_PATH = new URL('../assets/factura-template.png', import.meta.url);
 
 function safeDate(value: Date): string {
   if (Number.isNaN(value.getTime())) return '';
@@ -81,7 +87,7 @@ function breakLine(value: string, maxChars: number): string[] {
   return lines;
 }
 
-function buildInvoiceSvg(payload: InvoiceExportPayload): string {
+function buildFallbackInvoiceSvg(payload: InvoiceExportPayload): string {
   const issuedAt = safeDate(payload.issuedAt);
   const dueDate = safeDate(payload.dueDate);
   const total = safeMoney(payload.amountCents);
@@ -96,7 +102,7 @@ function buildInvoiceSvg(payload: InvoiceExportPayload): string {
   const issuerLines = breakLine(tenantName, 34);
   const customerLines = breakLine(customerName, 38);
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1754" viewBox="0 0 1240 1754">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${TEMPLATE_WIDTH}" height="${TEMPLATE_HEIGHT}" viewBox="0 0 ${TEMPLATE_WIDTH} ${TEMPLATE_HEIGHT}">
   <rect width="1240" height="1754" fill="#ffffff"/>
   <rect x="20" y="20" width="1200" height="1714" fill="none" stroke="#202020" stroke-width="1.5"/>
   <rect x="20" y="20" width="1200" height="45" fill="#f0f0f0" stroke="#202020" stroke-width="1"/>
@@ -213,9 +219,85 @@ function buildInvoiceSvg(payload: InvoiceExportPayload): string {
 </svg>`;
 }
 
+function buildTemplateOverlaySvg(payload: InvoiceExportPayload): string {
+  const issuedAt = safeDate(payload.issuedAt);
+  const dueDate = safeDate(payload.dueDate);
+  const total = safeMoney(payload.amountCents);
+
+  const tenantName = notEmpty(payload.tenantName);
+  const customerName = notEmpty(payload.customerName);
+  const customerCuit = notEmpty(payload.customerCuit);
+  const invoiceNumber = notEmpty(payload.invoiceNumber);
+  const status = notEmpty(payload.status);
+
+  const productLines = breakLine('', 72);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${TEMPLATE_WIDTH}" height="${TEMPLATE_HEIGHT}" viewBox="0 0 ${TEMPLATE_WIDTH} ${TEMPLATE_HEIGHT}">
+    <!-- Limpieza puntual de valores para plantilla con datos de ejemplo -->
+    <rect x="175" y="130" width="340" height="34" fill="#ffffff"/>
+    <rect x="193" y="182" width="320" height="33" fill="#ffffff"/>
+    <rect x="934" y="132" width="255" height="35" fill="#ffffff"/>
+    <rect x="932" y="182" width="255" height="35" fill="#ffffff"/>
+    <rect x="330" y="316" width="120" height="28" fill="#ffffff"/>
+    <rect x="584" y="316" width="120" height="28" fill="#ffffff"/>
+    <rect x="1088" y="316" width="125" height="28" fill="#ffffff"/>
+    <rect x="96" y="367" width="160" height="31" fill="#ffffff"/>
+    <rect x="740" y="367" width="450" height="31" fill="#ffffff"/>
+    <rect x="862" y="562" width="325" height="34" fill="#ffffff"/>
+    <rect x="1122" y="562" width="90" height="34" fill="#ffffff"/>
+    <rect x="1118" y="1106" width="102" height="164" fill="#ffffff"/>
+
+    <!-- Solo datos dinámicos -->
+    <text x="196" y="154" font-size="16" font-family="Arial">${escapeXml(tenantName)}</text>
+    <text x="196" y="205" font-size="16" font-family="Arial">${escapeXml(tenantName)}</text>
+    <text x="934" y="155" font-size="16" font-family="Arial">${escapeXml(invoiceNumber)}</text>
+    <text x="934" y="206" font-size="16" font-family="Arial">${escapeXml(issuedAt)}</text>
+
+    <text x="330" y="336" font-size="14" font-family="Arial">${escapeXml(issuedAt)}</text>
+    <text x="584" y="336" font-size="14" font-family="Arial">${escapeXml(issuedAt)}</text>
+    <text x="1088" y="336" font-size="14" font-family="Arial">${escapeXml(dueDate)}</text>
+
+    <text x="96" y="388" font-size="14" font-family="Arial">${escapeXml(customerCuit)}</text>
+    ${svgTextLines(breakLine(customerName, 40), 740, 388, 14, 1.05)}
+
+    ${svgTextLines(productLines, 112, 585, 12, 1.12)}
+    <text x="862" y="584" font-size="14" font-family="Arial">${escapeXml(total)}</text>
+    <text x="1122" y="584" font-size="14" font-family="Arial">${escapeXml(total)}</text>
+    <text x="1122" y="1130" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
+    <text x="1122" y="1172" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
+    <text x="1122" y="1256" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
+
+    <text x="42" y="1630" font-size="12" font-family="Arial" fill="#444444">Ref: ${escapeXml(payload.invoiceId)} - ${escapeXml(status)}</text>
+  </svg>`;
+}
+
+async function loadTemplateImage(): Promise<Buffer | null> {
+  const customPath = process.env.INVOICE_TEMPLATE_IMAGE_PATH?.trim();
+  if (customPath) {
+    try {
+      return await readFile(customPath);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    return await readFile(DEFAULT_TEMPLATE_PATH);
+  } catch {
+    return null;
+  }
+}
+
 async function renderImage(payload: InvoiceExportPayload, format: 'png' | 'jpg'): Promise<Buffer> {
-  const svg = buildInvoiceSvg(payload);
-  const pipeline = sharp(Buffer.from(svg, 'utf-8')).flatten({ background: '#ffffff' });
+  const templateBuffer = await loadTemplateImage();
+  const overlaySvg = templateBuffer ? buildTemplateOverlaySvg(payload) : buildFallbackInvoiceSvg(payload);
+
+  const pipeline = templateBuffer
+    ? sharp(templateBuffer)
+        .resize(TEMPLATE_WIDTH, TEMPLATE_HEIGHT, { fit: 'fill' })
+        .composite([{ input: Buffer.from(overlaySvg, 'utf-8'), top: 0, left: 0 }])
+        .flatten({ background: '#ffffff' })
+    : sharp(Buffer.from(overlaySvg, 'utf-8')).flatten({ background: '#ffffff' });
+
   if (format === 'jpg') {
     return pipeline.jpeg({ quality: 92 }).toBuffer();
   }
