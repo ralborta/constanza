@@ -234,23 +234,22 @@ function buildTemplateOverlaySvg(payload: InvoiceExportPayload): string {
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${TEMPLATE_WIDTH}" height="${TEMPLATE_HEIGHT}" viewBox="0 0 ${TEMPLATE_WIDTH} ${TEMPLATE_HEIGHT}">
     <!-- Limpieza puntual de valores para plantilla con datos de ejemplo -->
-    <rect x="175" y="130" width="340" height="34" fill="#ffffff"/>
-    <rect x="193" y="182" width="320" height="33" fill="#ffffff"/>
-    <rect x="934" y="132" width="255" height="35" fill="#ffffff"/>
-    <rect x="932" y="182" width="255" height="35" fill="#ffffff"/>
+    <rect x="56" y="84" width="460" height="42" fill="#ffffff"/>
+    <rect x="193" y="182" width="325" height="34" fill="#ffffff"/>
+    <rect x="1136" y="132" width="78" height="35" fill="#ffffff"/>
+    <rect x="932" y="182" width="282" height="35" fill="#ffffff"/>
     <rect x="330" y="316" width="120" height="28" fill="#ffffff"/>
     <rect x="584" y="316" width="120" height="28" fill="#ffffff"/>
-    <rect x="1088" y="316" width="125" height="28" fill="#ffffff"/>
+    <rect x="1088" y="316" width="132" height="28" fill="#ffffff"/>
     <rect x="96" y="367" width="160" height="31" fill="#ffffff"/>
-    <rect x="740" y="367" width="450" height="31" fill="#ffffff"/>
-    <rect x="862" y="562" width="325" height="34" fill="#ffffff"/>
-    <rect x="1122" y="562" width="90" height="34" fill="#ffffff"/>
-    <rect x="1118" y="1106" width="102" height="164" fill="#ffffff"/>
+    <rect x="740" y="367" width="476" height="31" fill="#ffffff"/>
+    <rect x="862" y="562" width="358" height="34" fill="#ffffff"/>
+    <rect x="1122" y="562" width="98" height="34" fill="#ffffff"/>
+    <rect x="1090" y="1098" width="130" height="190" fill="#ffffff"/>
 
     <!-- Solo datos dinámicos -->
-    <text x="196" y="154" font-size="16" font-family="Arial">${escapeXml(tenantName)}</text>
     <text x="196" y="205" font-size="16" font-family="Arial">${escapeXml(tenantName)}</text>
-    <text x="934" y="155" font-size="16" font-family="Arial">${escapeXml(invoiceNumber)}</text>
+    <text x="1138" y="155" font-size="16" font-family="Arial">${escapeXml(invoiceNumber)}</text>
     <text x="934" y="206" font-size="16" font-family="Arial">${escapeXml(issuedAt)}</text>
 
     <text x="330" y="336" font-size="14" font-family="Arial">${escapeXml(issuedAt)}</text>
@@ -258,14 +257,14 @@ function buildTemplateOverlaySvg(payload: InvoiceExportPayload): string {
     <text x="1088" y="336" font-size="14" font-family="Arial">${escapeXml(dueDate)}</text>
 
     <text x="96" y="388" font-size="14" font-family="Arial">${escapeXml(customerCuit)}</text>
-    ${svgTextLines(breakLine(customerName, 40), 740, 388, 14, 1.05)}
+    ${svgTextLines(breakLine(customerName, 44), 740, 388, 14, 1.05)}
 
     ${svgTextLines(productLines, 112, 585, 12, 1.12)}
     <text x="862" y="584" font-size="14" font-family="Arial">${escapeXml(total)}</text>
-    <text x="1122" y="584" font-size="14" font-family="Arial">${escapeXml(total)}</text>
-    <text x="1122" y="1130" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
-    <text x="1122" y="1172" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
-    <text x="1122" y="1256" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
+    <text x="1126" y="584" font-size="14" font-family="Arial">${escapeXml(total)}</text>
+    <text x="1102" y="1130" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
+    <text x="1102" y="1172" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
+    <text x="1102" y="1256" font-size="14" font-family="Arial" font-weight="700">${escapeXml(total)}</text>
 
     <text x="42" y="1630" font-size="12" font-family="Arial" fill="#444444">Ref: ${escapeXml(payload.invoiceId)} - ${escapeXml(status)}</text>
   </svg>`;
