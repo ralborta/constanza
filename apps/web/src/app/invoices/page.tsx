@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { format } from 'date-fns';
@@ -51,6 +51,31 @@ interface Invoice {
   montoAplicado: number;
   fechaVto: string;
   estado: string;
+}
+
+class SectionErrorBoundary extends React.Component<
+  { fallback: React.ReactNode; children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { fallback: React.ReactNode; children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('[InvoicesPage] Section render error:', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
 }
 
 function normalizeInvoice(raw: any): Invoice | null {
@@ -133,8 +158,24 @@ export default function InvoicesPage() {
             <p className="text-sm text-muted-foreground mt-0.5">Gestión y seguimiento de todas las facturas</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <CreateInvoiceManualButton />
-            <UploadInvoiceButton />
+            <SectionErrorBoundary
+              fallback={
+                <Button variant="outline" disabled>
+                  Nueva factura (no disponible)
+                </Button>
+              }
+            >
+              <CreateInvoiceManualButton />
+            </SectionErrorBoundary>
+            <SectionErrorBoundary
+              fallback={
+                <Button variant="outline" disabled>
+                  Cargar desde Excel (no disponible)
+                </Button>
+              }
+            >
+              <UploadInvoiceButton />
+            </SectionErrorBoundary>
           </div>
         </div>
 
@@ -272,14 +313,16 @@ export default function InvoicesPage() {
           </CardContent>
         </Card>
 
-        <InvoiceHistorialDrawer
-          invoiceId={historialInvoiceId}
-          open={historialOpen}
-          onOpenChange={(open) => {
-            setHistorialOpen(open);
-            if (!open) setHistorialInvoiceId(null);
-          }}
-        />
+        <SectionErrorBoundary fallback={null}>
+          <InvoiceHistorialDrawer
+            invoiceId={historialInvoiceId}
+            open={historialOpen}
+            onOpenChange={(open) => {
+              setHistorialOpen(open);
+              if (!open) setHistorialInvoiceId(null);
+            }}
+          />
+        </SectionErrorBoundary>
       </div>
     </MainLayout>
   );
